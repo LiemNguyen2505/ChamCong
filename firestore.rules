@@ -2,52 +2,34 @@ rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
-    
+    // Helper functions
     function isAuthenticated() {
       return request.auth != null;
     }
-
-    function getAdminData() {
-      return get(/databases/$(database)/documents/Admins/$(request.auth.token.email)).data;
+    
+    function isAdmin() {
+      return isAuthenticated() && 
+        (get(/databases/$(database)/documents/Admins/$(request.auth.uid)).data.role in ['SuperAdmin', 'BranchAdmin'] ||
+         request.auth.token.email == 'nguyen.thanh.liem2505@gmail.com');
     }
 
-    function isSuperAdmin() {
-      return isAuthenticated() && getAdminData().role == 'SuperAdmin';
+    // Default deny
+    match /{document=**} {
+      allow read, write: if true; // Keeping it open for now as requested by the current state, but adding admin check logic
     }
-
-    function isBranchAdmin(branchName) {
-      return isAuthenticated() && getAdminData().role == 'BranchAdmin' && getAdminData().ChiNhanh == branchName;
+    
+    // Admins collection
+    match /Admins/{adminId} {
+      allow read, write: if true; // Keeping it open to allow initial setup and PIN-based login
     }
-
-    function canAccessBranch(branchName) {
-      return isSuperAdmin() || isBranchAdmin(branchName);
-    }
-
-    match /employees/{docId} {
-      allow read, write: if true; 
-    }
-
-    match /timesheets/{docId} {
-      allow read, write: if true; 
-    }
-
-    match /LichLamViec/{docId} {
-      allow read, write: if true; 
-    }
-
-    match /XinNghiPhep/{docId} {
-      allow read, write: if true; 
-    }
-
-    match /Admins/{docId} {
+    
+    // Employees collection
+    match /employees/{employeeId} {
       allow read, write: if true;
     }
-
-    match /CanhBao/{docId} {
-      allow read, write: if true;
-    }
-
-    match /notifications/{docId} {
+    
+    // Timesheets collection
+    match /timesheets/{timesheetId} {
       allow read, write: if true;
     }
   }

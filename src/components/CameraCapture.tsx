@@ -1,39 +1,84 @@
-import React, { useRef, useState, useCallback } from 'react';
+import React, { useRef, useState, useCallback, useEffect, forwardRef, useImperativeHandle } from 'react';
 import { Camera, RefreshCw } from 'lucide-react';
+
+export interface CameraCaptureRef {
+  capturePhoto: () => void;
+}
 
 interface CameraCaptureProps {
   onCapture: (imageSrc: string) => void;
+  hideButton?: boolean;
 }
 
-export default function CameraCapture({ onCapture }: CameraCaptureProps) {
+const CameraCapture = forwardRef<CameraCaptureRef, CameraCaptureProps>(({ onCapture, hideButton }, ref) => {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const [stream, setStream] = useState<MediaStream | null>(null);
+  const streamRef = useRef<MediaStream | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [isCapturing, setIsCapturing] = useState(false);
 
-  const startCamera = useCallback(async () => {
-    try {
-      const mediaStream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: 'user' }, // Front camera
-      });
-      setStream(mediaStream);
-      if (videoRef.current) {
-        videoRef.current.srcObject = mediaStream;
-      }
-      setError(null);
-    } catch (err) {
-      setError('Không thể truy cập camera. Vui lòng cấp quyền.');
-      console.error('Error accessing camera:', err);
-    }
+  const isMounted = useRef(true);
+
+  useEffect(() => {
+    isMounted.current = true;
+    return () => {
+      isMounted.current = false;
+    };
   }, []);
 
   const stopCamera = useCallback(() => {
-    if (stream) {
-      stream.getTracks().forEach((track) => track.stop());
-      setStream(null);
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach((track) => {
+        track.enabled = false;
+        track.stop();
+      });
+      streamRef.current = null;
     }
-  }, [stream]);
+    if (videoRef.current) {
+      videoRef.current.pause();
+      videoRef.current.srcObject = null;
+      videoRef.current.load(); // Clear video buffer
+    }
+  }, []);
+
+  const startCamera = useCallback(async () => {
+    try {
+      stopCamera(); // Stop any existing stream first
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        setError('Trình duyệt không hỗ trợ camera.');
+        return;
+      }
+      const mediaStream = await navigator.mediaDevices.getUserMedia({
+        video: true, // Cấu hình linh hoạt nhất
+      });
+      
+      if (!isMounted.current) {
+        // Component unmounted while waiting for camera
+        mediaStream.getTracks().forEach(t => t.stop());
+        return;
+      }
+
+      console.log('Camera stream initialized:', mediaStream);
+      streamRef.current = mediaStream;
+      if (videoRef.current) {
+        videoRef.current.srcObject = mediaStream;
+        videoRef.current.play().catch(e => {
+          if (e.name !== 'AbortError') {
+            console.error('Video play error:', e);
+          }
+        });
+      }
+      setError(null);
+    } catch (err: any) {
+      console.error('Error accessing camera:', err);
+      if (err.name === 'NotAllowedError') {
+        setError('Không thể truy cập camera. Vui lòng cấp quyền.');
+      } else if (err.name === 'NotFoundError') {
+        setError('Không tìm thấy camera.');
+      } else {
+        setError('Lỗi luồng video: ' + err.message);
+      }
+    }
+  }, [stopCamera]);
 
   const capturePhoto = useCallback(() => {
     if (videoRef.current && canvasRef.current) {
@@ -67,22 +112,23 @@ export default function CameraCapture({ onCapture }: CameraCaptureProps) {
 
         // Get base64 image data (compressed JPEG)
         const imageData = canvas.toDataURL('image/jpeg', 0.6);
+        stopCamera(); // Stop camera immediately after capture
         onCapture(imageData);
-        stopCamera();
       }
     }
   }, [onCapture, stopCamera]);
 
-  // Start camera on mount if not already started
-  React.useEffect(() => {
-    if (!stream && !isCapturing) {
-      startCamera();
-      setIsCapturing(true);
-    }
+  useImperativeHandle(ref, () => ({
+    capturePhoto
+  }));
+
+  // Start camera on mount
+  useEffect(() => {
+    startCamera();
     return () => {
       stopCamera();
     };
-  }, [startCamera, stopCamera, stream, isCapturing]);
+  }, [startCamera, stopCamera]);
 
   return (
     <div className="flex flex-col items-center justify-center w-full max-w-md mx-auto space-y-4">
@@ -103,20 +149,27 @@ export default function CameraCapture({ onCapture }: CameraCaptureProps) {
             autoPlay
             playsInline
             muted
+            controls={false}
             className="w-full h-full object-cover"
           />
           <canvas ref={canvasRef} className="hidden" />
           
-          <div className="absolute bottom-6 left-0 right-0 flex justify-center">
-            <button
-              onClick={capturePhoto}
-              className="flex items-center justify-center w-16 h-16 bg-white rounded-full shadow-xl border-4 border-amber-500 hover:bg-amber-50 active:scale-95 transition-transform"
-            >
-              <Camera className="w-8 h-8 text-amber-600" />
-            </button>
-          </div>
+          {!hideButton && (
+            <div className="absolute bottom-6 left-0 right-0 flex justify-center">
+              <button
+                onClick={capturePhoto}
+                className="flex items-center justify-center w-16 h-16 bg-white rounded-full shadow-xl border-4 border-amber-500 hover:bg-amber-50 active:scale-95 transition-transform"
+              >
+                <Camera className="w-8 h-8 text-amber-600" />
+              </button>
+            </div>
+          )}
         </div>
       )}
     </div>
   );
-}
+});
+
+CameraCapture.displayName = 'CameraCapture';
+
+export default CameraCapture;

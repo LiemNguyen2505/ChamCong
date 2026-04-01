@@ -1,5 +1,6 @@
 import React from 'react';
 import { HashRouter as Router, Routes, Route, useNavigate } from 'react-router-dom';
+import { Toaster } from 'react-hot-toast';
 import EmployeeView from './components/EmployeeView';
 import AdminView from './components/AdminView';
 import { Shield } from 'lucide-react';
@@ -20,6 +21,7 @@ export default function App() {
   return (
     <Router>
       <div className="min-h-screen bg-stone-50">
+        <Toaster position="top-right" />
         <Routes>
           <Route path="/" element={<EmployeeView />} />
           <Route path="/admin" element={<AdminView />} />

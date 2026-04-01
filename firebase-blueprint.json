@@ -60,15 +60,15 @@
       "description": "Lịch làm việc của nhân viên",
       "type": "object",
       "properties": {
-        "Ngay": { "type": "string" },
+        "date": { "type": "string" },
         "empId": { "type": "string" },
         "locationId": { "type": "string" },
-        "TenCa": { "type": "string" },
-        "GioBatDau": { "type": "string" },
-        "GioKetThuc": { "type": "string" },
-        "TrangThai": { "type": "string" }
+        "shiftName": { "type": "string" },
+        "startTime": { "type": "string" },
+        "endTime": { "type": "string" },
+        "status": { "type": "string" }
       },
-      "required": ["Ngay", "empId", "locationId", "TenCa", "GioBatDau", "GioKetThuc", "TrangThai"]
+      "required": ["date", "empId", "locationId", "startTime", "endTime", "status"]
     },
     "XinNghiPhep": {
       "title": "XinNghiPhep",
@@ -129,6 +129,24 @@
         "NoiDung": { "type": "string" }
       },
       "required": ["empId", "fullName", "locationId", "ThoiGian", "NoiDung"]
+    },
+    "ApprovalRequest": {
+      "title": "ApprovalRequest",
+      "description": "Yêu cầu cần admin duyệt (vào trễ, ra sớm, đổi ca, thoát app, nghỉ đột xuất...)",
+      "type": "object",
+      "properties": {
+        "empId": { "type": "string" },
+        "fullName": { "type": "string" },
+        "locationId": { "type": "string" },
+        "type": { "type": "string", "enum": ["checkin_early", "checkin_late", "checkout_different", "shift_swap", "app_exit", "off_sudden"] },
+        "status": { "type": "string", "enum": ["pending", "approved", "rejected"] },
+        "timestamp": { "type": "string", "format": "date-time" },
+        "details": { "type": "object" },
+        "note": { "type": "string" },
+        "adminId": { "type": "string" },
+        "processedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["empId", "fullName", "locationId", "type", "status", "timestamp"]
     }
   },
   "firestore": {
@@ -163,6 +181,10 @@
     "/SalaryHistory/{docId}": {
       "schema": { "$ref": "#/entities/SalaryHistory" },
       "description": "Lịch sử tăng lương"
+    },
+    "/ApprovalRequests/{docId}": {
+      "schema": { "$ref": "#/entities/ApprovalRequest" },
+      "description": "Yêu cầu cần duyệt"
     }
   }
 }

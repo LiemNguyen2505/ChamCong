@@ -1,27 +1,37 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { db } from '../firebase';
-import { collection, query, orderBy, onSnapshot, addDoc, serverTimestamp, deleteDoc, doc, updateDoc, getDocs, where, deleteField } from 'firebase/firestore';
+import { db, auth } from '../firebase';
+import { GoogleAuthProvider, signInWithPopup } from 'firebase/auth';
+import { collection, query, orderBy, onSnapshot, addDoc, serverTimestamp, deleteDoc, doc, updateDoc, getDocs, where, deleteField, getDoc, setDoc } from 'firebase/firestore';
 import { format } from 'date-fns';
 import { vi } from 'date-fns/locale';
-import { Search, Filter, LogOut, Users, Clock, Plus, Trash2, Edit2, ShieldCheck, Download, Calendar, CheckCircle, XCircle, AlertCircle, Eye, EyeOff, Bell, BellOff, TrendingUp, DollarSign, History as HistoryIcon, X } from 'lucide-react';
+import { Search, Filter, LogOut, Users, Clock, Plus, Trash2, Edit2, ShieldCheck, Download, Calendar, CheckCircle, XCircle, AlertCircle, Eye, EyeOff, Bell, BellOff, TrendingUp, DollarSign, History as HistoryIcon, X, Key, Smartphone, CheckCircle2, RefreshCw, Undo2, Save, Settings2 } from 'lucide-react';
 import toast, { Toaster } from 'react-hot-toast';
 import * as XLSX from 'xlsx';
 import { saveAs } from 'file-saver';
 import { differenceInMonths, parseISO, addMonths } from 'date-fns';
+import { SmartScheduleBuilder } from './SmartScheduleBuilder';
+import { PayrollAdjustmentModal } from './PayrollAdjustmentModal';
+import { HolidayConfigModal } from './HolidayConfigModal';
 
 interface Employee {
   id: string;
   empId: string;
   phone: string;
   fullName: string;
-  cccd: string;
-  hourlyRate: number;
+  hourlyRate: number; // Lương cơ bản
+  responsibilityBonus: number; // Thưởng trách nhiệm
   pinCode: string;
   isFirstLogin: boolean;
   joinDate: string;
+  locationId?: string;
+  locationIds?: string[];
   lastSalaryReviewDate?: any;
   createdAt?: any;
+  bankAccount?: string;
+  notes?: string;
+  defaultRole?: 'QUẦY' | 'PV';
+  cccd?: string;
 }
 
 interface SalaryHistory {
@@ -30,6 +40,8 @@ interface SalaryHistory {
   fullName: string;
   oldRate: number;
   newRate: number;
+  oldBonus: number;
+  newBonus: number;
   effectiveDate: any;
   reason: string;
   approvedBy: string;
@@ -61,6 +73,21 @@ interface Timesheet {
   totalHours: number;
   totalPay: number;
   createdByAdminId?: string;
+  incompleteTasks?: string[];
+  checkoutRequiresApproval?: boolean;
+  scheduledShiftEndTime?: string;
+  selectedShiftEndTime?: string;
+  note?: string;
+  isEndTimeModified?: boolean;
+}
+
+export interface ShiftTask {
+  id: string;
+  content: string;
+  isCompleted: boolean;
+  createdBy: 'manager' | 'employee';
+  isHandover?: boolean;
+  handoverApproved?: boolean;
 }
 
 interface WorkSchedule {
@@ -72,6 +99,8 @@ interface WorkSchedule {
   startTime: string;
   endTime: string;
   status: string;
+  roleInShift?: 'QUẦY' | 'PV' | 'BOTH';
+  tasks?: ShiftTask[];
 }
 
 interface LeaveRequest {
@@ -110,9 +139,44 @@ interface AppNotification {
   empId: string;
   fullName: string;
   locationId: string;
-  type: 'check_in' | 'check_out';
-  timestamp: string;
+  type: 'check_in' | 'check_out' | 'checkout_approval';
+  timestamp: any;
   message: string;
+  title?: string;
+  isRead?: boolean;
+  timesheetId?: string;
+}
+
+interface ApprovalRequest {
+  id: string;
+  empId: string;
+  fullName: string;
+  locationId: string;
+  type: 'checkin_early' | 'checkin_late' | 'checkout_different' | 'shift_swap' | 'app_exit' | 'off_sudden';
+  status: 'pending' | 'approved' | 'rejected';
+  timestamp: any;
+  details: any;
+  note?: string;
+  adminId?: string;
+  processedAt?: any;
+}
+
+export interface PayrollAdjustment {
+  id: string;
+  empId: string;
+  monthYear: string; // "yyyy-MM"
+  penalty: number;
+  returnRetainedSalary: number;
+  advanceSalary: number;
+  compensation: number;
+  note: string;
+}
+
+export interface HolidayConfig {
+  id: string;
+  date: string; // "yyyy-MM-dd"
+  name: string;
+  multiplier: number;
 }
 
 const SUPER_ADMIN: AdminAccount = {
@@ -129,7 +193,7 @@ export default function AdminView() {
   const [currentAdmin, setCurrentAdmin] = useState<AdminAccount | null>(null);
   const [password, setPassword] = useState('');
   const [showLoginPin, setShowLoginPin] = useState(false);
-  const [activeTab, setActiveTab] = useState<'chamcong' | 'nhanvien' | 'lichlamviec' | 'xinnghiphep' | 'admins' | 'canhbao' | 'lichsu'>('chamcong');
+  const [activeTab, setActiveTab] = useState<'chamcong' | 'nhanvien' | 'lichlamviec' | 'xinnghiphep' | 'admins' | 'canhbao' | 'lichsu' | 'duyetgio'>('chamcong');
   
   const [nhanViens, setNhanViens] = useState<Employee[]>([]);
   const [chamCongs, setChamCongs] = useState<Timesheet[]>([]);
@@ -140,7 +204,23 @@ export default function AdminView() {
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
   const [salaryHistories, setSalaryHistories] = useState<SalaryHistory[]>([]);
   const [auditLogs, setAuditLogs] = useState<AuditLog[]>([]);
+  const [approvalRequests, setApprovalRequests] = useState<ApprovalRequest[]>([]);
   const [showNotifications, setShowNotifications] = useState(false);
+
+  const getRequestTypeLabel = (type: string) => {
+    switch(type) {
+      case 'checkin_early': return { label: 'Vào ca sớm', color: 'text-blue-600 bg-blue-50' };
+      case 'checkin_late': return { label: 'Vào ca trễ', color: 'text-amber-600 bg-amber-50' };
+      case 'checkout_different': return { label: 'Ra ca khác giờ', color: 'text-cyan-600 bg-cyan-50' };
+      case 'shift_swap': return { label: 'Đổi ca', color: 'text-indigo-600 bg-indigo-50' };
+      case 'app_exit': return { label: 'Thoát Web App', color: 'text-red-600 bg-red-50' };
+      case 'off_sudden': return { label: 'Nghỉ đột xuất', color: 'text-rose-600 bg-rose-50' };
+      case 'late_early': return { label: 'ĐI TRỄ / VỀ SỚM', color: 'text-orange-600 bg-orange-50' };
+      case 'forgot_check': return { label: 'QUÊN CHẤM CÔNG', color: 'text-emerald-600 bg-emerald-50' };
+      case 'feedback': return { label: 'Góp ý', color: 'text-pink-600 bg-pink-50' };
+      default: return { label: type, color: 'text-gray-600 bg-gray-50' };
+    }
+  };
 
   const logAction = async (action: string, target: string, details: string) => {
     if (!currentAdmin) return;
@@ -159,31 +239,133 @@ export default function AdminView() {
   };
 
   const [loading, setLoading] = useState(false);
+  const [successMsg, setSuccessMsg] = useState<string | null>(null);
   const [filterBranch, setFilterBranch] = useState<string>('All');
   const [filterMonth, setFilterMonth] = useState(format(new Date(), 'yyyy-MM'));
+  const [payrollAdjustments, setPayrollAdjustments] = useState<PayrollAdjustment[]>([]);
+  const [holidays, setHolidays] = useState<HolidayConfig[]>([]);
+  const [showHolidayConfig, setShowHolidayConfig] = useState(false);
+  const [editingAdjustment, setEditingAdjustment] = useState<PayrollAdjustment | null>(null);
+
+  // Column visibility and inline editing state
+  const [visibleColumns, setVisibleColumns] = useState<Record<string, boolean>>({
+    stt: true,
+    name: true,
+    bank: false,
+    joinDate: false,
+    hours: true,
+    baseSalary: true,
+    responsibility: true,
+    holiday: true,
+    penalty: true,
+    retained: true,
+    returnRetained: true,
+    advance: true,
+    compensation: true,
+    actual: true,
+    note: true,
+  });
+  const [showColumnConfig, setShowColumnConfig] = useState(false);
+  const [localAdjustments, setLocalAdjustments] = useState<Record<string, Partial<PayrollAdjustment>>>({});
+  const [undoStack, setUndoStack] = useState<Record<string, Partial<PayrollAdjustment>>[]>([]);
+  const [isSavingPayroll, setIsSavingPayroll] = useState(false);
 
   // Salary Review Notifications
   const [salaryReviewNotifications, setSalaryReviewNotifications] = useState<{empId: string, fullName: string, nextReviewDate: string}[]>([]);
+
+  useEffect(() => {
+    const unsubscribe = auth.onAuthStateChanged(async (user) => {
+      if (user && user.email === 'nguyen.thanh.liem2505@gmail.com') {
+        setCurrentAdmin({
+          id: 'super',
+          email: user.email || 'admin',
+          pin: '******',
+          role: 'SuperAdmin',
+          locationIds: ['Góc Phố', 'Phố Xanh']
+        });
+        setIsAuthenticated(true);
+        setFilterBranch('All');
+      } else if (user) {
+        const q = query(collection(db, 'Admins'), where('email', '==', user.email));
+        const snapshot = await getDocs(q);
+        if (!snapshot.empty) {
+          const data = snapshot.docs[0].data();
+          const adminData = { 
+            id: snapshot.docs[0].id, 
+            ...data,
+            locationIds: Array.isArray(data.locationIds) ? data.locationIds : (data.locationId ? [data.locationId] : [])
+          } as AdminAccount;
+          setCurrentAdmin(adminData);
+          setIsAuthenticated(true);
+          setFilterBranch('All');
+        }
+      }
+    });
+    return () => unsubscribe();
+  }, []);
+
+  // Salary Review Notification Logic
+  useEffect(() => {
+    const checkSalaryReviews = async () => {
+      const today = new Date();
+      if (today.getDate() !== 3) return;
+
+      // Check if we already checked this month
+      const lastCheck = localStorage.getItem('lastSalaryReviewCheck');
+      if (lastCheck === format(today, 'yyyy-MM')) return;
+
+      for (const nv of nhanViens) {
+        const lastReviewDate = nv.lastSalaryReviewDate ? new Date(nv.lastSalaryReviewDate.toDate()) : new Date(nv.joinDate);
+        const monthsSinceReview = differenceInMonths(today, lastReviewDate);
+        if (monthsSinceReview >= 3) {
+          await addDoc(collection(db, 'AppNotifications'), {
+            empId: nv.empId,
+            fullName: nv.fullName,
+            locationId: 'All',
+            type: 'check_in', // Using existing type for now
+            timestamp: serverTimestamp(),
+            message: `Nhân viên ${nv.fullName} đã đến hạn xem xét tăng lương.`
+          });
+        }
+      }
+      localStorage.setItem('lastSalaryReviewCheck', format(today, 'yyyy-MM'));
+    };
+    checkSalaryReviews();
+  }, [nhanViens]);
+
+  // Admin Change PIN State
+  const [showChangeAdminPinModal, setShowChangeAdminPinModal] = useState(false);
+  const [newAdminPin, setNewAdminPin] = useState('');
+  const [confirmNewAdminPin, setConfirmNewAdminPin] = useState('');
 
   // Add Employee State
   const [showAddEmployeeModal, setShowAddEmployeeModal] = useState(false);
   const [showEditEmployeeModal, setShowEditEmployeeModal] = useState(false);
   const [editingEmployee, setEditingEmployee] = useState<Employee | null>(null);
-  const [showSalaryHistoryModal, setShowSalaryHistoryModal] = useState(false);
-  const [showIncreaseSalaryModal, setShowIncreaseSalaryModal] = useState(false);
+  // Salary Management State
+  const [showSalaryManagementModal, setShowSalaryManagementModal] = useState(false);
+  const [salaryManagementTab, setSalaryManagementTab] = useState<'history' | 'increase'>('history');
   const [selectedEmpForSalary, setSelectedEmpForSalary] = useState<Employee | null>(null);
+  const [newSalaryRateStr, setNewSalaryRateStr] = useState('');
   const [newSalaryRate, setNewSalaryRate] = useState<number>(0);
+  const [newBonusRateStr, setNewBonusRateStr] = useState('');
+  const [newBonusRate, setNewBonusRate] = useState<number>(0);
   const [salaryIncreaseReason, setSalaryIncreaseReason] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [newEmployee, setNewEmployee] = useState<Partial<Employee>>({
     empId: '',
     phone: '',
     fullName: '',
-    cccd: '',
     hourlyRate: 0,
+    responsibilityBonus: 0,
     joinDate: format(new Date(), 'yyyy-MM-dd'),
+    locationId: 'Góc Phố',
+    defaultRole: 'PV',
+    cccdLast4: ''
   });
   const [luongTheoGioStr, setLuongTheoGioStr] = useState('');
+  const [thuongTrachNhiemStr, setThuongTrachNhiemStr] = useState('');
+
 
   // Add Admin State
   const [showAddAdminModal, setShowAddAdminModal] = useState(false);
@@ -199,8 +381,34 @@ export default function AdminView() {
   });
   const [showAddAdminPin, setShowAddAdminPin] = useState(false);
 
+  // Confirmation Modal State
+  const [showConfirmModal, setShowConfirmModal] = useState(false);
+  const [confirmAction, setConfirmAction] = useState<{title: string, message: string, onConfirm: () => void} | null>(null);
+
+  const openConfirmModal = (title: string, message: string, onConfirm: () => void) => {
+    setConfirmAction({title, message, onConfirm});
+    setShowConfirmModal(true);
+  };
+
+  const closeConfirmModal = () => {
+    setShowConfirmModal(false);
+    setConfirmAction(null);
+  };
+
+
   // Manual Attendance State
-  const [showManualAttendanceModal, setShowManualAttendanceModal] = useState(false);
+  const [showAdjustModal, setShowAdjustModal] = useState(false);
+  const [selectedShift, setSelectedShift] = useState<any>(null);
+  const [newEndTime, setNewEndTime] = useState('');
+
+  const handleAdjustShift = async () => {
+    if (!selectedShift) return;
+    await updateDoc(doc(db, 'LichLamViec', selectedShift.id), {
+      plannedEndTime: newEndTime
+    });
+    setShowAdjustModal(false);
+    setSuccessMsg('Đã cập nhật giờ ra ca dự kiến!');
+  };
   const [showEditAttendanceModal, setShowEditAttendanceModal] = useState(false);
   const [editingAttendance, setEditingAttendance] = useState<Timesheet | null>(null);
   const [manualAttendance, setManualAttendance] = useState({
@@ -211,36 +419,188 @@ export default function AdminView() {
     locationId: 'Góc Phố'
   });
 
+  const handlePayrollChange = (empId: string, field: keyof PayrollAdjustment, value: any) => {
+    setUndoStack(prev => [...prev, localAdjustments]);
+    setLocalAdjustments(prev => ({
+      ...prev,
+      [empId]: {
+        ...prev[empId],
+        [field]: value
+      }
+    }));
+  };
+
+  const handleUndoPayroll = () => {
+    if (undoStack.length === 0) return;
+    const previousState = undoStack[undoStack.length - 1];
+    setLocalAdjustments(previousState);
+    setUndoStack(prev => prev.slice(0, -1));
+  };
+
+  const handleSavePayroll = async () => {
+    setIsSavingPayroll(true);
+    try {
+      for (const empId of Object.keys(localAdjustments)) {
+        const changes = localAdjustments[empId];
+        if (Object.keys(changes).length === 0) continue;
+        
+        const existingAdj = payrollAdjustments.find(a => a.empId === empId && a.monthYear === filterMonth);
+        const adjId = existingAdj?.id || `${empId}_${filterMonth}`;
+        
+        const dataToSave = {
+          empId,
+          monthYear: filterMonth,
+          penalty: changes.penalty !== undefined ? changes.penalty : (existingAdj?.penalty || 0),
+          returnRetainedSalary: changes.returnRetainedSalary !== undefined ? changes.returnRetainedSalary : (existingAdj?.returnRetainedSalary || 0),
+          advanceSalary: changes.advanceSalary !== undefined ? changes.advanceSalary : (existingAdj?.advanceSalary || 0),
+          compensation: changes.compensation !== undefined ? changes.compensation : (existingAdj?.compensation || 0),
+          note: changes.note !== undefined ? changes.note : (existingAdj?.note || ''),
+        };
+        
+        await setDoc(doc(db, 'PayrollAdjustments', adjId), dataToSave, { merge: true });
+      }
+      setLocalAdjustments({});
+      setUndoStack([]);
+      toast.success('Đã lưu bảng lương thành công!');
+    } catch (error) {
+      console.error("Error saving payroll:", error);
+      toast.error('Có lỗi xảy ra khi lưu bảng lương.');
+    } finally {
+      setIsSavingPayroll(false);
+    }
+  };
+
   // Handle Login
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     try {
-      if (password === SUPER_ADMIN.pin) {
-        setCurrentAdmin(SUPER_ADMIN);
+      const q = query(collection(db, 'Admins'), where('pin', '==', password));
+      const snapshot = await getDocs(q);
+      if (!snapshot.empty) {
+        const data = snapshot.docs[0].data();
+        const adminData = { 
+          id: snapshot.docs[0].id, 
+          ...data,
+          locationIds: Array.isArray(data.locationIds) ? data.locationIds : (data.locationId ? [data.locationId] : [])
+        } as AdminAccount;
+        setCurrentAdmin(adminData);
         setIsAuthenticated(true);
-      } else {
-        const q = query(collection(db, 'Admins'), where('pin', '==', password));
-        const snapshot = await getDocs(q);
-        if (!snapshot.empty) {
-          const data = snapshot.docs[0].data();
-          const adminData = { 
-            id: snapshot.docs[0].id, 
-            ...data,
-            locationIds: Array.isArray(data.locationIds) ? data.locationIds : (data.locationId ? [data.locationId] : [])
-          } as AdminAccount;
-          setCurrentAdmin(adminData);
+        setFilterBranch('All');
+      } else if (password === '123456') {
+        const superDoc = await getDoc(doc(db, 'Admins', 'super'));
+        if (!superDoc.exists()) {
+          setCurrentAdmin({
+            id: 'super',
+            email: 'admin',
+            pin: '123456',
+            role: 'SuperAdmin',
+            locationIds: ['Góc Phố', 'Phố Xanh']
+          });
           setIsAuthenticated(true);
           setFilterBranch('All');
         } else {
           toast.error('Mã PIN không đúng');
         }
+      } else {
+        toast.error('Mã PIN không đúng');
       }
     } catch (err) {
       console.error(err);
       toast.error('Lỗi đăng nhập');
     }
     setLoading(false);
+  };
+
+  const handleGoogleLogin = async () => {
+    setLoading(true);
+    try {
+      const provider = new GoogleAuthProvider();
+      const result = await signInWithPopup(auth, provider);
+      const user = result.user;
+      
+      // Check if this email is the owner or in the Admins collection
+      const ownerEmail = 'nguyen.thanh.liem2505@gmail.com';
+      
+      if (user.email === ownerEmail) {
+        setCurrentAdmin({
+          id: 'super',
+          email: user.email || 'admin',
+          pin: '******',
+          role: 'SuperAdmin',
+          locationIds: ['Góc Phố', 'Phố Xanh']
+        });
+        setIsAuthenticated(true);
+        setFilterBranch('All');
+        toast.success('Đăng nhập thành công với quyền Chủ sở hữu');
+        return;
+      }
+
+      const q = query(collection(db, 'Admins'), where('email', '==', user.email));
+      const snapshot = await getDocs(q);
+      
+      if (!snapshot.empty) {
+        const data = snapshot.docs[0].data();
+        const adminData = { 
+          id: snapshot.docs[0].id, 
+          ...data,
+          locationIds: Array.isArray(data.locationIds) ? data.locationIds : (data.locationId ? [data.locationId] : [])
+        } as AdminAccount;
+        setCurrentAdmin(adminData);
+        setIsAuthenticated(true);
+        setFilterBranch('All');
+        toast.success('Đăng nhập thành công');
+      } else {
+        toast.error('Email này không có quyền truy cập Admin');
+      }
+    } catch (err) {
+      console.error(err);
+      toast.error('Lỗi đăng nhập Google');
+    }
+    setLoading(false);
+  };
+
+  const handleChangeAdminPin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (newAdminPin !== confirmNewAdminPin) {
+      toast.error('Mã PIN xác nhận không khớp');
+      return;
+    }
+    if (newAdminPin.length < 4 || newAdminPin.length > 6) {
+      toast.error('Mã PIN phải từ 4 đến 6 chữ số');
+      return;
+    }
+    if (!currentAdmin) return;
+    
+    try {
+      if (currentAdmin.id === 'super') {
+        await setDoc(doc(db, 'Admins', 'super'), {
+          ...currentAdmin,
+          pin: newAdminPin
+        });
+      } else {
+        await updateDoc(doc(db, 'Admins', currentAdmin.id), {
+          pin: newAdminPin
+        });
+        
+        // Update employee PIN if this admin is also an employee
+        const emp = nhanViens.find(nv => nv.fullName === currentAdmin.email);
+        if (emp) {
+          await updateDoc(doc(db, 'employees', emp.id), {
+            pinCode: newAdminPin
+          });
+        }
+      }
+      
+      setCurrentAdmin({ ...currentAdmin, pin: newAdminPin });
+      toast.success('Đổi mã PIN thành công');
+      setShowChangeAdminPinModal(false);
+      setNewAdminPin('');
+      setConfirmNewAdminPin('');
+    } catch (error) {
+      console.error(error);
+      toast.error('Lỗi khi đổi mã PIN');
+    }
   };
 
   // Fetch Data
@@ -347,6 +707,29 @@ export default function AdminView() {
       });
     }
 
+    // Fetch ApprovalRequests
+    let qAR = query(collection(db, 'ApprovalRequests'), orderBy('timestamp', 'desc'));
+    if (branchFilter !== 'All') {
+      qAR = query(collection(db, 'ApprovalRequests'), where('locationId', '==', branchFilter), orderBy('timestamp', 'desc'));
+    } else if (currentAdmin.role !== 'SuperAdmin') {
+      qAR = query(collection(db, 'ApprovalRequests'), where('locationId', 'in', managedBranches), orderBy('timestamp', 'desc'));
+    }
+    const unsubAR = onSnapshot(qAR, (snap) => {
+      setApprovalRequests(snap.docs.map(d => ({ id: d.id, ...d.data() } as ApprovalRequest)));
+    });
+
+    // Fetch PayrollAdjustments
+    const qPayroll = query(collection(db, 'PayrollAdjustments'));
+    const unsubPayroll = onSnapshot(qPayroll, (snap) => {
+      setPayrollAdjustments(snap.docs.map(d => ({ id: d.id, ...d.data() } as PayrollAdjustment)));
+    });
+
+    // Fetch Holidays
+    const qHolidays = query(collection(db, 'Holidays'));
+    const unsubHolidays = onSnapshot(qHolidays, (snap) => {
+      setHolidays(snap.docs.map(d => ({ id: d.id, ...d.data() } as HolidayConfig)));
+    });
+
     return () => {
       unsubNV();
       unsubCC();
@@ -357,6 +740,9 @@ export default function AdminView() {
       unsubNotif();
       unsubSalary();
       unsubAudit();
+      unsubAR();
+      unsubPayroll();
+      unsubHolidays();
     };
   }, [isAuthenticated, currentAdmin, filterBranch]);
 
@@ -401,6 +787,7 @@ export default function AdminView() {
         'Sai Số GPS (m)': cc.SaiSoGPS,
         'Số Lần Rời App': cc.SoLanRoiApp || 0,
         'Phút Phạt': cc.PhutPhatRoiApp || 0,
+        'Nhiệm Vụ Chưa HT': cc.incompleteTasks ? cc.incompleteTasks.join(', ') : '',
         'Tổng Giờ Hợp Lệ': cc.totalHours ? cc.totalHours.toFixed(2) : '0',
         'Lương Theo Giờ': employee?.hourlyRate || 0,
         'Tổng Lương': (cc.totalPay || 0).toLocaleString() + 'đ'
@@ -423,17 +810,6 @@ export default function AdminView() {
       toast.error('Vui lòng nhập Họ Tên');
       return;
     }
-    if (!newEmployee.cccd) {
-      toast.error('Vui lòng nhập Số CCCD');
-      return;
-    }
-
-    // Check for duplicate CCCD
-    const isDuplicateCCCD = nhanViens.some(nv => nv.cccd === newEmployee.cccd);
-    if (isDuplicateCCCD) {
-      toast.error('Số CCCD đã tồn tại trong hệ thống');
-      return;
-    }
 
     // Check for duplicate Phone (if provided)
     if (newEmployee.phone) {
@@ -453,15 +829,14 @@ export default function AdminView() {
       const nextId = maxId + 1;
       const maNV = `NV${String(nextId).padStart(3, '0')}`;
       
-      // Default PIN: last 4 digits of phone, if no phone use last 4 digits of CCCD
+      // Default PIN: last 4 digits of phone
       let maPIN = '0000';
       if (newEmployee.phone && newEmployee.phone.length >= 4) {
         maPIN = newEmployee.phone.slice(-4);
-      } else if (newEmployee.cccd && newEmployee.cccd.length >= 4) {
-        maPIN = newEmployee.cccd.slice(-4);
       }
 
       const luong = parseInt(luongTheoGioStr.replace(/,/g, '')) || 0;
+      const thuong = parseInt(thuongTrachNhiemStr.replace(/,/g, '')) || 0;
 
       const employeeData = {
         ...newEmployee,
@@ -469,8 +844,11 @@ export default function AdminView() {
         empId: maNV,
         pinCode: maPIN,
         hourlyRate: luong,
+        responsibilityBonus: thuong,
         isFirstLogin: true,
         joinDate: newEmployee.joinDate || format(new Date(), 'yyyy-MM-dd'),
+        locationId: newEmployee.locationId || (currentAdmin?.role === 'SuperAdmin' ? 'Góc Phố' : currentAdmin?.locationIds?.[0] || 'Góc Phố'),
+        locationIds: [newEmployee.locationId || (currentAdmin?.role === 'SuperAdmin' ? 'Góc Phố' : currentAdmin?.locationIds?.[0] || 'Góc Phố')],
         createdAt: serverTimestamp()
       };
 
@@ -483,9 +861,10 @@ export default function AdminView() {
         empId: '',
         phone: '',
         fullName: '',
-        cccd: '',
         hourlyRate: 0,
         joinDate: format(new Date(), 'yyyy-MM-dd'),
+        locationId: currentAdmin?.role === 'SuperAdmin' ? 'Góc Phố' : currentAdmin?.locationIds?.[0] || 'Góc Phố',
+        defaultRole: 'PV'
       });
       setLuongTheoGioStr('');
       setShowAddEmployeeModal(false);
@@ -506,17 +885,6 @@ export default function AdminView() {
       toast.error('Vui lòng nhập Họ Tên');
       return;
     }
-    if (!editingEmployee.cccd) {
-      toast.error('Vui lòng nhập Số CCCD');
-      return;
-    }
-
-    // Check for duplicate CCCD (excluding current employee)
-    const isDuplicateCCCD = nhanViens.some(nv => nv.cccd === editingEmployee.cccd && nv.id !== editingEmployee.id);
-    if (isDuplicateCCCD) {
-      toast.error('Số CCCD đã tồn tại trong hệ thống');
-      return;
-    }
 
     // Check for duplicate Phone (if provided, excluding current employee)
     if (editingEmployee.phone) {
@@ -533,12 +901,22 @@ export default function AdminView() {
         ? parseInt(luongTheoGioStr.replace(/,/g, '')) || 0 
         : editingEmployee.hourlyRate;
       
+      const thuong = typeof thuongTrachNhiemStr === 'string' && thuongTrachNhiemStr !== ''
+        ? parseInt(thuongTrachNhiemStr.replace(/,/g, '')) || 0
+        : (editingEmployee.responsibilityBonus || 0);
+
       await updateDoc(doc(db, 'employees', editingEmployee.id), {
         fullName: editingEmployee.fullName,
         phone: editingEmployee.phone || '',
-        cccd: editingEmployee.cccd,
         hourlyRate: luong,
-        joinDate: editingEmployee.joinDate
+        responsibilityBonus: thuong,
+        joinDate: editingEmployee.joinDate,
+        locationId: editingEmployee.locationId || 'Góc Phố',
+        locationIds: [editingEmployee.locationId || 'Góc Phố'],
+        defaultRole: editingEmployee.defaultRole || 'PV',
+        bankAccount: editingEmployee.bankAccount || '',
+        notes: editingEmployee.notes || '',
+        cccd: editingEmployee.cccd || ''
       });
       await logAction('Sửa', 'Nhân viên', `Sửa thông tin nhân viên ${editingEmployee.fullName} (Mã: ${editingEmployee.empId})`);
       
@@ -546,6 +924,7 @@ export default function AdminView() {
       setShowEditEmployeeModal(false);
       setEditingEmployee(null);
       setLuongTheoGioStr('');
+      setThuongTrachNhiemStr('');
     } catch (error) {
       console.error(error);
       toast.error('Lỗi khi cập nhật nhân viên');
@@ -555,36 +934,45 @@ export default function AdminView() {
   };
 
   const handleResetPIN = async (nv: Employee) => {
-    if (window.confirm(`Bạn có chắc chắn muốn reset mã PIN của nhân viên ${nv.fullName} về 4 số cuối điện thoại?`)) {
-      try {
-        if (!nv.phone || nv.phone.length < 4) {
-          toast.error('Số điện thoại không hợp lệ để reset PIN');
-          return;
+    openConfirmModal(
+      'Reset PIN',
+      `Bạn có chắc chắn muốn reset mã PIN của nhân viên ${nv.fullName} về 4 số cuối điện thoại?`,
+      async () => {
+        try {
+          if (!nv.phone || nv.phone.length < 4) {
+            toast.error('Số điện thoại không hợp lệ để reset PIN');
+            return;
+          }
+          const newPin = nv.phone.slice(-4);
+          await updateDoc(doc(db, 'employees', nv.id), {
+            pinCode: newPin,
+            isFirstLogin: true
+          });
+          toast.success('Reset PIN thành công');
+        } catch (error) {
+          console.error('Reset PIN error:', error);
+          toast.error('Lỗi khi reset PIN');
         }
-        const newPin = nv.phone.slice(-4);
-        await updateDoc(doc(db, 'employees', nv.id), {
-          pinCode: newPin,
-          isFirstLogin: true
-        });
-        toast.success('Reset PIN thành công');
-      } catch (error) {
-        console.error(error);
-        toast.error('Lỗi khi reset PIN');
       }
-    }
+    );
   };
 
   const handleResetDevice = async (nv: Employee) => {
-    if (window.confirm(`Bạn có chắc muốn reset thiết bị cho nhân viên ${nv.fullName}? Nhân viên sẽ có thể đăng nhập trên thiết bị mới.`)) {
-      try {
-        await updateDoc(doc(db, 'employees', nv.id), {
-          deviceId: deleteField()
-        });
-        toast.success('Reset thiết bị thành công');
-      } catch (error) {
-        toast.error('Lỗi khi reset thiết bị');
+    openConfirmModal(
+      'Reset thiết bị',
+      `Bạn có chắc muốn reset thiết bị cho nhân viên ${nv.fullName}? Nhân viên sẽ có thể đăng nhập trên thiết bị mới.`,
+      async () => {
+        try {
+          await updateDoc(doc(db, 'employees', nv.id), {
+            deviceId: deleteField()
+          });
+          toast.success('Reset thiết bị thành công');
+        } catch (error) {
+          console.error('Reset Device error:', error);
+          toast.error('Lỗi khi reset thiết bị');
+        }
       }
-    }
+    );
   };
 
   const handleAddAdmin = async (e: React.FormEvent) => {
@@ -664,10 +1052,13 @@ export default function AdminView() {
     try {
       const oldRate = selectedEmpForSalary.hourlyRate;
       const newRate = newSalaryRate;
+      const oldBonus = selectedEmpForSalary.responsibilityBonus || 0;
+      const newBonus = newBonusRate;
       
       // 1. Update Employee
       await updateDoc(doc(db, 'employees', selectedEmpForSalary.id), {
         hourlyRate: newRate,
+        responsibilityBonus: newBonus,
         lastSalaryReviewDate: new Date().toISOString()
       });
       
@@ -677,16 +1068,19 @@ export default function AdminView() {
         fullName: selectedEmpForSalary.fullName,
         oldRate: oldRate,
         newRate: newRate,
-        effectiveDate: new Date().toISOString(),
+        oldBonus: oldBonus,
+        newBonus: newBonus,
+        effectiveDate: serverTimestamp(),
         reason: salaryIncreaseReason || 'Tăng lương định kỳ',
         approvedBy: currentAdmin?.email || 'Admin'
       });
-      await logAction('Tăng lương', 'Nhân viên', `Tăng lương cho ${selectedEmpForSalary.fullName} (Mã: ${selectedEmpForSalary.empId}) từ ${oldRate} lên ${newRate}`);
+      await logAction('Tăng lương', 'Nhân viên', `Tăng lương cho ${selectedEmpForSalary.fullName} (Mã: ${selectedEmpForSalary.empId}): Lương ${oldRate}->${newRate}, Thưởng ${oldBonus}->${newBonus}`);
       
       toast.success('Cập nhật lương thành công');
-      setShowIncreaseSalaryModal(false);
+      setShowSalaryManagementModal(false);
       setSelectedEmpForSalary(null);
       setNewSalaryRate(0);
+      setNewBonusRate(0);
       setSalaryIncreaseReason('');
     } catch (error) {
       console.error(error);
@@ -742,7 +1136,7 @@ export default function AdminView() {
       await logAction('Chấm công hộ', 'Chấm công', `Chấm công hộ cho ${employee.fullName} (Mã: ${manualAttendance.empId}) vào ngày ${manualAttendance.date}`);
 
       toast.success('Chấm công hộ thành công');
-      setShowManualAttendanceModal(false);
+      setShowEditAttendanceModal(false);
       setManualAttendance({
         empId: '',
         date: format(new Date(), 'yyyy-MM-dd'),
@@ -899,6 +1293,7 @@ export default function AdminView() {
                   className="w-full px-4 py-4 rounded-2xl bg-white/5 border border-white/10 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-center text-3xl tracking-[0.5em] text-white transition-all placeholder:text-white/20"
                   placeholder="••••••"
                   maxLength={6}
+                  minLength={4}
                   required
                 />
                 <button
@@ -921,6 +1316,25 @@ export default function AdminView() {
                   Đang xác thực...
                 </div>
               ) : 'Đăng nhập hệ thống'}
+            </button>
+
+            <div className="relative my-6">
+              <div className="absolute inset-0 flex items-center">
+                <div className="w-full border-t border-white/10"></div>
+              </div>
+              <div className="relative flex justify-center text-sm">
+                <span className="px-2 bg-slate-900 text-white/40">Hoặc</span>
+              </div>
+            </div>
+
+            <button
+              type="button"
+              onClick={handleGoogleLogin}
+              disabled={loading}
+              className="w-full bg-white/5 border border-white/10 text-white py-4 rounded-2xl font-semibold flex items-center justify-center gap-3 hover:bg-white/10 transition-all active:scale-[0.98] disabled:opacity-50"
+            >
+              <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" className="w-5 h-5" alt="Google" />
+              Đăng nhập bằng Google
             </button>
             <button
               type="button"
@@ -952,7 +1366,7 @@ export default function AdminView() {
                 <p className="text-[10px] uppercase tracking-[0.2em] text-blue-400 font-bold">Quản lý nhân sự</p>
               </div>
               <span className="ml-2 px-3 py-1 bg-white/10 text-blue-200 text-[10px] rounded-full font-bold border border-white/10 backdrop-blur-sm">
-                {currentAdmin?.role} - {currentAdmin?.locationIds?.join(', ')}
+                {currentAdmin?.email} | {currentAdmin?.role} - {currentAdmin?.locationIds?.join(', ')}
               </span>
             </div>
             <div className="flex items-center gap-4">
@@ -1040,15 +1454,23 @@ export default function AdminView() {
                           <div key={notif.id} className="p-4 border-b border-gray-50 hover:bg-gray-50 transition-colors">
                             <div className="flex justify-between items-start mb-1">
                               <span className={`text-[10px] font-bold uppercase px-1.5 py-0.5 rounded ${
-                                notif.type === 'check_in' ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700'
+                                notif.type === 'check_in' ? 'bg-emerald-100 text-emerald-700' : 
+                                notif.type === 'check_out' ? 'bg-rose-100 text-rose-700' :
+                                'bg-amber-100 text-amber-700'
                               }`}>
-                                {notif.type === 'check_in' ? 'Vào ca' : 'Ra ca'}
+                                {notif.type === 'check_in' ? 'Vào ca' : 
+                                 notif.type === 'check_out' ? 'Ra ca' : 
+                                 'Chờ Duyệt'}
                               </span>
                               <span className="text-[10px] text-gray-400">
-                                {format(new Date(notif.timestamp), 'HH:mm dd/MM')}
+                                {notif.timestamp ? format(
+                                  typeof notif.timestamp === 'string' ? new Date(notif.timestamp) : 
+                                  (notif.timestamp as any).toDate ? (notif.timestamp as any).toDate() : new Date(), 
+                                  'HH:mm dd/MM'
+                                ) : ''}
                               </span>
                             </div>
-                            <p className="text-sm text-gray-800 font-medium">{notif.fullName}</p>
+                            <p className="text-sm text-gray-800 font-medium">{notif.fullName || notif.title}</p>
                             <p className="text-xs text-gray-500">{notif.message}</p>
                           </div>
                         ))
@@ -1059,7 +1481,15 @@ export default function AdminView() {
               </div>
 
               <button
+                onClick={() => setShowChangeAdminPinModal(true)}
+                className="flex items-center gap-2 text-blue-200 hover:text-white transition-all bg-white/5 hover:bg-white/10 px-4 py-2 rounded-xl border border-white/10"
+              >
+                <Key className="w-5 h-5" />
+                <span className="hidden sm:inline font-bold">Đổi PIN</span>
+              </button>
+              <button
                 onClick={() => {
+                  auth.signOut();
                   setIsAuthenticated(false);
                   setCurrentAdmin(null);
                   setPassword('');
@@ -1089,6 +1519,20 @@ export default function AdminView() {
             Chấm công
           </button>
           <button
+            onClick={() => setActiveTab('duyetgio')}
+            className={`flex items-center gap-2 px-6 py-3 rounded-xl font-bold whitespace-nowrap transition-all shadow-sm ${
+              activeTab === 'duyetgio' ? 'bg-amber-600 text-white shadow-amber-200' : 'bg-white text-slate-600 hover:bg-slate-50'
+            }`}
+          >
+            <CheckCircle2 className="w-5 h-5" />
+            Chờ Duyệt
+            {chamCongs.filter(c => c.checkoutRequiresApproval).length > 0 && (
+              <span className="bg-red-500 text-white py-0.5 px-2 rounded-full text-xs font-black ml-1">
+                {chamCongs.filter(c => c.checkoutRequiresApproval).length}
+              </span>
+            )}
+          </button>
+          <button
             onClick={() => setActiveTab('nhanvien')}
             className={`flex items-center gap-2 px-6 py-3 rounded-xl font-bold whitespace-nowrap transition-all shadow-sm ${
               activeTab === 'nhanvien' ? 'bg-indigo-600 text-white shadow-indigo-200' : 'bg-white text-slate-600 hover:bg-slate-50'
@@ -1096,6 +1540,24 @@ export default function AdminView() {
           >
             <Users className="w-5 h-5" />
             Nhân viên
+          </button>
+          <button
+            onClick={() => setActiveTab('bangluong')}
+            className={`flex items-center gap-2 px-6 py-3 rounded-xl font-bold whitespace-nowrap transition-all shadow-sm ${
+              activeTab === 'bangluong' ? 'bg-green-600 text-white shadow-green-200' : 'bg-white text-slate-600 hover:bg-slate-50'
+            }`}
+          >
+            <DollarSign className="w-5 h-5" />
+            Bảng Lương
+          </button>
+          <button
+            onClick={() => setActiveTab('vipham')}
+            className={`flex items-center gap-2 px-6 py-3 rounded-xl font-bold whitespace-nowrap transition-all shadow-sm ${
+              activeTab === 'vipham' ? 'bg-red-600 text-white shadow-red-200' : 'bg-white text-slate-600 hover:bg-slate-50'
+            }`}
+          >
+            <AlertCircle className="w-5 h-5" />
+            Vi phạm
           </button>
           <button
             onClick={() => setActiveTab('lichlamviec')}
@@ -1146,13 +1608,348 @@ export default function AdminView() {
 
         {/* Tab Content */}
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+          {activeTab === 'duyetgio' && (
+            <div className="p-6">
+              {/* Combined Approval Requests Table */}
+              <div className="space-y-6">
+                {/* Pending Requests */}
+                <div className="bg-white rounded-xl border border-gray-200 overflow-hidden shadow-sm">
+                  <div className="px-4 py-3 bg-amber-50 border-b border-amber-100 flex items-center gap-2">
+                    <Clock className="w-5 h-5 text-amber-600" />
+                    <h2 className="text-lg font-bold text-amber-900">Yêu cầu chờ duyệt</h2>
+                  </div>
+                  {approvalRequests.filter(r => r.status === 'pending').length === 0 ? (
+                    <div className="p-8 text-center text-gray-500 text-sm">
+                      Không có yêu cầu nào đang chờ duyệt.
+                    </div>
+                  ) : (
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-sm text-left">
+                        <thead className="text-xs text-gray-500 uppercase bg-gray-50">
+                          <tr>
+                            <th className="px-4 py-3 w-12">STT</th>
+                            <th className="px-4 py-3">Nhân viên</th>
+                            <th className="px-4 py-3">Loại yêu cầu</th>
+                            <th className="px-4 py-3">Thời gian</th>
+                            <th className="px-4 py-3">Chi tiết</th>
+                            <th className="px-4 py-3 text-right">Thao tác</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {approvalRequests.filter(r => r.status === 'pending').map((req, index) => {
+                            const typeInfo = getRequestTypeLabel(req.type);
+                            
+                            return (
+                              <tr key={req.id} className="border-b hover:bg-gray-50">
+                                <td className="px-4 py-3 text-gray-500 font-medium">{index + 1}</td>
+                                <td className="px-4 py-3">
+                                  <div className="font-medium text-gray-900">{req.fullName}</div>
+                                  <div className="text-xs text-gray-500">{req.locationId}</div>
+                                </td>
+                                <td className="px-4 py-3">
+                                  <span className={`px-2 py-1 rounded-full text-[10px] font-bold uppercase ${typeInfo.color}`}>
+                                    {typeInfo.label}
+                                  </span>
+                                </td>
+                                <td className="px-4 py-3 text-gray-500">
+                                  {req.timestamp ? format(new Date(req.timestamp.toDate ? req.timestamp.toDate() : req.timestamp), 'HH:mm dd/MM') : '-'}
+                                </td>
+                                <td className="px-4 py-3 text-gray-600 text-xs">
+                                  {req.type === 'checkout_different' && (
+                                    <div>
+                                      Lịch: {req.details?.scheduledEndTime} → Thực tế: {req.details?.actualEndTime}
+                                    </div>
+                                  )}
+                                  {(req.type === 'checkin_late' || req.type === 'checkin_early') && (
+                                    <div>
+                                      Lịch: {req.details?.scheduledStartTime} → Thực tế: {req.details?.actualStartTime}
+                                      {req.details?.lateMinutes > 0 && <span className="text-red-500 ml-1">(Trễ {req.details.lateMinutes}p)</span>}
+                                    </div>
+                                  )}
+                                  {req.type === 'shift_swap' && (
+                                    <div>
+                                      Đổi với: {req.details?.swapWithEmpId} vào ngày {req.details?.requestDate || req.details?.swapDate}
+                                      {req.details?.requestTime && <div className="font-bold">Ca: {req.details.requestTime}</div>}
+                                    </div>
+                                  )}
+                                  {req.type === 'off_sudden' && (
+                                    <div>
+                                      Xin nghỉ ngày {req.details?.requestDate || 'hôm nay'}
+                                      {req.details?.requestTime && <div className="font-bold">Ca: {req.details.requestTime}</div>}
+                                    </div>
+                                  )}
+                                  {req.type === 'late_early' && (
+                                    <div>
+                                      Thời gian xin: <span className="font-bold">{req.details?.requestTime}</span> vào ngày {req.details?.requestDate}
+                                    </div>
+                                  )}
+                                  {req.type === 'forgot_check' && (
+                                    <div>
+                                      Quên chấm công ngày {req.details?.requestDate}: 
+                                      <div className="font-bold mt-0.5 text-emerald-700">
+                                        Giờ vào: {req.details?.requestTime || '--:--'} → Giờ ra: {req.details?.requestSubTime || '--:--'}
+                                      </div>
+                                    </div>
+                                  )}
+                                  {req.type === 'app_exit' && (
+                                    <div>Xin thoát App sử dụng điện thoại</div>
+                                  )}
+                                  {req.note && <div className="italic mt-1">"{req.note}"</div>}
+                                </td>
+                                <td className="px-4 py-3 text-right space-x-2">
+                                  <button
+                                    onClick={() => openConfirmModal(
+                                      'Xác nhận duyệt',
+                                      `Bạn có chắc chắn muốn duyệt yêu cầu ${typeInfo.label.toLowerCase()} của ${req.fullName}?`,
+                                      async () => {
+                                        try {
+                                          await updateDoc(doc(db, 'ApprovalRequests', req.id), {
+                                            status: 'approved',
+                                            adminId: currentAdmin?.email,
+                                            processedAt: serverTimestamp()
+                                          });
+                                          
+                                          // Perform specific actions based on type
+                                          if (req.type === 'checkout_different' && req.details?.timesheetId) {
+                                            await updateDoc(doc(db, 'timesheets', req.details.timesheetId), {
+                                              checkoutRequiresApproval: false,
+                                              checkoutApprovedBy: currentAdmin?.email,
+                                              checkoutApprovedAt: serverTimestamp()
+                                            });
+                                          } else if ((req.type === 'checkin_late' || req.type === 'checkin_early') && req.details?.timesheetId) {
+                                            await updateDoc(doc(db, 'timesheets', req.details.timesheetId), {
+                                              isLateExcused: true,
+                                              latePenaltyMinutes: 0,
+                                              checkinApprovedBy: currentAdmin?.email,
+                                              checkinApprovedAt: serverTimestamp()
+                                            });
+                                          } else if (req.type === 'off_sudden') {
+                                            const todayStr = format(new Date(), 'yyyy-MM-dd');
+                                            const q = query(collection(db, 'LichLamViec'), where('empId', '==', req.empId), where('date', '==', todayStr));
+                                            const snap = await getDocs(q);
+                                            for (const d of snap.docs) {
+                                              await updateDoc(doc(db, 'LichLamViec', d.id), { isOff: true });
+                                            }
+                                          } else if (req.type === 'shift_swap' && req.details?.swapWithEmpId && req.details?.swapDate) {
+                                            const dateStr = req.details.swapDate;
+                                            const q1 = query(collection(db, 'LichLamViec'), where('empId', '==', req.empId), where('date', '==', dateStr));
+                                            const q2 = query(collection(db, 'LichLamViec'), where('empId', '==', req.details.swapWithEmpId), where('date', '==', dateStr));
+                                            
+                                            const [snap1, snap2] = await Promise.all([getDocs(q1), getDocs(q2)]);
+                                            
+                                            for (const d of snap1.docs) {
+                                              await updateDoc(doc(db, 'LichLamViec', d.id), { empId: req.details.swapWithEmpId });
+                                            }
+                                            for (const d of snap2.docs) {
+                                              await updateDoc(doc(db, 'LichLamViec', d.id), { empId: req.empId });
+                                            }
+                                          }
+                                          
+                                          await logAction('Duyệt yêu cầu', req.fullName, `Duyệt ${typeInfo.label} cho ${req.fullName}`);
+                                          toast.success('Đã duyệt thành công!');
+                                        } catch (error) {
+                                          console.error(error);
+                                          toast.error('Lỗi khi duyệt yêu cầu');
+                                        }
+                                      }
+                                    )}
+                                    className="px-3 py-1.5 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 text-xs font-bold transition-colors"
+                                  >
+                                    Duyệt
+                                  </button>
+                                  <button
+                                    onClick={() => openConfirmModal(
+                                      'Xác nhận từ chối',
+                                      `Bạn có chắc chắn muốn từ chối yêu cầu ${typeInfo.label.toLowerCase()} của ${req.fullName}?`,
+                                      async () => {
+                                        try {
+                                          await updateDoc(doc(db, 'ApprovalRequests', req.id), {
+                                            status: 'rejected',
+                                            adminId: currentAdmin?.email,
+                                            processedAt: serverTimestamp()
+                                          });
+                                          
+                                          // Perform specific actions based on type (e.g., revert timesheet)
+                                          if (req.type === 'checkout_different' && req.details?.timesheetId) {
+                                            const tsDoc = await getDoc(doc(db, 'timesheets', req.details.timesheetId));
+                                            if (tsDoc.exists()) {
+                                              const log = tsDoc.data();
+                                              const emp = nhanViens.find(e => e.empId === log.empId);
+                                              const checkInTime = new Date(log.checkInTime);
+                                              const [schedH, schedM] = (log.scheduledShiftEndTime || '00:00').split(':').map(Number);
+                                              const checkInMinutes = checkInTime.getHours() * 60 + checkInTime.getMinutes();
+                                              const schedMinutes = schedH * 60 + schedM;
+                                              let actualDurationMinutes = schedMinutes - checkInMinutes;
+                                              const totalHours = Math.max(0, actualDurationMinutes / 60);
+                                              const totalPay = totalHours * (emp?.hourlyRate || 0);
+
+                                              await updateDoc(doc(db, 'timesheets', req.details.timesheetId), {
+                                                checkoutRequiresApproval: false,
+                                                selectedShiftEndTime: log.scheduledShiftEndTime,
+                                                isEndTimeModified: false,
+                                                totalHours,
+                                                totalPay,
+                                                checkoutRejectedBy: currentAdmin?.email,
+                                                checkoutRejectedAt: serverTimestamp()
+                                              });
+                                            }
+                                          }
+                                          
+                                          await logAction('Từ chối yêu cầu', req.fullName, `Từ chối ${typeInfo.label} cho ${req.fullName}`);
+                                          toast.success('Đã từ chối yêu cầu');
+                                        } catch (error) {
+                                          console.error(error);
+                                          toast.error('Lỗi khi từ chối yêu cầu');
+                                        }
+                                      }
+                                    )}
+                                    className="px-3 py-1.5 bg-red-600 text-white rounded-lg hover:bg-red-700 text-xs font-bold transition-colors"
+                                  >
+                                    Từ chối
+                                  </button>
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </div>
+
+                {/* Processed Requests (History) */}
+                <div className="bg-white rounded-xl border border-gray-200 overflow-hidden shadow-sm">
+                  <div className="px-4 py-3 bg-gray-50 border-b border-gray-100 flex items-center gap-2">
+                    <HistoryIcon className="w-4 h-4 text-gray-600" />
+                    <h3 className="font-bold text-gray-900 text-sm">Lịch sử phê duyệt</h3>
+                  </div>
+                  {approvalRequests.filter(r => r.status !== 'pending').length === 0 ? (
+                    <div className="p-8 text-center text-gray-500 text-sm">
+                      Chưa có lịch sử phê duyệt.
+                    </div>
+                  ) : (
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-sm text-left">
+                        <thead className="text-xs text-gray-500 uppercase bg-gray-50">
+                          <tr>
+                            <th className="px-4 py-3">Nhân viên</th>
+                            <th className="px-4 py-3">Loại</th>
+                            <th className="px-4 py-3">Kết quả</th>
+                            <th className="px-4 py-3">Người duyệt</th>
+                            <th className="px-4 py-3 text-right">Thao tác</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {approvalRequests.filter(r => r.status !== 'pending').slice(0, 10).map(req => {
+                            return (
+                              <tr key={req.id} className="border-b hover:bg-gray-50 opacity-75">
+                                <td className="px-4 py-3">
+                                  <div className="font-medium text-gray-700">{req.fullName}</div>
+                                  <div className="text-[10px] text-gray-400">
+                                    {req.processedAt ? format(new Date(req.processedAt.toDate ? req.processedAt.toDate() : req.processedAt), 'HH:mm dd/MM') : '-'}
+                                  </div>
+                                </td>
+                                <td className="px-4 py-3 text-xs text-gray-500">
+                                  {getRequestTypeLabel(req.type).label}
+                                </td>
+                                <td className="px-4 py-3">
+                                  <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ${
+                                    req.status === 'approved' ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'
+                                  }`}>
+                                    {req.status === 'approved' ? 'Đã duyệt' : 'Từ chối'}
+                                  </span>
+                                </td>
+                                <td className="px-4 py-3 text-xs text-gray-500">
+                                  {req.adminId}
+                                </td>
+                                <td className="px-4 py-3 text-right">
+                                  <button
+                                    onClick={() => openConfirmModal(
+                                      'Xác nhận hoàn tác',
+                                      'Bạn có chắc chắn muốn hoàn tác hành động này? Yêu cầu sẽ quay lại trạng thái Chờ duyệt.',
+                                      async () => {
+                                        try {
+                                          await updateDoc(doc(db, 'ApprovalRequests', req.id), {
+                                            status: 'pending',
+                                            adminId: deleteField(),
+                                            processedAt: deleteField()
+                                          });
+                                          
+                                          // Revert specific actions if needed
+                                          if (req.type === 'checkout_different' && req.details?.timesheetId) {
+                                            await updateDoc(doc(db, 'timesheets', req.details.timesheetId), {
+                                              checkoutRequiresApproval: true,
+                                              checkoutApprovedBy: deleteField(),
+                                              checkoutApprovedAt: deleteField(),
+                                              checkoutRejectedBy: deleteField(),
+                                              checkoutRejectedAt: deleteField()
+                                            });
+                                          } else if ((req.type === 'checkin_late' || req.type === 'checkin_early') && req.details?.timesheetId) {
+                                            const lateMinutes = req.details?.lateMinutes || 0;
+                                            const latePenaltyMinutes = lateMinutes * 3;
+                                            await updateDoc(doc(db, 'timesheets', req.details.timesheetId), {
+                                              isLateExcused: false,
+                                              latePenaltyMinutes,
+                                              checkinApprovedBy: deleteField(),
+                                              checkinApprovedAt: deleteField()
+                                            });
+                                          } else if (req.type === 'off_sudden') {
+                                            const dateStr = format(new Date(req.timestamp.toDate ? req.timestamp.toDate() : req.timestamp), 'yyyy-MM-dd');
+                                            const q = query(collection(db, 'LichLamViec'), where('empId', '==', req.empId), where('date', '==', dateStr));
+                                            const snap = await getDocs(q);
+                                            for (const d of snap.docs) {
+                                              await updateDoc(doc(db, 'LichLamViec', d.id), { isOff: false });
+                                            }
+                                          } else if (req.type === 'shift_swap' && req.details?.swapWithEmpId && req.details?.swapDate) {
+                                            // Revert swap: swap back
+                                            const dateStr = req.details.swapDate;
+                                            const q1 = query(collection(db, 'LichLamViec'), where('empId', '==', req.empId), where('date', '==', dateStr));
+                                            const q2 = query(collection(db, 'LichLamViec'), where('empId', '==', req.details.swapWithEmpId), where('date', '==', dateStr));
+                                            
+                                            const [snap1, snap2] = await Promise.all([getDocs(q1), getDocs(q2)]);
+                                            
+                                            for (const d of snap1.docs) {
+                                              await updateDoc(doc(db, 'LichLamViec', d.id), { empId: req.details.swapWithEmpId });
+                                            }
+                                            for (const d of snap2.docs) {
+                                              await updateDoc(doc(db, 'LichLamViec', d.id), { empId: req.empId });
+                                            }
+                                          }
+                                          
+                                          await logAction('Hoàn tác phê duyệt', req.fullName, `Hoàn tác phê duyệt ${req.type} cho ${req.fullName}`);
+                                          toast.success('Đã hoàn tác thành công');
+                                        } catch (error) {
+                                          console.error(error);
+                                          toast.error('Lỗi khi hoàn tác');
+                                        }
+                                      }
+                                    )}
+                                    className="text-amber-600 hover:text-amber-700 text-xs font-bold flex items-center gap-1 justify-end ml-auto"
+                                  >
+                                    <RefreshCw className="w-3 h-3" />
+                                    Hoàn tác
+                                  </button>
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+
+
           {activeTab === 'chamcong' && (
             <div className="p-6">
               <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
                 <div className="flex items-center gap-4">
-                  <h2 className="text-lg font-bold text-gray-900">Lịch sử chấm công</h2>
+                  <h2 className="text-lg font-bold text-slate-900">Lịch sử chấm công</h2>
                   <button
-                    onClick={() => setShowManualAttendanceModal(true)}
+                    onClick={() => setShowEditAttendanceModal(true)}
                     className="flex items-center gap-2 px-3 py-1.5 bg-amber-100 text-amber-700 rounded-lg text-xs font-bold hover:bg-amber-200 transition-colors"
                   >
                     <Plus className="w-4 h-4" />
@@ -1164,13 +1961,13 @@ export default function AdminView() {
                     type="month"
                     value={filterMonth}
                     onChange={(e) => setFilterMonth(e.target.value)}
-                    className="px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                    className="px-3 py-2 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-sky-500 outline-none"
                   />
                   {currentAdmin?.role === 'SuperAdmin' ? (
                     <select
                       value={filterBranch}
                       onChange={(e) => setFilterBranch(e.target.value)}
-                      className="px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                      className="px-3 py-2 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-sky-500 outline-none"
                     >
                       <option value="All">Tất cả chi nhánh</option>
                       <option value="Góc Phố">Góc Phố</option>
@@ -1181,7 +1978,7 @@ export default function AdminView() {
                       <select
                         value={filterBranch}
                         onChange={(e) => setFilterBranch(e.target.value)}
-                        className="px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                        className="px-3 py-2 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-sky-500 outline-none"
                       >
                         <option value="All">Tất cả chi nhánh quản lý</option>
                         {currentAdmin.locationIds.map(loc => (
@@ -1192,7 +1989,7 @@ export default function AdminView() {
                   )}
                   <button
                     onClick={exportToExcel}
-                    className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700"
+                    className="flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-lg text-sm font-medium hover:bg-emerald-700 transition-colors"
                   >
                     <Download className="w-4 h-4" />
                     Xuất Excel
@@ -1202,41 +1999,53 @@ export default function AdminView() {
               <div className="overflow-x-auto">
                 <table className="w-full text-left border-collapse">
                   <thead>
-                    <tr className="bg-gray-50 border-y border-gray-200">
-                      <th className="p-4 text-sm font-semibold text-gray-600">Ngày</th>
-                      <th className="p-4 text-sm font-semibold text-gray-600">Nhân viên</th>
-                      <th className="p-4 text-sm font-semibold text-gray-600">Chi nhánh</th>
-                      <th className="p-4 text-sm font-semibold text-gray-600">Giờ vào</th>
-                      <th className="p-4 text-sm font-semibold text-gray-600">Giờ ra</th>
-                      <th className="p-4 text-sm font-semibold text-gray-600">Số lần rời</th>
-                      <th className="p-4 text-sm font-semibold text-gray-600">Phút phạt</th>
-                      <th className="p-4 text-sm font-semibold text-gray-600">Tổng giờ</th>
-                      <th className="p-4 text-sm font-semibold text-gray-600">Tổng lương</th>
-                      <th className="p-4 text-sm font-semibold text-gray-600 text-right">Thao tác</th>
+                    <tr className="bg-slate-50 border-y border-slate-200">
+                      <th className="p-4 text-sm font-semibold text-slate-600">Ngày</th>
+                      <th className="p-4 text-sm font-semibold text-slate-600">Nhân viên</th>
+                      <th className="p-4 text-sm font-semibold text-slate-600">Chi nhánh</th>
+                      <th className="p-4 text-sm font-semibold text-slate-600">Giờ vào</th>
+                      <th className="p-4 text-sm font-semibold text-slate-600">Giờ ra</th>
+                      <th className="p-4 text-sm font-semibold text-slate-600">Số lần rời</th>
+                      <th className="p-4 text-sm font-semibold text-slate-600">Phút phạt</th>
+                      <th className="p-4 text-sm font-semibold text-slate-600">Nhiệm vụ chưa HT</th>
+                      <th className="p-4 text-sm font-semibold text-slate-600">Tổng giờ</th>
+                      <th className="p-4 text-sm font-semibold text-slate-600">Tổng lương</th>
+                      <th className="p-4 text-sm font-semibold text-slate-600 text-right">Thao tác</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-gray-200">
+                  <tbody className="divide-y divide-slate-200">
                     {chamCongs.filter(cc => cc.date.startsWith(filterMonth)).map(log => {
                       const employee = nhanViens.find(nv => nv.empId === log.empId);
                       const canDelete = currentAdmin?.role === 'SuperAdmin' || (log.createdByAdminId && log.createdByAdminId === currentAdmin?.id);
                       
                       return (
-                      <tr key={log.id} className="hover:bg-gray-50">
-                        <td className="p-4 text-sm text-gray-900">{log.date}</td>
-                        <td className="p-4 text-sm font-medium text-gray-900">{employee?.fullName || 'Không rõ'}</td>
-                        <td className="p-4 text-sm text-gray-600">{log.locationId}</td>
-                        <td className="p-4 text-sm text-gray-600">
+                      <tr key={log.id} className="hover:bg-slate-50 transition-colors">
+                        <td className="p-4 text-sm text-slate-900">{log.date}</td>
+                        <td className="p-4 text-sm font-medium text-slate-900">{employee?.fullName || 'Không rõ'}</td>
+                        <td className="p-4 text-sm text-slate-600">{log.locationId}</td>
+                        <td className="p-4 text-sm text-slate-600">
                           {log.checkInTime ? format(new Date(log.checkInTime), 'HH:mm:ss') : '-'}
-                          {log.AnhVaoCa && <a href={log.AnhVaoCa} target="_blank" rel="noreferrer" className="ml-2 text-blue-500 text-xs underline">Ảnh</a>}
+                          {log.AnhVaoCa && <a href={log.AnhVaoCa} target="_blank" rel="noreferrer" className="ml-2 text-sky-500 text-xs underline">Ảnh</a>}
                         </td>
-                        <td className="p-4 text-sm text-gray-600">
+                        <td className="p-4 text-sm text-slate-600">
                           {log.checkOutTime ? format(new Date(log.checkOutTime), 'HH:mm:ss') : '-'}
-                          {log.AnhRaCa && <a href={log.AnhRaCa} target="_blank" rel="noreferrer" className="ml-2 text-blue-500 text-xs underline">Ảnh</a>}
+                          {log.AnhRaCa && <a href={log.AnhRaCa} target="_blank" rel="noreferrer" className="ml-2 text-sky-500 text-xs underline">Ảnh</a>}
                         </td>
-                        <td className="p-4 text-sm text-red-600 font-medium">{log.SoLanRoiApp || 0}</td>
-                        <td className="p-4 text-sm text-red-600 font-medium">{log.PhutPhatRoiApp || 0}p</td>
-                        <td className="p-4 text-sm font-bold text-blue-600">{log.totalHours ? log.totalHours.toFixed(2) : '0'}h</td>
-                        <td className="p-4 text-sm font-bold text-green-600">{(log.totalPay || 0).toLocaleString()}đ</td>
+                        <td className="p-4 text-sm text-rose-600 font-medium">{log.SoLanRoiApp || 0}</td>
+                        <td className="p-4 text-sm text-rose-600 font-medium">{log.PhutPhatRoiApp || 0}p</td>
+                        <td className="p-4 text-sm text-rose-600">
+                          {log.incompleteTasks && log.incompleteTasks.length > 0 ? (
+                            <ul className="list-disc list-inside">
+                              {log.incompleteTasks.map((task, idx) => (
+                                <li key={idx} className="text-xs">{task}</li>
+                              ))}
+                            </ul>
+                          ) : (
+                            <span className="text-slate-400">-</span>
+                          )}
+                        </td>
+                        <td className="p-4 text-sm font-bold text-sky-600">{log.totalHours ? log.totalHours.toFixed(2) : '0'}h</td>
+                        <td className="p-4 text-sm font-bold text-emerald-600">{(log.totalPay || 0).toLocaleString()}đ</td>
                         <td className="p-4 text-sm text-right flex justify-end gap-2">
                           {canDelete && (
                             <>
@@ -1249,14 +2058,14 @@ export default function AdminView() {
                                   });
                                   setShowEditAttendanceModal(true);
                                 }}
-                                className="p-1.5 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                                className="p-1.5 text-sky-600 hover:bg-sky-50 rounded-lg transition-colors"
                                 title="Sửa bản ghi"
                               >
                                 <Edit2 className="w-4 h-4" />
                               </button>
                               <button
                                 onClick={() => handleDeleteAttendance(log)}
-                                className="p-1.5 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                                className="p-1.5 text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
                                 title="Xóa bản ghi"
                               >
                                 <Trash2 className="w-4 h-4" />
@@ -1272,117 +2081,528 @@ export default function AdminView() {
             </div>
           )}
 
+          {activeTab === 'bangluong' && (
+            <div className="p-6">
+              <div className="flex justify-between items-center mb-6">
+                <h2 className="text-lg font-bold text-gray-900">Bảng tính lương</h2>
+                <div className="flex gap-4">
+                  <input
+                    type="month"
+                    value={filterMonth}
+                    onChange={(e) => setFilterMonth(e.target.value)}
+                    className="px-4 py-2 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none"
+                  />
+                  <button
+                    onClick={() => setShowHolidayConfig(true)}
+                    className="px-4 py-2 bg-amber-100 text-amber-700 rounded-xl font-bold hover:bg-amber-200 transition-colors flex items-center gap-2"
+                  >
+                    <Calendar className="w-5 h-5" />
+                    Cấu hình ngày lễ
+                  </button>
+                  <div className="relative">
+                    <button
+                      onClick={() => setShowColumnConfig(!showColumnConfig)}
+                      className="px-4 py-2 bg-slate-100 text-slate-700 rounded-xl font-bold hover:bg-slate-200 transition-colors flex items-center gap-2"
+                    >
+                      <Settings2 className="w-5 h-5" />
+                      Tùy chỉnh cột
+                    </button>
+                    {showColumnConfig && (
+                      <div className="absolute top-full right-0 mt-2 w-64 bg-white rounded-xl shadow-xl border border-slate-100 p-4 z-50 text-left">
+                        <h4 className="font-bold text-slate-900 mb-3">Hiển thị cột</h4>
+                        <div className="space-y-2 max-h-64 overflow-y-auto">
+                          {Object.entries({
+                            stt: 'TT', name: 'Tên', bank: 'Số TK ngân hàng', joinDate: 'Ngày vào làm',
+                            hours: 'Số giờ công', baseSalary: 'Lương cơ bản', responsibility: 'Thưởng Trách nhiệm',
+                            holiday: 'Thưởng Lễ', penalty: 'Phạt', retained: 'Lương giữ tạm',
+                            returnRetained: 'Trả lương giữ tạm', advance: 'Ứng lương',
+                            compensation: 'Tiền đền ly tách', actual: 'Tiền thực lãnh', note: 'Ghi chú'
+                          }).map(([key, label]) => (
+                            <label key={key} className="flex items-center gap-2 cursor-pointer">
+                              <input
+                                type="checkbox"
+                                checked={visibleColumns[key]}
+                                onChange={(e) => setVisibleColumns(prev => ({ ...prev, [key]: e.target.checked }))}
+                                className="rounded text-sky-600 focus:ring-sky-500"
+                              />
+                              <span className="text-sm text-slate-700">{label}</span>
+                            </label>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                  <button
+                    onClick={handleUndoPayroll}
+                    disabled={undoStack.length === 0}
+                    className={`px-4 py-2 rounded-xl font-bold transition-colors flex items-center gap-2 ${
+                      undoStack.length > 0 ? 'bg-sky-100 text-sky-700 hover:bg-sky-200' : 'bg-slate-100 text-slate-400 cursor-not-allowed'
+                    }`}
+                  >
+                    <Undo2 className="w-5 h-5" />
+                    Hoàn tác
+                  </button>
+                  <button
+                    onClick={handleSavePayroll}
+                    disabled={Object.keys(localAdjustments).length === 0 || isSavingPayroll}
+                    className={`px-4 py-2 rounded-xl font-bold transition-colors flex items-center gap-2 ${
+                      Object.keys(localAdjustments).length > 0 
+                        ? 'bg-sky-600 text-white hover:bg-sky-700' 
+                        : 'bg-slate-100 text-slate-400 cursor-not-allowed'
+                    }`}
+                  >
+                    <Save className="w-5 h-5" />
+                    {isSavingPayroll ? 'Đang lưu...' : 'Lưu thay đổi'}
+                  </button>
+                  <button
+                    onClick={() => {
+                      const dataToExport = nhanViens.map((emp, index) => {
+                        const empTimesheets = chamCongs.filter(cc => cc.empId === emp.id && cc.date.startsWith(filterMonth));
+                        const totalHours = empTimesheets.reduce((sum, cc) => sum + (cc.totalHours || 0), 0);
+                        
+                        let holidayHours = 0;
+                        let holidayBonusTotal = 0;
+                        empTimesheets.forEach(cc => {
+                          const holiday = holidays.find(h => h.date === cc.date);
+                          if (holiday) {
+                            holidayHours += (cc.totalHours || 0);
+                            holidayBonusTotal += (cc.totalHours || 0) * (emp.hourlyRate || 0) * (holiday.multiplier - 1);
+                          }
+                        });
+                          
+                        const baseSalaryTotal = totalHours * (emp.hourlyRate || 0);
+                        const responsibilityBonusTotal = totalHours * (emp.responsibilityBonus || 0);
+                        
+                        let retainedSalary = 0;
+                        if (emp.joinDate && emp.joinDate.startsWith(filterMonth)) {
+                          retainedSalary = 500000;
+                        }
+                        
+                        const adjustment = payrollAdjustments.find(a => a.empId === emp.id && a.monthYear === filterMonth) || {
+                          penalty: 0,
+                          returnRetainedSalary: 0,
+                          advanceSalary: 0,
+                          compensation: 0,
+                          note: ''
+                        };
+                        
+                        const actualSalary = baseSalaryTotal + responsibilityBonusTotal + holidayBonusTotal 
+                          - (adjustment.penalty || 0) - retainedSalary + (adjustment.returnRetainedSalary || 0) 
+                          - (adjustment.advanceSalary || 0) - (adjustment.compensation || 0);
+
+                        return {
+                          'TT': index + 1,
+                          'Tên': emp.fullName,
+                          'Số TK ngân hàng': emp.bankAccount || '',
+                          'Ngày vào làm': emp.joinDate ? format(parseISO(emp.joinDate), 'dd/MM/yyyy') : '',
+                          'Số giờ công': totalHours.toFixed(2),
+                          'Lương cơ bản': emp.hourlyRate || 0,
+                          'Thưởng Trách nhiệm': responsibilityBonusTotal,
+                          'Thưởng Lễ (Số h)': holidayHours > 0 ? holidayHours.toFixed(2) : '',
+                          'Phạt': adjustment.penalty || 0,
+                          'Lương giữ tạm': retainedSalary,
+                          'Trả lương giữ tạm': adjustment.returnRetainedSalary || 0,
+                          'Ứng lương': adjustment.advanceSalary || 0,
+                          'Tiền đền ly tách': adjustment.compensation || 0,
+                          'Tiền thực lãnh': actualSalary,
+                          'Ghi chú': adjustment.note || ''
+                        };
+                      });
+
+                      const ws = XLSX.utils.json_to_sheet(dataToExport);
+                      const wb = XLSX.utils.book_new();
+                      XLSX.utils.book_append_sheet(wb, ws, "Bảng Lương");
+                      XLSX.writeFile(wb, `Bang_Luong_${filterMonth}.xlsx`);
+                    }}
+                    className="px-4 py-2 bg-green-600 text-white rounded-xl font-bold hover:bg-green-700 transition-colors flex items-center gap-2"
+                  >
+                    <Download className="w-5 h-5" />
+                    Xuất Excel
+                  </button>
+                </div>
+              </div>
+
+              <div className="overflow-x-auto bg-white rounded-2xl shadow-sm border border-slate-200">
+                <table className="w-full text-left border-collapse whitespace-nowrap">
+                  <thead>
+                    <tr className="bg-slate-100 border-b border-slate-200 text-sm">
+                      {visibleColumns.stt && <th className="p-3 font-semibold text-slate-700 border-r border-slate-200 text-center w-12">TT</th>}
+                      {visibleColumns.name && <th className="p-3 font-semibold text-slate-700 border-r border-slate-200 min-w-[150px]">Tên</th>}
+                      {visibleColumns.bank && <th className="p-3 font-semibold text-slate-700 border-r border-slate-200 min-w-[120px]">Số TK ngân hàng</th>}
+                      {visibleColumns.joinDate && <th className="p-3 font-semibold text-slate-700 border-r border-slate-200 min-w-[100px]">Ngày vào làm</th>}
+                      {visibleColumns.hours && <th className="p-3 font-semibold text-slate-700 border-r border-slate-200 text-right w-24">Số giờ công</th>}
+                      {visibleColumns.baseSalary && <th className="p-3 font-semibold text-slate-700 border-r border-slate-200 text-right min-w-[100px]">Lương cơ bản</th>}
+                      {visibleColumns.responsibility && <th className="p-3 font-semibold text-slate-700 border-r border-slate-200 text-right min-w-[120px]">Thưởng Trách nhiệm</th>}
+                      {visibleColumns.holiday && <th className="p-3 font-semibold text-slate-700 border-r border-slate-200 text-right min-w-[100px]">Thưởng Lễ (Số h)</th>}
+                      {visibleColumns.penalty && <th className="p-3 font-semibold text-slate-700 border-r border-slate-200 text-right min-w-[100px]">Phạt</th>}
+                      {visibleColumns.retained && <th className="p-3 font-semibold text-slate-700 border-r border-slate-200 text-right min-w-[120px]">Lương giữ tạm</th>}
+                      {visibleColumns.returnRetained && <th className="p-3 font-semibold text-slate-700 border-r border-slate-200 text-right min-w-[120px]">Trả lương giữ tạm</th>}
+                      {visibleColumns.advance && <th className="p-3 font-semibold text-slate-700 border-r border-slate-200 text-right min-w-[100px]">Ứng lương</th>}
+                      {visibleColumns.compensation && <th className="p-3 font-semibold text-slate-700 border-r border-slate-200 text-right min-w-[120px]">Tiền đền ly tách</th>}
+                      {visibleColumns.actual && <th className="p-3 font-bold text-sky-800 bg-sky-100/50 border-r border-slate-200 text-right min-w-[120px]">Tiền thực lãnh</th>}
+                      {visibleColumns.note && <th className="p-3 font-semibold text-slate-700 min-w-[150px]">Ghi chú</th>}
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-200">
+                    {nhanViens.map((emp, index) => {
+                      const empTimesheets = chamCongs.filter(cc => cc.empId === emp.id && cc.date.startsWith(filterMonth));
+                      const totalHours = empTimesheets.reduce((sum, cc) => sum + (cc.totalHours || 0), 0);
+                      
+                      const holidayDates = holidays.map(h => h.date);
+                      let holidayHours = 0;
+                      let holidayBonusTotal = 0;
+                      
+                      empTimesheets.forEach(cc => {
+                        const holiday = holidays.find(h => h.date === cc.date);
+                        if (holiday) {
+                          holidayHours += (cc.totalHours || 0);
+                          // Extra bonus = (multiplier - 1) * hourlyRate
+                          holidayBonusTotal += (cc.totalHours || 0) * (emp.hourlyRate || 0) * (holiday.multiplier - 1);
+                        }
+                      });
+                        
+                      const baseSalaryTotal = totalHours * (emp.hourlyRate || 0);
+                      const responsibilityBonusTotal = totalHours * (emp.responsibilityBonus || 0);
+                      
+                      let retainedSalary = 0;
+                      if (emp.joinDate && emp.joinDate.startsWith(filterMonth)) {
+                        retainedSalary = 500000;
+                      }
+                      
+                      const adjustment = payrollAdjustments.find(a => a.empId === emp.id && a.monthYear === filterMonth) || {
+                        penalty: 0,
+                        returnRetainedSalary: 0,
+                        advanceSalary: 0,
+                        compensation: 0,
+                        note: ''
+                      };
+                      
+                      const localAdj = localAdjustments[emp.id] || {};
+                      
+                      const finalPenalty = localAdj.penalty !== undefined ? localAdj.penalty : (adjustment.penalty || 0);
+                      const finalReturnRetained = localAdj.returnRetainedSalary !== undefined ? localAdj.returnRetainedSalary : (adjustment.returnRetainedSalary || 0);
+                      const finalAdvance = localAdj.advanceSalary !== undefined ? localAdj.advanceSalary : (adjustment.advanceSalary || 0);
+                      const finalCompensation = localAdj.compensation !== undefined ? localAdj.compensation : (adjustment.compensation || 0);
+                      const finalNote = localAdj.note !== undefined ? localAdj.note : (adjustment.note || '');
+                      
+                      const actualSalary = baseSalaryTotal + responsibilityBonusTotal + holidayBonusTotal 
+                        - finalPenalty - retainedSalary + finalReturnRetained 
+                        - finalAdvance - finalCompensation;
+
+                      const formatCurrency = (val: number) => new Intl.NumberFormat('vi-VN').format(val);
+
+                      return (
+                        <tr key={emp.id} className="border-b border-slate-200 hover:bg-slate-50/50 transition-colors">
+                          {visibleColumns.stt && <td className="p-3 border border-slate-200 text-center text-slate-600">{index + 1}</td>}
+                          {visibleColumns.name && <td className="p-3 font-medium border border-slate-200 text-slate-800">{emp.fullName}</td>}
+                          {visibleColumns.bank && <td className="p-3 border border-slate-200 text-slate-600">{emp.bankAccount || '-'}</td>}
+                          {visibleColumns.joinDate && <td className="p-3 border border-slate-200 text-slate-600">{emp.joinDate ? format(parseISO(emp.joinDate), 'dd/MM/yyyy') : '-'}</td>}
+                          {visibleColumns.hours && <td className="p-3 font-bold text-sky-600 border border-slate-200 text-right">{totalHours.toFixed(2)}</td>}
+                          {visibleColumns.baseSalary && <td className="p-3 border border-slate-200 text-right text-slate-700">{formatCurrency(emp.hourlyRate || 0)}</td>}
+                          {visibleColumns.responsibility && <td className="p-3 border border-slate-200 text-right text-slate-700">{formatCurrency(responsibilityBonusTotal)}</td>}
+                          {visibleColumns.holiday && <td className="p-3 border border-slate-200 text-right text-slate-700">{holidayHours > 0 ? holidayHours.toFixed(2) : '-'}</td>}
+                          {visibleColumns.penalty && (
+                            <td className="p-0 border border-slate-200">
+                              <input 
+                                type="text"
+                                value={finalPenalty === 0 ? '' : formatCurrency(finalPenalty)}
+                                onChange={(e) => {
+                                  const val = parseInt(e.target.value.replace(/\D/g, '')) || 0;
+                                  handlePayrollChange(emp.id, 'penalty', val);
+                                }}
+                                className="w-full h-full p-3 bg-transparent outline-none focus:bg-sky-50 focus:ring-2 focus:ring-inset focus:ring-sky-500 text-right text-rose-600 font-medium"
+                                placeholder="0"
+                              />
+                            </td>
+                          )}
+                          {visibleColumns.retained && <td className="p-3 text-amber-600 font-medium border border-slate-200 text-right">{formatCurrency(retainedSalary)}</td>}
+                          {visibleColumns.returnRetained && (
+                            <td className="p-0 border border-slate-200">
+                              <input 
+                                type="text"
+                                value={finalReturnRetained === 0 ? '' : formatCurrency(finalReturnRetained)}
+                                onChange={(e) => {
+                                  const val = parseInt(e.target.value.replace(/\D/g, '')) || 0;
+                                  handlePayrollChange(emp.id, 'returnRetainedSalary', val);
+                                }}
+                                className="w-full h-full p-3 bg-transparent outline-none focus:bg-sky-50 focus:ring-2 focus:ring-inset focus:ring-sky-500 text-right text-emerald-600 font-medium"
+                                placeholder="0"
+                              />
+                            </td>
+                          )}
+                          {visibleColumns.advance && (
+                            <td className="p-0 border border-slate-200">
+                              <input 
+                                type="text"
+                                value={finalAdvance === 0 ? '' : formatCurrency(finalAdvance)}
+                                onChange={(e) => {
+                                  const val = parseInt(e.target.value.replace(/\D/g, '')) || 0;
+                                  handlePayrollChange(emp.id, 'advanceSalary', val);
+                                }}
+                                className="w-full h-full p-3 bg-transparent outline-none focus:bg-sky-50 focus:ring-2 focus:ring-inset focus:ring-sky-500 text-right text-amber-600 font-medium"
+                                placeholder="0"
+                              />
+                            </td>
+                          )}
+                          {visibleColumns.compensation && (
+                            <td className="p-0 border border-slate-200">
+                              <input 
+                                type="text"
+                                value={finalCompensation === 0 ? '' : formatCurrency(finalCompensation)}
+                                onChange={(e) => {
+                                  const val = parseInt(e.target.value.replace(/\D/g, '')) || 0;
+                                  handlePayrollChange(emp.id, 'compensation', val);
+                                }}
+                                className="w-full h-full p-3 bg-transparent outline-none focus:bg-sky-50 focus:ring-2 focus:ring-inset focus:ring-sky-500 text-right text-rose-600 font-medium"
+                                placeholder="0"
+                              />
+                            </td>
+                          )}
+                          {visibleColumns.actual && <td className="p-3 font-bold text-sky-700 text-lg border border-slate-200 text-right bg-sky-50/30">{formatCurrency(actualSalary)}</td>}
+                          {visibleColumns.note && (
+                            <td className="p-0 border border-slate-200">
+                              <input 
+                                type="text"
+                                value={finalNote}
+                                onChange={(e) => handlePayrollChange(emp.id, 'note', e.target.value)}
+                                className="w-full h-full p-3 bg-transparent outline-none focus:bg-sky-50 focus:ring-2 focus:ring-inset focus:ring-sky-500 text-slate-700"
+                                placeholder="Ghi chú..."
+                              />
+                            </td>
+                          )}
+                        </tr>
+                      );
+                    })}
+                    {nhanViens.length === 0 && (
+                      <tr>
+                        <td colSpan={Object.values(visibleColumns).filter(Boolean).length} className="p-8 text-center text-gray-500 border border-gray-300">
+                          Không có dữ liệu nhân viên.
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
           {activeTab === 'nhanvien' && (
             <div className="p-6">
               <div className="flex justify-between items-center mb-6">
                 <h2 className="text-lg font-bold text-gray-900">Quản lý nhân viên</h2>
-                <button
-                  onClick={() => {
-                    setNewEmployee({
-                      empId: '',
-                      phone: '',
-                      fullName: '',
-                      cccd: '',
-                      hourlyRate: 0,
-                      joinDate: format(new Date(), 'yyyy-MM-dd'),
-                    });
-                    setLuongTheoGioStr('');
-                    setShowAddEmployeeModal(true);
-                  }}
-                  className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700"
-                >
-                  <Plus className="w-4 h-4" />
-                  Thêm nhân viên
-                </button>
+                {currentAdmin?.role === 'SuperAdmin' && (
+                  <button
+                    onClick={() => {
+                      setNewEmployee({
+                        empId: '',
+                        phone: '',
+                        fullName: '',
+                        hourlyRate: 0,
+                        joinDate: format(new Date(), 'yyyy-MM-dd'),
+                        locationId: currentAdmin?.role === 'SuperAdmin' ? 'Góc Phố' : currentAdmin?.locationIds?.[0] || 'Góc Phố'
+                      });
+                      setLuongTheoGioStr('');
+                      setShowAddEmployeeModal(true);
+                    }}
+                    className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700"
+                  >
+                    <Plus className="w-4 h-4" />
+                    Thêm nhân viên
+                  </button>
+                )}
               </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {nhanViens.map(nv => (
-                  <div key={nv.id} className="border border-gray-200 rounded-xl p-4 flex flex-col gap-2 relative group">
-                    <div className="flex justify-between items-start">
-                      <h3 className="font-bold text-gray-900">{nv.fullName}</h3>
-                      <div className="flex flex-col items-end gap-1">
-                        <span className="px-2 py-1 bg-gray-100 text-gray-600 text-xs rounded-full font-bold">{nv.empId}</span>
-                        {salaryReviewNotifications.some(n => n.empId === nv.empId) && (
-                          <span className="px-2 py-1 bg-red-100 text-red-600 text-[10px] font-bold rounded-full animate-pulse">
-                            Đến hạn review lương
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                    <p className="text-sm text-gray-600">SĐT: {nv.phone}</p>
-                    <p className="text-sm text-gray-600">CCCD: {nv.cccd}</p>
-                    <p className="text-sm text-gray-600">Ngày vào làm: {nv.joinDate ? format(new Date(nv.joinDate), 'dd/MM/yyyy') : 'N/A'}</p>
-                    <p className="text-sm text-gray-600">Lương: <span className="font-bold text-emerald-600">{nv.hourlyRate.toLocaleString()}đ/h</span></p>
-                    <div className="flex flex-wrap gap-2 mt-2">
-                      <button
-                        onClick={() => handleResetPIN(nv)}
-                        className="px-3 py-1.5 bg-amber-100 text-amber-700 rounded-lg text-[10px] font-bold uppercase tracking-wider hover:bg-amber-200 transition-colors"
-                      >
-                        Reset PIN
-                      </button>
-                      <button
-                        onClick={() => handleResetDevice(nv)}
-                        className="px-3 py-1.5 bg-purple-100 text-purple-700 rounded-lg text-[10px] font-bold uppercase tracking-wider hover:bg-purple-200 transition-colors"
-                      >
-                        Reset Thiết bị
-                      </button>
-                      <button
-                        onClick={() => {
+              <div className="overflow-x-auto bg-white rounded-xl border border-gray-200 shadow-sm">
+                <table className="w-full text-left border-collapse">
+                  <thead>
+                    <tr className="bg-gray-50 border-b border-gray-200 text-sm">
+                      <th className="p-3 font-semibold text-gray-600">Họ Tên</th>
+                      <th className="p-3 font-semibold text-gray-600">Liên hệ</th>
+                      <th className="p-3 font-semibold text-gray-600">Chi nhánh</th>
+                      <th className="p-3 font-semibold text-gray-600">Ngày vào làm</th>
+                      <th className="p-3 font-semibold text-gray-600">Lương / Lương TN</th>
+                      <th className="p-3 font-semibold text-gray-600 text-right">Thao tác</th>
+                    </tr>
+                  </thead>
+                  <tbody className="text-sm">
+                    {nhanViens.filter(nv => currentAdmin?.role === 'SuperAdmin' || (currentAdmin?.locationIds || []).includes(nv.locationId || '')).map(nv => (
+                      <tr 
+                        key={nv.id} 
+                        className="border-b border-gray-100 hover:bg-gray-50 transition-colors cursor-pointer"
+                        onDoubleClick={() => {
                           setEditingEmployee(nv);
-                          setLuongTheoGioStr(nv.hourlyRate.toLocaleString());
+                          setLuongTheoGioStr(nv.hourlyRate.toLocaleString('en-US'));
+                          setThuongTrachNhiemStr((nv.responsibilityBonus || 0).toLocaleString('en-US'));
                           setShowEditEmployeeModal(true);
                         }}
-                        className="px-3 py-1.5 bg-blue-100 text-blue-700 rounded-lg text-[10px] font-bold uppercase tracking-wider hover:bg-blue-200 transition-colors"
                       >
-                        Sửa
-                      </button>
-                      <button
-                        onClick={() => {
-                          setSelectedEmpForSalary(nv);
-                          setShowSalaryHistoryModal(true);
-                        }}
-                        className="px-3 py-1.5 bg-indigo-100 text-indigo-700 rounded-lg text-[10px] font-bold uppercase tracking-wider hover:bg-indigo-200 transition-colors flex items-center gap-1"
-                      >
-                        <HistoryIcon className="w-3 h-3" />
-                        Lịch sử lương
-                      </button>
-                      <button
-                        onClick={() => {
-                          setSelectedEmpForSalary(nv);
-                          setNewSalaryRate(nv.hourlyRate);
-                          setShowIncreaseSalaryModal(true);
-                        }}
-                        className="px-3 py-1.5 bg-emerald-100 text-emerald-700 rounded-lg text-[10px] font-bold uppercase tracking-wider hover:bg-emerald-200 transition-colors flex items-center gap-1"
-                      >
-                        <TrendingUp className="w-3 h-3" />
-                        Tăng lương
-                      </button>
-                    </div>
-                    <button
-                      onClick={async () => {
-                        if (window.confirm('Bạn có chắc chắn muốn xóa nhân viên này?')) {
-                          try {
-                            await deleteDoc(doc(db, 'employees', nv.id));
-                            toast.success('Xóa nhân viên thành công');
-                          } catch (error) {
-                            toast.error('Lỗi khi xóa nhân viên');
-                          }
-                        }
-                      }}
-                      className="absolute top-4 right-4 p-2 bg-red-100 text-red-600 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
-                  </div>
-                ))}
+                        <td className="p-3">
+                          <div className="font-bold text-gray-900">{nv.fullName}</div>
+                          {salaryReviewNotifications.some(n => n.empId === nv.empId) && (
+                            <span className="inline-block mt-1 px-2 py-0.5 bg-red-100 text-red-600 text-[10px] font-bold rounded-full animate-pulse">
+                              Đến hạn review lương
+                            </span>
+                          )}
+                        </td>
+                        <td className="p-3">
+                          <div className="text-gray-600">{nv.phone}</div>
+                        </td>
+                        <td className="p-3 text-gray-600">
+                          {nv.locationId || (Array.isArray(nv.locationIds) && nv.locationIds.length > 0 ? nv.locationIds[0] : 'N/A')}
+                        </td>
+                        <td className="p-3 text-gray-600">{nv.joinDate ? format(new Date(nv.joinDate), 'dd/MM/yyyy') : 'N/A'}</td>
+                        <td className="p-3">
+                          <div className="font-bold text-emerald-600">{(nv.hourlyRate || 0).toLocaleString('en-US')}đ/h</div>
+                          <div className="text-blue-600 text-xs">Lương TN: {(nv.responsibilityBonus || 0).toLocaleString('en-US')}đ/h</div>
+                        </td>
+                        <td className="p-3">
+                          <div className="flex justify-end gap-2 flex-wrap">
+                            {currentAdmin?.role === 'SuperAdmin' && (
+                              <>
+                                <button
+                                  onClick={() => handleResetPIN(nv)}
+                                  className="p-1.5 text-amber-600 hover:bg-amber-50 rounded transition-colors"
+                                  title="Reset PIN"
+                                >
+                                  <Key className="w-4 h-4" />
+                                </button>
+                                <button
+                                  onClick={() => handleResetDevice(nv)}
+                                  className="p-1.5 text-purple-600 hover:bg-purple-50 rounded transition-colors"
+                                  title="Reset Thiết bị"
+                                >
+                                  <Smartphone className="w-4 h-4" />
+                                </button>
+                              </>
+                            )}
+                            <button
+                              onClick={() => {
+                                setSelectedEmpForSalary(nv);
+                                setShowSalaryManagementModal(true);
+                                setSalaryManagementTab(currentAdmin?.role === 'SuperAdmin' ? 'history' : 'increase');
+                                setNewSalaryRate(nv.hourlyRate);
+                                setNewSalaryRateStr(nv.hourlyRate.toLocaleString('en-US'));
+                                setNewBonusRate(nv.responsibilityBonus || 0);
+                                setNewBonusRateStr((nv.responsibilityBonus || 0).toLocaleString('en-US'));
+                              }}
+                              className="p-1.5 text-indigo-600 hover:bg-indigo-50 rounded transition-colors"
+                              title={currentAdmin?.role === 'SuperAdmin' ? 'Quản lý lương' : 'Đề xuất tăng lương'}
+                            >
+                              <DollarSign className="w-4 h-4" />
+                            </button>
+                            <button
+                              onClick={() => {
+                                setEditingEmployee(nv);
+                                setLuongTheoGioStr(nv.hourlyRate.toLocaleString('en-US'));
+                                setThuongTrachNhiemStr((nv.responsibilityBonus || 0).toLocaleString('en-US'));
+                                setShowEditEmployeeModal(true);
+                              }}
+                              className="p-1.5 text-blue-600 hover:bg-blue-50 rounded transition-colors"
+                              title="Sửa"
+                            >
+                              <Edit2 className="w-4 h-4" />
+                            </button>
+                            {currentAdmin?.role === 'SuperAdmin' && (
+                              <button
+                                onClick={() => {
+                                  openConfirmModal(
+                                    'Xóa nhân viên',
+                                    `Bạn có chắc chắn muốn xóa nhân viên ${nv.fullName}?`,
+                                    async () => {
+                                      try {
+                                        await deleteDoc(doc(db, 'employees', nv.id));
+                                        toast.success('Xóa nhân viên thành công');
+                                      } catch (error) {
+                                        console.error('Delete employee error:', error);
+                                        toast.error('Lỗi khi xóa nhân viên');
+                                      }
+                                    }
+                                  );
+                                }}
+                                className="p-1.5 text-red-600 hover:bg-red-50 rounded transition-colors"
+                                title="Xóa"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
+          {activeTab === 'vipham' && (
+            <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
+              <h2 className="text-xl font-black text-slate-900 mb-6">Quản lý vi phạm</h2>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm text-left text-slate-500">
+                  <thead className="text-xs text-slate-700 uppercase bg-slate-50">
+                    <tr>
+                      <th className="px-6 py-3">Ngày</th>
+                      <th className="px-6 py-3">Nhân viên</th>
+                      <th className="px-6 py-3">Nội dung</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {canhBaos.map((cb) => (
+                      <tr key={cb.id} className="bg-white border-b hover:bg-slate-50">
+                        <td className="px-6 py-4">{format(new Date(cb.timestamp), 'dd/MM/yyyy HH:mm')}</td>
+                        <td className="px-6 py-4 font-medium text-slate-900">{cb.fullName}</td>
+                        <td className="px-6 py-4">{cb.message}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               </div>
             </div>
           )}
 
           {activeTab === 'lichlamviec' && (
-            <div className="p-6">
-              <h2 className="text-lg font-bold text-gray-900 mb-6">Lịch làm việc</h2>
-              <p className="text-gray-500">Tính năng đang được phát triển...</p>
+            <div className="p-6 h-[calc(100vh-120px)]">
+              <SmartScheduleBuilder
+                employees={nhanViens}
+                schedules={lichLamViecs}
+                currentBranchFilter={filterBranch}
+                managedBranches={currentAdmin?.locationIds || []}
+                onAddShift={async (shift) => {
+                  try {
+                    const emp = nhanViens.find(e => e.id === shift.empId);
+                    await addDoc(collection(db, 'LichLamViec'), {
+                      ...shift,
+                      empName: emp?.fullName || '',
+                      shiftName: `${shift.startTime} - ${shift.endTime}`,
+                      status: 'scheduled',
+                      createdAt: serverTimestamp()
+                    });
+                  } catch (error) {
+                    console.error('Error adding shift:', error);
+                    toast.error('Lỗi khi thêm ca làm việc');
+                  }
+                }}
+                onUpdateShift={async (id, shift) => {
+                  try {
+                    const updateData: any = { ...shift };
+                    if (shift.startTime && shift.endTime) {
+                      updateData.shiftName = `${shift.startTime} - ${shift.endTime}`;
+                    }
+                    await updateDoc(doc(db, 'LichLamViec', id), updateData);
+                  } catch (error) {
+                    console.error('Error updating shift:', error);
+                    toast.error('Lỗi khi cập nhật ca làm việc');
+                  }
+                }}
+                onDeleteShift={async (id) => {
+                  try {
+                    await deleteDoc(doc(db, 'LichLamViec', id));
+                  } catch (error) {
+                    console.error('Error deleting shift:', error);
+                    toast.error('Lỗi khi xóa ca làm việc');
+                  }
+                }}
+              />
             </div>
           )}
 
@@ -1484,75 +2704,212 @@ export default function AdminView() {
         </div>
       </main>
 
+      {/* Admin Change PIN Modal */}
+      {showChangeAdminPinModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-2xl p-6 w-full max-w-sm">
+            <h2 className="text-xl font-bold text-gray-900 mb-4">Đổi mã PIN Admin</h2>
+            <form onSubmit={handleChangeAdminPin} className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Mã PIN mới (6 số)</label>
+                <input
+                  type="password"
+                  required
+                  maxLength={6}
+                  minLength={4}
+                  value={newAdminPin}
+                  onChange={e => setNewAdminPin(e.target.value.replace(/\D/g, ''))}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none text-center text-2xl tracking-widest"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Xác nhận mã PIN mới</label>
+                <input
+                  type="password"
+                  required
+                  maxLength={6}
+                  minLength={4}
+                  value={confirmNewAdminPin}
+                  onChange={e => setConfirmNewAdminPin(e.target.value.replace(/\D/g, ''))}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none text-center text-2xl tracking-widest"
+                />
+              </div>
+              <div className="flex gap-3 pt-4">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowChangeAdminPinModal(false);
+                    setNewAdminPin('');
+                    setConfirmNewAdminPin('');
+                  }}
+                  className="flex-1 px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-lg font-medium"
+                >
+                  Hủy
+                </button>
+                <button
+                  type="submit"
+                  className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700"
+                >
+                  Xác nhận
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
       {/* Add Employee Modal */}
       {showAddEmployeeModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
           <div className="bg-white rounded-2xl p-6 w-full max-w-md">
-            <h2 className="text-xl font-bold text-gray-900 mb-4">Thêm nhân viên mới</h2>
-            <form onSubmit={handleAddEmployee} className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Họ Tên <span className="text-red-500">*</span>
-                </label>
-                <input
-                  type="text"
-                  required
-                  value={newEmployee.fullName}
-                  onChange={e => setNewEmployee({ ...newEmployee, fullName: e.target.value })}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
-                  placeholder="Nhập họ và tên"
-                />
+            <h2 className="text-xl font-bold text-gray-900 mb-6">Thêm nhân viên mới</h2>
+            <form onSubmit={handleAddEmployee} className="space-y-6">
+              {/* Basic Information */}
+              <div className="bg-gray-50 p-4 rounded-xl border border-gray-200 shadow-inner">
+                <h3 className="text-sm font-semibold text-blue-700 uppercase tracking-wider mb-4">Thông tin cơ bản</h3>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="col-span-2">
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Họ Tên <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      value={newEmployee.fullName}
+                      onChange={e => setNewEmployee({ ...newEmployee, fullName: e.target.value })}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none shadow-sm"
+                      placeholder="Nhập họ và tên"
+                    />
+                  </div>
+                  <div className="col-span-2">
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Số điện thoại</label>
+                    <input
+                      type="tel"
+                      value={newEmployee.phone || ''}
+                      onChange={e => setNewEmployee({ ...newEmployee, phone: e.target.value.replace(/\D/g, '') })}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none shadow-sm"
+                      placeholder="Nhập SĐT"
+                    />
+                  </div>
+                  <div className="col-span-2">
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Số CCCD (Dùng để reset PIN)</label>
+                    <input
+                      type="text"
+                      value={newEmployee.cccd || ''}
+                      onChange={e => setNewEmployee({ ...newEmployee, cccd: e.target.value.replace(/\D/g, '') })}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none shadow-sm"
+                      placeholder="Nhập số CCCD"
+                    />
+                  </div>
+                  <div className="col-span-2">
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Chi nhánh <span className="text-red-500">*</span>
+                    </label>
+                    <div className="flex flex-wrap gap-4 p-3 border border-gray-200 rounded-lg bg-white shadow-inner">
+                      {['Góc Phố', 'Phố Xanh'].map(branch => (
+                        <label key={branch} className="flex items-center gap-2 cursor-pointer">
+                          <input
+                            type="radio"
+                            name="newEmployeeLocation"
+                            checked={newEmployee.locationId === branch}
+                            onChange={() => setNewEmployee({ ...newEmployee, locationId: branch })}
+                            className="w-4 h-4 text-blue-600 focus:ring-blue-500"
+                            disabled={currentAdmin?.role !== 'SuperAdmin'}
+                          />
+                          <span className="text-sm text-gray-700">{branch}</span>
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Lương Cơ Bản (đ/h)</label>
+                    <input
+                      type="text"
+                      value={luongTheoGioStr}
+                      onChange={e => {
+                        const val = e.target.value.replace(/\D/g, '');
+                        const formatted = val ? parseInt(val).toLocaleString('en-US') : '';
+                        setLuongTheoGioStr(formatted);
+                      }}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none shadow-sm"
+                      placeholder="0"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Lương Trách Nhiệm (đ/h)</label>
+                    <input
+                      type="text"
+                      value={thuongTrachNhiemStr}
+                      onChange={e => {
+                        const val = e.target.value.replace(/\D/g, '');
+                        const formatted = val ? parseInt(val).toLocaleString('en-US') : '';
+                        setThuongTrachNhiemStr(formatted);
+                      }}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none shadow-sm"
+                      placeholder="0"
+                    />
+                  </div>
+                </div>
               </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Số điện thoại</label>
-                <input
-                  type="tel"
-                  value={newEmployee.phone}
-                  onChange={e => setNewEmployee({ ...newEmployee, phone: e.target.value.replace(/\D/g, '') })}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
-                  placeholder="Nhập số điện thoại (không bắt buộc)"
-                />
+
+              {/* Optional Information */}
+              <div className="bg-gray-50 p-4 rounded-xl border border-gray-200 shadow-inner">
+                <h3 className="text-sm font-semibold text-emerald-700 uppercase tracking-wider mb-4">Thông tin bổ sung</h3>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="col-span-2">
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Vị trí mặc định
+                    </label>
+                    <div className="flex gap-6 p-3 border border-gray-200 rounded-lg bg-white shadow-inner">
+                      {['QUẦY', 'PV'].map(role => (
+                        <label key={role} className="flex items-center gap-2 cursor-pointer">
+                          <input
+                            type="radio"
+                            name="newEmployeeRole"
+                            checked={(newEmployee.defaultRole || 'PV') === role}
+                            onChange={() => setNewEmployee({ ...newEmployee, defaultRole: role as 'QUẦY' | 'PV' })}
+                            className="w-4 h-4 text-blue-600 focus:ring-blue-500"
+                          />
+                          <span className="text-sm text-gray-700">{role === 'QUẦY' ? 'Pha chế (QUẦY)' : 'Phục vụ (PV)'}</span>
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Ngày Vào Làm</label>
+                    <input
+                      type="date"
+                      required
+                      value={newEmployee.joinDate || ''}
+                      onChange={e => setNewEmployee({ ...newEmployee, joinDate: e.target.value })}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none shadow-sm"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Số TK Ngân Hàng</label>
+                    <input
+                      type="text"
+                      value={newEmployee.bankAccount || ''}
+                      onChange={e => setNewEmployee({ ...newEmployee, bankAccount: e.target.value })}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none shadow-sm"
+                      placeholder="Nhập số TK"
+                    />
+                  </div>
+                  <div className="col-span-2">
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Ghi chú</label>
+                    <textarea
+                      value={newEmployee.notes || ''}
+                      onChange={e => setNewEmployee({ ...newEmployee, notes: e.target.value })}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none resize-none shadow-sm"
+                      placeholder="Ghi chú (nếu có)"
+                      rows={2}
+                    />
+                  </div>
+                </div>
               </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Số CCCD <span className="text-red-500">*</span>
-                </label>
-                <input
-                  type="text"
-                  required
-                  value={newEmployee.cccd}
-                  onChange={e => setNewEmployee({ ...newEmployee, cccd: e.target.value.replace(/\D/g, '') })}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
-                  placeholder="Nhập số CCCD"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Ngày Vào Làm</label>
-                <input
-                  type="date"
-                  required
-                  value={newEmployee.joinDate}
-                  onChange={e => setNewEmployee({ ...newEmployee, joinDate: e.target.value })}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Lương Theo Giờ
-                </label>
-                <input
-                  type="text"
-                  value={luongTheoGioStr}
-                  onChange={e => {
-                    const val = e.target.value.replace(/\D/g, '');
-                    const formatted = val ? parseInt(val).toLocaleString() : '';
-                    setLuongTheoGioStr(formatted);
-                  }}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
-                  placeholder="Nhập mức lương (không bắt buộc)"
-                />
-              </div>
-              <div className="flex justify-end gap-3 pt-4">
+
+
+              <div className="flex justify-end gap-3 pt-4 border-t border-gray-100">
                 <button
                   type="button"
                   onClick={() => setShowAddEmployeeModal(false)}
@@ -1643,7 +3000,7 @@ export default function AdminView() {
                       <input
                         type={showAddAdminPin ? "text" : "password"}
                         required
-                        minLength={6}
+                        minLength={4}
                         maxLength={6}
                         value={newAdmin.pin}
                         onChange={e => setNewAdmin({ ...newAdmin, pin: e.target.value })}
@@ -1718,7 +3075,7 @@ export default function AdminView() {
       )}
 
       {/* Manual Attendance Modal */}
-      {showManualAttendanceModal && (
+      {showEditAttendanceModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
           <div className="bg-white rounded-2xl p-6 w-full max-w-md shadow-2xl animate-in zoom-in-95">
             <h2 className="text-xl font-bold text-gray-900 mb-4 flex items-center gap-2">
@@ -1753,14 +3110,20 @@ export default function AdminView() {
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Chi nhánh</label>
-                  <select
-                    value={manualAttendance.locationId}
-                    onChange={e => setManualAttendance({ ...manualAttendance, locationId: e.target.value })}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
-                  >
-                    <option value="Góc Phố">Góc Phố</option>
-                    <option value="Phố Xanh">Phố Xanh</option>
-                  </select>
+                  <div className="flex gap-4 p-2 border border-gray-300 rounded-lg">
+                    {['Góc Phố', 'Phố Xanh'].map(branch => (
+                      <label key={branch} className="flex items-center gap-2 cursor-pointer">
+                        <input
+                          type="radio"
+                          name="manualAttendanceLocation"
+                          checked={manualAttendance.locationId === branch}
+                          onChange={() => setManualAttendance({ ...manualAttendance, locationId: branch })}
+                          className="w-4 h-4 text-amber-600 focus:ring-amber-500"
+                        />
+                        <span className="text-sm text-gray-700">{branch}</span>
+                      </label>
+                    ))}
+                  </div>
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-4">
@@ -1792,7 +3155,7 @@ export default function AdminView() {
               <div className="flex justify-end gap-3 pt-4">
                 <button
                   type="button"
-                  onClick={() => setShowManualAttendanceModal(false)}
+                  onClick={() => setShowEditAttendanceModal(false)}
                   className="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-lg font-medium"
                 >
                   Hủy
@@ -1813,66 +3176,147 @@ export default function AdminView() {
       {showEditEmployeeModal && editingEmployee && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
           <div className="bg-white rounded-2xl p-6 w-full max-w-md">
-            <h2 className="text-xl font-bold text-gray-900 mb-4">Sửa thông tin nhân viên</h2>
-            <form onSubmit={handleUpdateEmployee} className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Họ Tên <span className="text-red-500">*</span>
-                </label>
-                <input
-                  type="text"
-                  required
-                  value={editingEmployee.fullName}
-                  onChange={e => setEditingEmployee({ ...editingEmployee, fullName: e.target.value })}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
-                />
+            <h2 className="text-xl font-bold text-gray-900 mb-6">Sửa thông tin nhân viên</h2>
+            <form onSubmit={handleUpdateEmployee} className="space-y-6">
+              {/* Basic Information */}
+              <div className="bg-gray-50 p-4 rounded-xl border border-gray-200 shadow-inner">
+                <h3 className="text-sm font-semibold text-blue-700 uppercase tracking-wider mb-4">Thông tin cơ bản</h3>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="col-span-2">
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Họ Tên <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      value={editingEmployee.fullName}
+                      onChange={e => setEditingEmployee({ ...editingEmployee, fullName: e.target.value })}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none shadow-sm"
+                    />
+                  </div>
+                  <div className="col-span-2">
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Số điện thoại</label>
+                    <input
+                      type="tel"
+                      value={editingEmployee.phone || ''}
+                      onChange={e => setEditingEmployee({ ...editingEmployee, phone: e.target.value.replace(/\D/g, '') })}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none shadow-sm"
+                    />
+                  </div>
+                  <div className="col-span-2">
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Số CCCD (Dùng để reset PIN)</label>
+                    <input
+                      type="text"
+                      value={editingEmployee.cccd || ''}
+                      onChange={e => setEditingEmployee({ ...editingEmployee, cccd: e.target.value.replace(/\D/g, '') })}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none shadow-sm"
+                      placeholder="Nhập số CCCD"
+                    />
+                  </div>
+                  <div className="col-span-2">
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Chi nhánh <span className="text-red-500">*</span>
+                    </label>
+                    <div className="flex flex-wrap gap-4 p-3 border border-gray-200 rounded-lg bg-white shadow-inner">
+                      {['Góc Phố', 'Phố Xanh'].map(branch => (
+                        <label key={branch} className="flex items-center gap-2 cursor-pointer">
+                          <input
+                            type="radio"
+                            name="editEmployeeLocation"
+                            checked={editingEmployee.locationId === branch}
+                            onChange={() => setEditingEmployee({ ...editingEmployee, locationId: branch })}
+                            className="w-4 h-4 text-blue-600 focus:ring-blue-500"
+                            disabled={currentAdmin?.role !== 'SuperAdmin'}
+                          />
+                          <span className="text-sm text-gray-700">{branch}</span>
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Lương Cơ Bản (đ/h)</label>
+                    <input
+                      type="text"
+                      value={luongTheoGioStr}
+                      onChange={e => {
+                        const val = e.target.value.replace(/\D/g, '');
+                        const formatted = val ? parseInt(val).toLocaleString('en-US') : '';
+                        setLuongTheoGioStr(formatted);
+                      }}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none shadow-sm"
+                      placeholder={editingEmployee.hourlyRate.toLocaleString('en-US')}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Lương Trách Nhiệm (đ/h)</label>
+                    <input
+                      type="text"
+                      value={thuongTrachNhiemStr}
+                      onChange={e => {
+                        const val = e.target.value.replace(/\D/g, '');
+                        const formatted = val ? parseInt(val).toLocaleString('en-US') : '';
+                        setThuongTrachNhiemStr(formatted);
+                      }}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none shadow-sm"
+                      placeholder={(editingEmployee.responsibilityBonus || 0).toLocaleString('en-US')}
+                    />
+                  </div>
+                </div>
               </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Số điện thoại</label>
-                <input
-                  type="tel"
-                  value={editingEmployee.phone}
-                  onChange={e => setEditingEmployee({ ...editingEmployee, phone: e.target.value.replace(/\D/g, '') })}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Số CCCD <span className="text-red-500">*</span>
-                </label>
-                <input
-                  type="text"
-                  required
-                  value={editingEmployee.cccd}
-                  onChange={e => setEditingEmployee({ ...editingEmployee, cccd: e.target.value.replace(/\D/g, '') })}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Ngày Vào Làm</label>
-                <input
-                  type="date"
-                  required
-                  value={editingEmployee.joinDate}
-                  onChange={e => setEditingEmployee({ ...editingEmployee, joinDate: e.target.value })}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Lương Theo Giờ
-                </label>
-                <input
-                  type="text"
-                  value={luongTheoGioStr}
-                  onChange={e => {
-                    const val = e.target.value.replace(/\D/g, '');
-                    const formatted = val ? parseInt(val).toLocaleString() : '';
-                    setLuongTheoGioStr(formatted);
-                  }}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
-                  placeholder={editingEmployee.hourlyRate.toLocaleString()}
-                />
+
+              {/* Optional Information */}
+              <div className="bg-gray-50 p-4 rounded-xl border border-gray-200 shadow-inner">
+                <h3 className="text-sm font-semibold text-emerald-700 uppercase tracking-wider mb-4">Thông tin bổ sung</h3>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="col-span-2">
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Vị trí mặc định
+                    </label>
+                    <div className="flex gap-6 p-3 border border-gray-200 rounded-lg bg-white shadow-inner">
+                      {['QUẦY', 'PV'].map(role => (
+                        <label key={role} className="flex items-center gap-2 cursor-pointer">
+                          <input
+                            type="radio"
+                            name="editEmployeeRole"
+                            checked={(editingEmployee.defaultRole || 'PV') === role}
+                            onChange={() => setEditingEmployee({ ...editingEmployee, defaultRole: role as 'QUẦY' | 'PV' })}
+                            className="w-4 h-4 text-blue-600 focus:ring-blue-500"
+                          />
+                          <span className="text-sm text-gray-700">{role === 'QUẦY' ? 'Pha chế (QUẦY)' : 'Phục vụ (PV)'}</span>
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Ngày Vào Làm</label>
+                    <input
+                      type="date"
+                      required
+                      value={editingEmployee.joinDate || ''}
+                      onChange={e => setEditingEmployee({ ...editingEmployee, joinDate: e.target.value })}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none shadow-sm"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Số TK Ngân Hàng</label>
+                    <input
+                      type="text"
+                      value={editingEmployee.bankAccount || ''}
+                      onChange={e => setEditingEmployee({ ...editingEmployee, bankAccount: e.target.value })}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none shadow-sm"
+                      placeholder="Nhập số tài khoản ngân hàng"
+                    />
+                  </div>
+                  <div className="col-span-2">
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Ghi chú</label>
+                    <textarea
+                      value={editingEmployee.notes || ''}
+                      onChange={e => setEditingEmployee({ ...editingEmployee, notes: e.target.value })}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none resize-none shadow-sm"
+                      rows={2}
+                    />
+                  </div>
+                </div>
               </div>
               <div className="flex justify-end gap-3 pt-4">
                 <button
@@ -1910,7 +3354,7 @@ export default function AdminView() {
                 <input
                   type="text"
                   required
-                  value={editingAdmin.email}
+                  value={editingAdmin.email || ''}
                   onChange={e => setEditingAdmin({ ...editingAdmin, email: e.target.value })}
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
                 />
@@ -1921,9 +3365,9 @@ export default function AdminView() {
                   <input
                     type={showAddAdminPin ? "text" : "password"}
                     required
-                    minLength={6}
+                    minLength={4}
                     maxLength={6}
-                    value={editingAdmin.pin}
+                    value={editingAdmin.pin || ''}
                     onChange={e => setEditingAdmin({ ...editingAdmin, pin: e.target.value })}
                     className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none text-center text-xl tracking-widest"
                   />
@@ -1939,7 +3383,7 @@ export default function AdminView() {
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Vai trò</label>
                 <select
-                  value={editingAdmin.role}
+                  value={editingAdmin.role || 'BranchAdmin'}
                   onChange={e => setEditingAdmin({ ...editingAdmin, role: e.target.value as 'SuperAdmin' | 'BranchAdmin' })}
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
                 >
@@ -2080,165 +3524,154 @@ export default function AdminView() {
         </div>
       )}
 
-      {/* Salary History Modal */}
-      {showSalaryHistoryModal && selectedEmpForSalary && (
+      {/* Salary Management Modal */}
+      {showSalaryManagementModal && selectedEmpForSalary && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-[60] animate-in fade-in duration-200">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl overflow-hidden border border-gray-100 flex flex-col max-h-[90vh]">
-            <div className="p-6 border-b border-gray-100 flex justify-between items-center bg-indigo-50">
-              <div>
+            <div className="p-6 border-b border-gray-100 bg-indigo-50">
+              <div className="flex justify-between items-center mb-4">
                 <h2 className="text-xl font-bold text-indigo-900 flex items-center gap-2">
-                  <HistoryIcon className="w-6 h-6" />
-                  Lịch sử lương: {selectedEmpForSalary.fullName}
+                  <DollarSign className="w-6 h-6" />
+                  Quản lý lương: {selectedEmpForSalary.fullName}
                 </h2>
-                <p className="text-sm text-indigo-600 font-medium">Mã NV: {selectedEmpForSalary.empId}</p>
+                <button
+                  onClick={() => {
+                    setShowSalaryManagementModal(false);
+                    setSelectedEmpForSalary(null);
+                  }}
+                  className="p-2 hover:bg-white/50 rounded-full transition-colors"
+                >
+                  <X className="w-6 h-6 text-indigo-900" />
+                </button>
               </div>
-              <button
-                onClick={() => {
-                  setShowSalaryHistoryModal(false);
-                  setSelectedEmpForSalary(null);
-                }}
-                className="p-2 hover:bg-white/50 rounded-full transition-colors"
-              >
-                <X className="w-6 h-6 text-indigo-900" />
-              </button>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setSalaryManagementTab('history')}
+                  className={`px-4 py-2 rounded-lg font-bold text-sm ${salaryManagementTab === 'history' ? 'bg-indigo-600 text-white' : 'bg-white text-indigo-600 hover:bg-indigo-100'}`}
+                >
+                  Lịch sử lương
+                </button>
+                <button
+                  onClick={() => setSalaryManagementTab('increase')}
+                  className={`px-4 py-2 rounded-lg font-bold text-sm ${salaryManagementTab === 'increase' ? 'bg-emerald-600 text-white' : 'bg-white text-emerald-600 hover:bg-emerald-100'}`}
+                >
+                  Tăng lương
+                </button>
+              </div>
             </div>
             
             <div className="p-6 overflow-y-auto flex-1">
-              {salaryHistories.filter(h => h.empId === selectedEmpForSalary.empId).length === 0 ? (
-                <div className="text-center py-12 text-gray-500 italic">
-                  Chưa có lịch sử thay đổi lương
-                </div>
+              {salaryManagementTab === 'history' ? (
+                salaryHistories.filter(h => h.empId === selectedEmpForSalary.empId).length === 0 ? (
+                  <div className="text-center py-12 text-gray-500 italic">Chưa có lịch sử thay đổi lương</div>
+                ) : (
+                  <div className="space-y-4">
+                    {salaryHistories
+                      .filter(h => h.empId === selectedEmpForSalary.empId)
+                      .map((history, idx) => (
+                        <div key={history.id || idx} className="p-4 border border-gray-100 rounded-xl bg-gray-50">
+                          <div className="flex justify-between items-start mb-2">
+                            <span className="text-xs font-bold text-gray-400 uppercase tracking-wider">
+                              {history.effectiveDate ? format(new Date(history.effectiveDate?.toDate?.() || history.effectiveDate), 'dd/MM/yyyy HH:mm') : 'Đang cập nhật...'}
+                            </span>
+                            <span className="px-2 py-1 bg-emerald-100 text-emerald-700 text-[10px] font-bold rounded-full uppercase">Thành công</span>
+                          </div>
+                          <div className="grid grid-cols-2 gap-4 mb-3">
+                            <div>
+                              <p className="text-[10px] font-bold text-gray-400 uppercase mb-1">Lương cũ</p>
+                              <p className="text-sm font-bold text-gray-600 line-through">{(history.oldRate || 0).toLocaleString('en-US')}đ/h</p>
+                              <p className="text-[10px] font-bold text-gray-400 uppercase mt-1">Thưởng cũ</p>
+                              <p className="text-xs font-bold text-gray-500 line-through">{(history.oldBonus || 0).toLocaleString('en-US')}đ/h</p>
+                            </div>
+                            <div>
+                              <p className="text-[10px] font-bold text-emerald-600 uppercase mb-1">Lương mới</p>
+                              <p className="text-lg font-bold text-emerald-700">{(history.newRate || 0).toLocaleString('en-US')}đ/h</p>
+                              <p className="text-[10px] font-bold text-blue-600 uppercase mt-1">Thưởng mới</p>
+                              <p className="text-sm font-bold text-blue-700">{(history.newBonus || 0).toLocaleString('en-US')}đ/h</p>
+                            </div>
+                          </div>
+                          <div className="pt-3 border-t border-gray-200/50">
+                            <p className="text-xs text-gray-600 italic">" {history.reason} "</p>
+                            <p className="text-[10px] text-gray-400 mt-2">Duyệt bởi: <span className="font-bold">{history.approvedBy}</span></p>
+                          </div>
+                        </div>
+                      ))}
+                  </div>
+                )
               ) : (
-                <div className="space-y-4">
-                  {salaryHistories
-                    .filter(h => h.empId === selectedEmpForSalary.empId)
-                    .map((history, idx) => (
-                      <div key={history.id || idx} className="p-4 border border-gray-100 rounded-xl bg-gray-50 hover:bg-white hover:shadow-md transition-all">
-                        <div className="flex justify-between items-start mb-2">
-                          <span className="text-xs font-bold text-gray-400 uppercase tracking-wider">
-                            {format(new Date(history.effectiveDate), 'dd/MM/yyyy HH:mm')}
-                          </span>
-                          <span className="px-2 py-1 bg-emerald-100 text-emerald-700 text-[10px] font-bold rounded-full uppercase">
-                            Thành công
-                          </span>
-                        </div>
-                        <div className="grid grid-cols-2 gap-4 mb-3">
-                          <div>
-                            <p className="text-[10px] font-bold text-gray-400 uppercase mb-1">Lương cũ</p>
-                            <p className="text-sm font-bold text-gray-600 line-through">{history.oldRate.toLocaleString()}đ/h</p>
-                          </div>
-                          <div>
-                            <p className="text-[10px] font-bold text-emerald-600 uppercase mb-1">Lương mới</p>
-                            <p className="text-lg font-bold text-emerald-700">{history.newRate.toLocaleString()}đ/h</p>
-                          </div>
-                        </div>
-                        <div className="pt-3 border-t border-gray-200/50">
-                          <p className="text-xs text-gray-600 italic">" {history.reason} "</p>
-                          <p className="text-[10px] text-gray-400 mt-2">Duyệt bởi: <span className="font-bold">{history.approvedBy}</span></p>
-                        </div>
+                <form onSubmit={handleIncreaseSalary} className="space-y-6">
+                  <div className="p-4 bg-gray-50 rounded-xl border border-gray-100">
+                    <p className="text-xs font-bold text-gray-400 uppercase mb-2">Thông tin hiện tại</p>
+                    <div className="flex justify-between items-center mb-1">
+                      <span className="text-sm text-gray-600">Lương cơ bản hiện tại:</span>
+                      <span className="text-lg font-bold text-gray-900">{(selectedEmpForSalary.hourlyRate || 0).toLocaleString('en-US')}đ/h</span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm text-gray-600">Thưởng TN hiện tại:</span>
+                      <span className="text-lg font-bold text-gray-900">{(selectedEmpForSalary.responsibilityBonus || 0).toLocaleString('en-US')}đ/h</span>
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-bold text-gray-700 mb-2">Lương cơ bản mới (đ/h)</label>
+                      <div className="relative">
+                        <input
+                          type="text"
+                          required
+                          value={newSalaryRateStr}
+                          onChange={e => {
+                            const rawValue = e.target.value.replace(/[^0-9]/g, '');
+                            setNewSalaryRateStr(rawValue ? Number(rawValue).toLocaleString('en-US') : '');
+                            setNewSalaryRate(Number(rawValue));
+                          }}
+                          className="w-full pl-10 pr-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition-all font-bold text-lg"
+                          placeholder="Nhập lương cơ bản..."
+                        />
+                        <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-5 h-5" />
                       </div>
-                    ))}
-                </div>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-bold text-gray-700 mb-2">Thưởng TN mới (đ/h)</label>
+                      <div className="relative">
+                        <input
+                          type="text"
+                          required
+                          value={newBonusRateStr}
+                          onChange={e => {
+                            const rawValue = e.target.value.replace(/[^0-9]/g, '');
+                            setNewBonusRateStr(rawValue ? Number(rawValue).toLocaleString('en-US') : '');
+                            setNewBonusRate(Number(rawValue));
+                          }}
+                          className="w-full pl-10 pr-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all font-bold text-lg"
+                          placeholder="Nhập thưởng TN..."
+                        />
+                        <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-5 h-5" />
+                      </div>
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-bold text-gray-700 mb-2">Lý do tăng lương (Tùy chọn)</label>
+                    <textarea
+                      value={salaryIncreaseReason}
+                      onChange={e => setSalaryIncreaseReason(e.target.value)}
+                      className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition-all min-h-[100px]"
+                      placeholder="VD: Làm việc xuất sắc, tăng lương định kỳ 3 tháng..."
+                    />
+                  </div>
+                  <button
+                    type="submit"
+                    disabled={isSubmitting || newSalaryRate <= selectedEmpForSalary.hourlyRate}
+                    className="w-full py-3 bg-emerald-600 text-white rounded-xl font-bold hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-emerald-200 transition-all flex items-center justify-center gap-2"
+                  >
+                    {isSubmitting ? <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : <>Xác nhận tăng</>}
+                  </button>
+                </form>
               )}
             </div>
           </div>
         </div>
       )}
 
-      {/* Increase Salary Modal */}
-      {showIncreaseSalaryModal && selectedEmpForSalary && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-[60] animate-in fade-in zoom-in-95 duration-200">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden border border-gray-100">
-            <div className="p-6 border-b border-gray-100 flex justify-between items-center bg-emerald-50">
-              <div>
-                <h2 className="text-xl font-bold text-emerald-900 flex items-center gap-2">
-                  <TrendingUp className="w-6 h-6" />
-                  Tăng lương nhân viên
-                </h2>
-                <p className="text-sm text-emerald-600 font-medium">{selectedEmpForSalary.fullName}</p>
-              </div>
-              <button
-                onClick={() => {
-                  setShowIncreaseSalaryModal(false);
-                  setSelectedEmpForSalary(null);
-                }}
-                className="p-2 hover:bg-white/50 rounded-full transition-colors"
-              >
-                <X className="w-6 h-6 text-emerald-900" />
-              </button>
-            </div>
-            
-            <form onSubmit={handleIncreaseSalary} className="p-6 space-y-6">
-              <div className="p-4 bg-gray-50 rounded-xl border border-gray-100">
-                <p className="text-xs font-bold text-gray-400 uppercase mb-2">Thông tin hiện tại</p>
-                <div className="flex justify-between items-center">
-                  <span className="text-sm text-gray-600">Lương hiện tại:</span>
-                  <span className="text-lg font-bold text-gray-900">{selectedEmpForSalary.hourlyRate.toLocaleString()}đ/h</span>
-                </div>
-              </div>
-
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-sm font-bold text-gray-700 mb-2">Mức lương mới (đ/h)</label>
-                  <div className="relative">
-                    <input
-                      type="number"
-                      required
-                      min={selectedEmpForSalary.hourlyRate + 1}
-                      value={newSalaryRate}
-                      onChange={e => setNewSalaryRate(Number(e.target.value))}
-                      className="w-full pl-10 pr-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition-all font-bold text-lg"
-                      placeholder="Nhập mức lương mới..."
-                    />
-                    <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-5 h-5" />
-                  </div>
-                  <p className="text-[10px] text-emerald-600 mt-1 font-bold">
-                    Tăng: +{(newSalaryRate - selectedEmpForSalary.hourlyRate).toLocaleString()}đ/h
-                  </p>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-bold text-gray-700 mb-2">Lý do tăng lương</label>
-                  <textarea
-                    required
-                    value={salaryIncreaseReason}
-                    onChange={e => setSalaryIncreaseReason(e.target.value)}
-                    className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition-all min-h-[100px]"
-                    placeholder="VD: Làm việc xuất sắc, tăng lương định kỳ 3 tháng..."
-                  />
-                </div>
-              </div>
-
-              <div className="flex gap-3 pt-4">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setShowIncreaseSalaryModal(false);
-                    setSelectedEmpForSalary(null);
-                  }}
-                  className="flex-1 py-3 text-gray-600 hover:bg-gray-100 rounded-xl font-bold transition-colors"
-                >
-                  Hủy
-                </button>
-                <button
-                  type="submit"
-                  disabled={isSubmitting || newSalaryRate <= selectedEmpForSalary.hourlyRate}
-                  className="flex-1 py-3 bg-emerald-600 text-white rounded-xl font-bold hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-emerald-200 transition-all flex items-center justify-center gap-2"
-                >
-                  {isSubmitting ? (
-                    <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                  ) : (
-                    <>
-                      <CheckCircle className="w-5 h-5" />
-                      Xác nhận tăng
-                    </>
-                  )}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
           {activeTab === 'lichsu' && currentAdmin?.role === 'SuperAdmin' && (
             <div className="bg-white rounded-2xl p-6 shadow-sm">
               <h2 className="text-xl font-bold text-gray-900 mb-6">Lịch sử hệ thống</h2>
@@ -2268,12 +3701,57 @@ export default function AdminView() {
               </div>
             </div>
           )}
+      {showConfirmModal && confirmAction && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-[100]">
+          <div className="bg-white rounded-2xl p-6 w-full max-w-sm shadow-xl">
+            <h3 className="text-lg font-bold text-gray-900 mb-2">{confirmAction.title}</h3>
+            <p className="text-gray-600 mb-6">{confirmAction.message}</p>
+            <div className="flex gap-3">
+              <button
+                onClick={closeConfirmModal}
+                className="flex-1 py-2.5 text-gray-600 hover:bg-gray-100 rounded-xl font-bold transition-colors"
+              >
+                Hủy
+              </button>
+              <button
+                onClick={() => {
+                  confirmAction.onConfirm();
+                  closeConfirmModal();
+                }}
+                className="flex-1 py-2.5 bg-red-600 text-white rounded-xl font-bold hover:bg-red-700 transition-colors"
+              >
+                Xác nhận
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {showHolidayConfig && (
+        <HolidayConfigModal
+          holidays={holidays}
+          onClose={() => setShowHolidayConfig(false)}
+        />
+      )}
+
+      {editingAdjustment && (
+        <PayrollAdjustmentModal
+          adjustment={editingAdjustment}
+          empName={nhanViens.find(e => e.id === editingAdjustment.empId)?.fullName || ''}
+          monthYear={editingAdjustment.monthYear}
+          empId={editingAdjustment.empId}
+          onClose={() => setEditingAdjustment(null)}
+          onSave={() => setEditingAdjustment(null)}
+        />
+      )}
+
       <div className="mt-8 mb-4 text-center">
         <p className="text-[10px] uppercase tracking-[0.4em] text-slate-500 font-black">
           Cafe HR Manager System
         </p>
         <p className="text-[8px] uppercase tracking-[0.2em] text-slate-400 font-bold mt-1">Version 1.0</p>
+        <p className="text-[10px] text-slate-400 font-medium italic mt-2">Designed by Liem Nguyen</p>
       </div>
+      <Toaster />
     </div>
   );
 }
