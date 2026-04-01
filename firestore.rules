@@ -1,0 +1,54 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function getAdminData() {
+      return get(/databases/$(database)/documents/Admins/$(request.auth.token.email)).data;
+    }
+
+    function isSuperAdmin() {
+      return isAuthenticated() && getAdminData().role == 'SuperAdmin';
+    }
+
+    function isBranchAdmin(branchName) {
+      return isAuthenticated() && getAdminData().role == 'BranchAdmin' && getAdminData().ChiNhanh == branchName;
+    }
+
+    function canAccessBranch(branchName) {
+      return isSuperAdmin() || isBranchAdmin(branchName);
+    }
+
+    match /employees/{docId} {
+      allow read, write: if true; 
+    }
+
+    match /timesheets/{docId} {
+      allow read, write: if true; 
+    }
+
+    match /LichLamViec/{docId} {
+      allow read, write: if true; 
+    }
+
+    match /XinNghiPhep/{docId} {
+      allow read, write: if true; 
+    }
+
+    match /Admins/{docId} {
+      allow read, write: if true;
+    }
+
+    match /CanhBao/{docId} {
+      allow read, write: if true;
+    }
+
+    match /notifications/{docId} {
+      allow read, write: if true;
+    }
+  }
+}

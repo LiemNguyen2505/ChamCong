@@ -1,0 +1,168 @@
+{
+  "entities": {
+    "Employee": {
+      "title": "Employee",
+      "description": "Thông tin nhân viên",
+      "type": "object",
+      "properties": {
+        "empId": { "type": "string" },
+        "fullName": { "type": "string" },
+        "phone": { "type": "string" },
+        "cccd": { "type": "string" },
+        "hourlyRate": { "type": "number" },
+        "pinCode": { "type": "string" },
+        "isFirstLogin": { "type": "boolean" },
+        "joinDate": { "type": "string", "format": "date" },
+        "lastSalaryReviewDate": { "type": "string", "format": "date-time" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["empId", "fullName", "phone", "cccd", "hourlyRate", "pinCode", "isFirstLogin", "joinDate"]
+    },
+    "SalaryHistory": {
+      "title": "SalaryHistory",
+      "description": "Lịch sử tăng lương của nhân viên",
+      "type": "object",
+      "properties": {
+        "empId": { "type": "string" },
+        "fullName": { "type": "string" },
+        "oldRate": { "type": "number" },
+        "newRate": { "type": "number" },
+        "effectiveDate": { "type": "string", "format": "date-time" },
+        "reason": { "type": "string" },
+        "approvedBy": { "type": "string" }
+      },
+      "required": ["empId", "fullName", "oldRate", "newRate", "effectiveDate", "approvedBy"]
+    },
+    "Timesheet": {
+      "title": "Timesheet",
+      "description": "Bản ghi chấm công hàng ngày",
+      "type": "object",
+      "properties": {
+        "timesheetId": { "type": "string" },
+        "empId": { "type": "string" },
+        "locationId": { "type": "string" },
+        "checkInTime": { "type": "string", "format": "date-time" },
+        "checkOutTime": { "type": "string", "format": "date-time" },
+        "totalHours": { "type": "number" },
+        "totalPay": { "type": "number" },
+        "date": { "type": "string" },
+        "SaiSoGPS": { "type": "number" },
+        "AnhVaoCa": { "type": "string" },
+        "AnhRaCa": { "type": "string" },
+        "PhutPhatRoiApp": { "type": "number" },
+        "SoLanRoiApp": { "type": "number" },
+        "createdByAdminId": { "type": "string" }
+      },
+      "required": ["timesheetId", "empId", "locationId", "checkInTime", "date"]
+    },
+    "LichLamViec": {
+      "title": "LichLamViec",
+      "description": "Lịch làm việc của nhân viên",
+      "type": "object",
+      "properties": {
+        "Ngay": { "type": "string" },
+        "empId": { "type": "string" },
+        "locationId": { "type": "string" },
+        "TenCa": { "type": "string" },
+        "GioBatDau": { "type": "string" },
+        "GioKetThuc": { "type": "string" },
+        "TrangThai": { "type": "string" }
+      },
+      "required": ["Ngay", "empId", "locationId", "TenCa", "GioBatDau", "GioKetThuc", "TrangThai"]
+    },
+    "XinNghiPhep": {
+      "title": "XinNghiPhep",
+      "description": "Đơn xin nghỉ phép",
+      "type": "object",
+      "properties": {
+        "NgayGui": { "type": "string", "format": "date-time" },
+        "empId": { "type": "string" },
+        "locationId": { "type": "string" },
+        "NgayNghi": { "type": "string" },
+        "LyDo": { "type": "string" },
+        "TrangThaiDuyet": { "type": "string", "enum": ["cho_duyet", "da_duyet", "tu_choi"] }
+      },
+      "required": ["NgayGui", "empId", "locationId", "NgayNghi", "LyDo", "TrangThaiDuyet"]
+    },
+    "Admin": {
+      "title": "Admin",
+      "description": "Tài khoản quản trị",
+      "type": "object",
+      "properties": {
+        "email": { "type": "string" },
+        "role": { "type": "string", "enum": ["SuperAdmin", "BranchAdmin"] },
+        "locationIds": { "type": "array", "items": { "type": "string" } },
+        "pin": { "type": "string" },
+        "notificationSettings": {
+          "type": "object",
+          "properties": {
+            "enabled": { "type": "boolean" },
+            "filterEmpId": { "type": "string" }
+          }
+        }
+      },
+      "required": ["email", "role", "locationIds", "pin"]
+    },
+    "Notification": {
+      "title": "Notification",
+      "description": "Thông báo chấm công",
+      "type": "object",
+      "properties": {
+        "empId": { "type": "string" },
+        "fullName": { "type": "string" },
+        "locationId": { "type": "string" },
+        "type": { "type": "string", "enum": ["check_in", "check_out"] },
+        "timestamp": { "type": "string", "format": "date-time" },
+        "message": { "type": "string" }
+      },
+      "required": ["empId", "fullName", "locationId", "type", "timestamp", "message"]
+    },
+    "CanhBao": {
+      "title": "CanhBao",
+      "description": "Cảnh báo khẩn",
+      "type": "object",
+      "properties": {
+        "empId": { "type": "string" },
+        "fullName": { "type": "string" },
+        "locationId": { "type": "string" },
+        "ThoiGian": { "type": "string", "format": "date-time" },
+        "NoiDung": { "type": "string" }
+      },
+      "required": ["empId", "fullName", "locationId", "ThoiGian", "NoiDung"]
+    }
+  },
+  "firestore": {
+    "/employees/{docId}": {
+      "schema": { "$ref": "#/entities/Employee" },
+      "description": "Danh sách nhân viên"
+    },
+    "/timesheets/{docId}": {
+      "schema": { "$ref": "#/entities/Timesheet" },
+      "description": "Dữ liệu chấm công"
+    },
+    "/LichLamViec/{docId}": {
+      "schema": { "$ref": "#/entities/LichLamViec" },
+      "description": "Lịch làm việc"
+    },
+    "/XinNghiPhep/{docId}": {
+      "schema": { "$ref": "#/entities/XinNghiPhep" },
+      "description": "Đơn xin nghỉ phép"
+    },
+    "/Admins/{docId}": {
+      "schema": { "$ref": "#/entities/Admin" },
+      "description": "Danh sách admin"
+    },
+    "/CanhBao/{docId}": {
+      "schema": { "$ref": "#/entities/CanhBao" },
+      "description": "Cảnh báo khẩn"
+    },
+    "/notifications/{docId}": {
+      "schema": { "$ref": "#/entities/Notification" },
+      "description": "Thông báo chấm công"
+    },
+    "/SalaryHistory/{docId}": {
+      "schema": { "$ref": "#/entities/SalaryHistory" },
+      "description": "Lịch sử tăng lương"
+    }
+  }
+}
