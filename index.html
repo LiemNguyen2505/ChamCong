@@ -11,6 +11,21 @@
     <meta http-equiv="Expires" content="0" />
 
     <script>
+      // Prevent Uncaught TypeError: Cannot set property fetch of #<Window> which has only a getter
+      try {
+        const fetchDesc = Object.getOwnPropertyDescriptor(window, 'fetch') || Object.getOwnPropertyDescriptor(Window.prototype, 'fetch');
+        if (fetchDesc && !fetchDesc.set) {
+          Object.defineProperty(window, 'fetch', {
+            get: function() { return fetchDesc.value || fetchDesc.get?.call(this); },
+            set: function(val) { console.warn('Ignored attempt to overwrite window.fetch'); },
+            configurable: true,
+            enumerable: true
+          });
+        }
+      } catch (e) {
+        console.error('Failed to polyfill fetch setter', e);
+      }
+
       // Cơ chế kiểm tra phiên bản (Versioning)
       // Thay đổi giá trị APP_VERSION mỗi khi bạn có bản cập nhật code mới
       const APP_VERSION = "1.0.1"; 

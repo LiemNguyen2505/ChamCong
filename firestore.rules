@@ -32,5 +32,10 @@ service cloud.firestore {
     match /timesheets/{timesheetId} {
       allow read, write: if true;
     }
+    
+    // BulletinBoard collection
+    match /BulletinBoard/{noteId} {
+      allow read, write: if true;
+    }
   }
 }
