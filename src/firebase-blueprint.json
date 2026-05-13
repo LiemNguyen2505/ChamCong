@@ -1,0 +1,241 @@
+{
+  "entities": {
+    "Employee": {
+      "title": "Employee",
+      "description": "Thông tin nhân viên",
+      "type": "object",
+      "properties": {
+        "empId": { "type": "string" },
+        "fullName": { "type": "string" },
+        "phone": { "type": "string" },
+        "cccd": { "type": "string" },
+        "hourlyRate": { "type": "number" },
+        "pinCode": { "type": "string" },
+        "isFirstLogin": { "type": "boolean" },
+        "joinDate": { "type": "string", "format": "date" },
+        "status": { "type": "string", "enum": ["Đang làm", "Đã nghỉ"] },
+        "retainedSalaryAmount": { "type": "number" },
+        "retainedSalaryStatus": { "type": "string", "enum": ["Chưa giữ", "Đã giữ", "Đã trả"] },
+        "retainedSalaryBranch": { "type": "string" },
+        "lastSalaryReviewDate": { "type": "string", "format": "date-time" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["empId", "fullName", "phone", "cccd", "hourlyRate", "pinCode", "isFirstLogin", "joinDate"]
+    },
+    "SalaryHistory": {
+      "title": "SalaryHistory",
+      "description": "Lịch sử tăng lương của nhân viên",
+      "type": "object",
+      "properties": {
+        "empId": { "type": "string" },
+        "fullName": { "type": "string" },
+        "oldRate": { "type": "number" },
+        "newRate": { "type": "number" },
+        "effectiveDate": { "type": "string", "format": "date-time" },
+        "reason": { "type": "string" },
+        "approvedBy": { "type": "string" }
+      },
+      "required": ["empId", "fullName", "oldRate", "newRate", "effectiveDate", "approvedBy"]
+    },
+    "Timesheet": {
+      "title": "Timesheet",
+      "description": "Bản ghi chấm công hàng ngày",
+      "type": "object",
+      "properties": {
+        "timesheetId": { "type": "string" },
+        "empId": { "type": "string" },
+        "locationId": { "type": "string" },
+        "checkInTime": { "type": "string", "format": "date-time" },
+        "checkOutTime": { "type": "string", "format": "date-time" },
+        "totalHours": { "type": "number" },
+        "totalPay": { "type": "number" },
+        "date": { "type": "string" },
+        "SaiSoGPS": { "type": "number" },
+        "AnhVaoCa": { "type": "string" },
+        "AnhRaCa": { "type": "string" },
+        "PhutPhatRoiApp": { "type": "number" },
+        "SoLanRoiApp": { "type": "number" },
+        "createdByAdminId": { "type": "string" }
+      },
+      "required": ["timesheetId", "empId", "locationId", "checkInTime", "date"]
+    },
+    "LichLamViec": {
+      "title": "LichLamViec",
+      "description": "Lịch làm việc của nhân viên",
+      "type": "object",
+      "properties": {
+        "date": { "type": "string" },
+        "empId": { "type": "string" },
+        "locationId": { "type": "string" },
+        "shiftName": { "type": "string" },
+        "startTime": { "type": "string" },
+        "endTime": { "type": "string" },
+        "status": { "type": "string" }
+      },
+      "required": ["date", "empId", "locationId", "startTime", "endTime", "status"]
+    },
+    "XinNghiPhep": {
+      "title": "XinNghiPhep",
+      "description": "Đơn xin nghỉ phép",
+      "type": "object",
+      "properties": {
+        "NgayGui": { "type": "string", "format": "date-time" },
+        "empId": { "type": "string" },
+        "locationId": { "type": "string" },
+        "NgayNghi": { "type": "string" },
+        "LyDo": { "type": "string" },
+        "TrangThaiDuyet": { "type": "string", "enum": ["cho_duyet", "da_duyet", "tu_choi"] }
+      },
+      "required": ["NgayGui", "empId", "locationId", "NgayNghi", "LyDo", "TrangThaiDuyet"]
+    },
+    "Admin": {
+      "title": "Admin",
+      "description": "Tài khoản quản trị",
+      "type": "object",
+      "properties": {
+        "email": { "type": "string" },
+        "role": { "type": "string", "enum": ["SuperAdmin", "BranchAdmin"] },
+        "locationIds": { "type": "array", "items": { "type": "string" } },
+        "pin": { "type": "string" },
+        "notificationSettings": {
+          "type": "object",
+          "properties": {
+            "enabled": { "type": "boolean" },
+            "filterEmpId": { "type": "string" }
+          }
+        }
+      },
+      "required": ["email", "role", "locationIds", "pin"]
+    },
+    "Notification": {
+      "title": "Notification",
+      "description": "Hệ thống thông báo đồng bộ đa tầng",
+      "type": "object",
+      "properties": {
+        "recipientId": { "type": "string", "description": "ID người nhận (empId, email của admin, hoặc 'all')" },
+        "locationId": { "type": "string", "description": "ID quán hoặc 'all'" },
+        "title": { "type": "string" },
+        "message": { "type": "string" },
+        "type": { "type": "string", "enum": ["violation", "salary", "shift", "system", "support", "approval"] },
+        "priority": { "type": "string", "enum": ["low", "medium", "high"] },
+        "isRead": { "type": "boolean" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "senderId": { "type": "string" },
+        "relatedId": { "type": "string", "description": "ID của đối tượng liên quan (VD: requestId, violationId)" }
+      },
+      "required": ["recipientId", "locationId", "title", "message", "type", "isRead", "createdAt"]
+    },
+    "CanhBao": {
+      "title": "CanhBao",
+      "description": "Cảnh báo khẩn",
+      "type": "object",
+      "properties": {
+        "empId": { "type": "string" },
+        "fullName": { "type": "string" },
+        "locationId": { "type": "string" },
+        "ThoiGian": { "type": "string", "format": "date-time" },
+        "NoiDung": { "type": "string" }
+      },
+      "required": ["empId", "fullName", "locationId", "ThoiGian", "NoiDung"]
+    },
+    "ApprovalRequest": {
+      "title": "ApprovalRequest",
+      "description": "Yêu cầu cần admin duyệt (vào trễ, ra sớm, đổi ca, thoát app, nghỉ đột xuất...)",
+      "type": "object",
+      "properties": {
+        "empId": { "type": "string" },
+        "fullName": { "type": "string" },
+        "locationId": { "type": "string" },
+        "type": { "type": "string", "enum": ["checkin_early", "checkin_late", "checkout_different", "shift_swap", "app_exit", "off_sudden"] },
+        "status": { "type": "string", "enum": ["pending", "approved", "rejected"] },
+        "timestamp": { "type": "string", "format": "date-time" },
+        "details": { "type": "object" },
+        "note": { "type": "string" },
+        "adminId": { "type": "string" },
+        "processedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["empId", "fullName", "locationId", "type", "status", "timestamp"]
+    },
+    "BulletinBoard": {
+      "title": "BulletinBoard",
+      "description": "Bảng tin nội bộ (Sticky Notes)",
+      "type": "object",
+      "properties": {
+        "content": { "type": "string" },
+        "authorId": { "type": "string" },
+        "authorName": { "type": "string" },
+        "authorAvatar": { "type": "string" },
+        "authorRole": { "type": "string" },
+        "locationId": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "readBy": { "type": "array", "items": { "type": "string" } },
+        "color": { "type": "string" },
+        "isPinned": { "type": "boolean" }
+      },
+      "required": ["content", "authorId", "authorName", "authorRole", "locationId", "createdAt", "color"]
+    },
+    "Violation": {
+      "title": "Violation",
+      "description": "Ghi nhận vi phạm/nhắc nhở nhân viên",
+      "type": "object",
+      "properties": {
+        "empId": { "type": "string" },
+        "monthYear": { "type": "string" },
+        "date": { "type": "string" },
+        "type": { "type": "string" },
+        "note": { "type": "string" },
+        "adminId": { "type": "string" },
+        "timestamp": { "type": "string", "format": "date-time" },
+        "isConfirmed": { "type": "boolean" },
+        "confirmedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["empId", "monthYear", "date", "type", "adminId", "timestamp"]
+    }
+  },
+  "firestore": {
+    "/employees/{docId}": {
+      "schema": { "$ref": "#/entities/Employee" },
+      "description": "Danh sách nhân viên"
+    },
+    "/timesheets/{docId}": {
+      "schema": { "$ref": "#/entities/Timesheet" },
+      "description": "Dữ liệu chấm công"
+    },
+    "/LichLamViec/{docId}": {
+      "schema": { "$ref": "#/entities/LichLamViec" },
+      "description": "Lịch làm việc"
+    },
+    "/XinNghiPhep/{docId}": {
+      "schema": { "$ref": "#/entities/XinNghiPhep" },
+      "description": "Đơn xin nghỉ phép"
+    },
+    "/Admins/{docId}": {
+      "schema": { "$ref": "#/entities/Admin" },
+      "description": "Danh sách admin"
+    },
+    "/CanhBao/{docId}": {
+      "schema": { "$ref": "#/entities/CanhBao" },
+      "description": "Cảnh báo khẩn"
+    },
+    "/notifications/{docId}": {
+      "schema": { "$ref": "#/entities/Notification" },
+      "description": "Thông báo chấm công"
+    },
+    "/SalaryHistory/{docId}": {
+      "schema": { "$ref": "#/entities/SalaryHistory" },
+      "description": "Lịch sử tăng lương"
+    },
+    "/ApprovalRequests/{docId}": {
+      "schema": { "$ref": "#/entities/ApprovalRequest" },
+      "description": "Yêu cầu cần duyệt"
+    },
+    "/BulletinBoard/{docId}": {
+      "schema": { "$ref": "#/entities/BulletinBoard" },
+      "description": "Bảng tin nội bộ"
+    },
+    "/Violations/{docId}": {
+      "schema": { "$ref": "#/entities/Violation" },
+      "description": "Dữ liệu vi phạm/nhắc nhở"
+    }
+  }
+}

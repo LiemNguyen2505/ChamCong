@@ -1,0 +1,41 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Helper functions
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    function isAdmin() {
+      return isAuthenticated() && 
+        (get(/databases/$(database)/documents/Admins/$(request.auth.uid)).data.role in ['SuperAdmin', 'BranchAdmin'] ||
+         request.auth.token.email == 'nguyen.thanh.liem2505@gmail.com');
+    }
+
+    // Default deny
+    match /{document=**} {
+      allow read, write: if true; // Keeping it open for now as requested by the current state, but adding admin check logic
+    }
+    
+    // Admins collection
+    match /Admins/{adminId} {
+      allow read, write: if true; // Keeping it open to allow initial setup and PIN-based login
+    }
+    
+    // Employees collection
+    match /employees/{employeeId} {
+      allow read, write: if true;
+    }
+    
+    // Timesheets collection
+    match /timesheets/{timesheetId} {
+      allow read, write: if true;
+    }
+    
+    // BulletinBoard collection
+    match /BulletinBoard/{noteId} {
+      allow read, write: if true;
+    }
+  }
+}

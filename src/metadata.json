@@ -1,0 +1,8 @@
+{
+  "name": "Cafe HR Manager",
+  "description": "Ứng dụng chấm công nhân sự F&B với xác thực vị trí và hình ảnh",
+  "requestFramePermissions": [
+    "camera",
+    "geolocation"
+  ]
+}
