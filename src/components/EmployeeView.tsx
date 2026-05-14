@@ -256,7 +256,7 @@ export default function EmployeeView({
       />
 
       <div className="flex-1 flex flex-col justify-start items-center w-full overflow-y-auto pt-4 px-3">
-        <div className="w-full max-w-md bg-white rounded-[2rem] shadow-2xl overflow-hidden border border-slate-100 mb-6 px-3 py-6">
+        <div className="w-full max-w-md bg-white rounded-[2rem] shadow-2xl overflow-hidden border border-slate-100 mb-6 px-3 py-6" style={{ marginTop: '-13px' }}>
           {successMsg && (
             <div className="mb-4 bg-emerald-50 border border-emerald-200 text-emerald-700 p-4 rounded-xl flex items-start">
               <CheckCircle className="w-5 h-5 mr-3 mt-0.5" />
