@@ -36,7 +36,7 @@ export const EmployeeLoginForm: React.FC<EmployeeLoginFormProps> = ({
     <div className="w-full max-w-[380px] mx-auto flex flex-col gap-6">
       <div className="text-center animate-in fade-in slide-in-from-bottom-4 duration-1000">
         <p className="text-sm text-stone-600 font-medium italic opacity-80">
-          "Chúc bạn một ngày làm việc năng lượng tại {kioskBranch || 'Góc Phố'}!"
+          "Chúc bạn một ngày làm việc năng lượng tại {kioskBranch}!"
         </p>
       </div>
       <form onSubmit={onLogin} className={`w-full bg-white/90 backdrop-blur-xl rounded-[2rem] shadow-[0_8px_30px_rgb(0,0,0,0.04)] p-8 border border-white/50 relative z-10 flex flex-col items-center transition-all duration-500`}>
