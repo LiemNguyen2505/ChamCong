@@ -173,13 +173,14 @@ export const EmployeeAttendancePanel: React.FC<EmployeeAttendancePanelProps> = (
         <div className="grid grid-cols-2 gap-0 relative z-10 border-stone-100">
           {/* Column 1: Salary */}
           <div className="flex flex-col items-center justify-center pr-4">
-            <div className="flex items-center gap-1.5 mb-2 px-1 whitespace-nowrap">
-              <h3 className={`font-bold ${theme.text} uppercase tracking-widest text-[12px] opacity-60 leading-none`}>Lương Dự Kiến</h3>
+            <div className="flex items-center gap-1.5 mb-2 px-1 whitespace-nowrap" style={{ marginTop: '8px' }}>
+              <h3 className={`font-bold ${theme.text} uppercase tracking-widest text-[12px] opacity-60 leading-none`} style={{ marginTop: '8px' }}>Lương Dự Kiến</h3>
               <button 
                 onClick={() => setShowStats(!showStats)} 
                 className={`${theme.text} opacity-60 hover:opacity-100 transition-opacity`}
+                style={{ marginTop: '-6px', paddingTop: '8px' }}
               >
-                {showStats ? <EyeOff strokeWidth={1.5} className="w-5 h-5" /> : <Eye strokeWidth={1.5} className="w-5 h-5" />}
+                {showStats ? <EyeOff strokeWidth={1.5} className="w-5 h-5" style={{ marginTop: '-2px' }} /> : <Eye strokeWidth={1.5} className="w-5 h-5" style={{ marginTop: '-2px' }} />}
               </button>
             </div>
             <div className="flex items-baseline gap-1">
@@ -191,7 +192,7 @@ export const EmployeeAttendancePanel: React.FC<EmployeeAttendancePanelProps> = (
           </div>
 
           {/* Column 2: Hours */}
-          <div className="flex flex-col border-l border-stone-200 pl-4 items-center justify-center">
+          <div className="flex flex-col border-l border-stone-200 pl-4 items-center justify-center" style={{ marginTop: '15px' }}>
             <div className="flex items-center gap-1.5 mb-2 whitespace-nowrap">
               <h3 className={`font-bold ${theme.text} uppercase tracking-widest text-[12px] opacity-60 leading-none`}>Tổng Giờ Công</h3>
               <Clock strokeWidth={2.5} className={`w-[22px] h-[22px] ${theme.text} opacity-60`} />
