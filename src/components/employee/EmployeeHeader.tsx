@@ -26,7 +26,7 @@ export const EmployeeHeader: React.FC<EmployeeHeaderProps> = ({
   onShowNotifications
 }) => {
   return (
-    <header className={`h-auto whitespace-nowrap ${theme.accent} flex flex-col px-4 md:px-8 flex-none z-40 shadow-md w-full left-0 transition-colors duration-500 pt-3 pb-3 md:pt-3 md:pb-4`}>
+    <header className={`h-auto whitespace-nowrap ${theme.accent} flex flex-col px-4 md:px-8 flex-none z-40 shadow-md w-full left-0 transition-colors duration-500 pt-2 pb-3 md:pt-2 md:pb-4`}>
       {/* Row 1: Branch Name and Action Icons */}
       <div className="flex items-center justify-between w-full">
         <div className="flex items-center gap-2">
@@ -42,7 +42,7 @@ export const EmployeeHeader: React.FC<EmployeeHeaderProps> = ({
               e.stopPropagation();
               onBranchReset();
             }}
-            className="p-3 hover:bg-white/20 active:bg-white/30 rounded-xl transition-all flex items-center justify-center"
+            className="p-2.5 hover:bg-white/20 active:bg-white/30 rounded-xl transition-all flex items-center justify-center"
             title="Đổi quán"
           >
             <RefreshCw className="w-6 h-6 text-white" />
