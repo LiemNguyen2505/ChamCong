@@ -170,10 +170,10 @@ export const EmployeeAttendancePanel: React.FC<EmployeeAttendancePanelProps> = (
           <Clock className="w-40 h-40" />
         </div>
 
-        <div className="grid grid-cols-2 gap-6 relative z-10">
+        <div className="grid grid-cols-2 gap-0 relative z-10 border-stone-100">
           {/* Column 1: Salary */}
-          <div className="flex flex-col">
-            <div className="flex items-center gap-1.5 mb-2 px-1">
+          <div className="flex flex-col items-center justify-center pr-4">
+            <div className="flex items-center gap-1.5 mb-2 px-1 whitespace-nowrap">
               <h3 className={`font-bold ${theme.text} uppercase tracking-widest text-[12px] opacity-60 leading-none`}>Lương Dự Kiến</h3>
               <button 
                 onClick={() => setShowStats(!showStats)} 
@@ -191,8 +191,8 @@ export const EmployeeAttendancePanel: React.FC<EmployeeAttendancePanelProps> = (
           </div>
 
           {/* Column 2: Hours */}
-          <div className="flex flex-col border-l border-stone-200 pl-6">
-            <div className="flex items-center gap-1.5 mb-2">
+          <div className="flex flex-col border-l border-stone-200 pl-4 items-center justify-center">
+            <div className="flex items-center gap-1.5 mb-2 whitespace-nowrap">
               <h3 className={`font-bold ${theme.text} uppercase tracking-widest text-[12px] opacity-60 leading-none`}>Tổng Giờ Công</h3>
               <Clock strokeWidth={2.5} className={`w-[22px] h-[22px] ${theme.text} opacity-60`} />
             </div>
@@ -205,13 +205,20 @@ export const EmployeeAttendancePanel: React.FC<EmployeeAttendancePanelProps> = (
           </div>
         </div>
 
-        <div className="grid grid-cols-1 gap-3 mt-8 relative z-10">
+        <div className="grid grid-cols-2 gap-3 mt-8 relative z-10">
+          <button 
+            onClick={() => setShowSalaryDetails(true)}
+            className={`py-3 rounded-2xl ${theme.button} text-white shadow-lg ${theme.shadow} transition-all active:scale-[0.97] flex items-center justify-center gap-2`}
+          >
+            <FileText className="w-4 h-4 opacity-70" />
+            <span className="text-[11px] font-black uppercase tracking-widest text-white">CHI TIẾT LƯƠNG</span>
+          </button>
           <button 
             onClick={() => setShowHistory(true)}
             className={`py-3 rounded-2xl ${theme.button} text-white shadow-lg ${theme.shadow} transition-all active:scale-[0.97] flex items-center justify-center gap-2`}
           >
             <History className="w-4 h-4 opacity-70" />
-            <span className="text-[11px] font-black uppercase tracking-widest text-white">LỊCH SỬ GIỜ CÔNG</span>
+            <span className="text-[11px] font-black uppercase tracking-widest text-white">BẢNG CHẤM CÔNG</span>
           </button>
         </div>
       </div>
