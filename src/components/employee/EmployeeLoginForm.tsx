@@ -82,7 +82,7 @@ export const EmployeeLoginForm: React.FC<EmployeeLoginFormProps> = ({
                 placeholder=""
                 value={pinInput}
                 onChange={(e) => setPinInput(e.target.value)}
-                className={`w-full px-4 h-[52px] pl-12 rounded-2xl bg-slate-50 border border-slate-200 focus:ring-2 ${theme.ring.replace('focus:ring-', 'focus:ring-').replace(']', ']/20')} focus:${theme.accent.replace('bg-', 'border-')} text-left text-lg ${theme.text} transition-all font-black outline-none`}
+                className={`w-full px-4 h-[52px] pl-12 rounded-xl bg-slate-50 border border-slate-200 focus:ring-2 ${theme.ring.replace('focus:ring-', 'focus:ring-').replace(']', ']/20')} focus:${theme.accent.replace('bg-', 'border-')} text-left text-lg ${theme.text} transition-all font-black outline-none`}
                 maxLength={6}
               />
               <button
