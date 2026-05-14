@@ -124,8 +124,8 @@ export const useEmployeeAuth = (employees: Employee[], admins: any[], kioskBranc
       setShowDeviceError(false);
       setPendingEmployee(null);
       setError(null);
-      setSuccessMsg('Đã đổi thiết bị thành công. Chào mừng bạn trở lại!');
-      setTimeout(() => setSuccessMsg(null), 3000);
+      // setSuccessMsg('Đã đổi thiết bị thành công. Chào mừng bạn trở lại!');
+      // setTimeout(() => setSuccessMsg(null), 3000);
     } catch (err) {
       console.error(err);
       setError('Lỗi khi đổi thiết bị. Vui lòng thử lại hoặc liên hệ quản lý.');
