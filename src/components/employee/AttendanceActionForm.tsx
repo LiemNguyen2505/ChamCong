@@ -53,7 +53,7 @@ export const AttendanceActionForm: React.FC<AttendanceActionFormProps> = ({
 }) => {
   return (
     <div className="space-y-4 animate-in fade-in zoom-in-95 duration-300">
-      <div className="flex items-center justify-between -mt-6 mb-2">
+      <div className="flex items-center justify-between -mt-3 mb-2">
         <h3 className="font-bold text-stone-800 text-lg flex items-center">
           <MapPin className={`w-5 h-5 mr-2 ${theme.text}`} />
           Xác thực vị trí & Khuôn mặt
@@ -144,7 +144,7 @@ export const AttendanceActionForm: React.FC<AttendanceActionFormProps> = ({
                 </div>
               </div>
             ) : (
-              <div className={`${theme.bg} ${theme.text} p-2 rounded-xl text-[9px] border border-dashed ${theme.border} flex items-center gap-1.5 shadow-sm`}>
+              <div className={`${theme.bg} ${theme.text} p-2 rounded-xl text-[11px] border border-dashed ${theme.border} flex items-center gap-1.5 shadow-sm`}>
                 <AlertTriangle className="w-3.5 h-3.5 flex-shrink-0" />
                 <span className="font-black uppercase tracking-tight">Ca phát sinh</span>
               </div>
@@ -153,7 +153,7 @@ export const AttendanceActionForm: React.FC<AttendanceActionFormProps> = ({
 
           <div className="flex flex-col gap-1.5">
             <div className="flex items-center">
-              <label className={`px-2 py-0.5 rounded-md font-black text-white text-[9px] uppercase tracking-wider ${actionType === 'check-in' ? 'bg-emerald-600' : 'bg-red-600'}`}>
+              <label className={`px-2 py-0.5 rounded-md font-black text-white text-[11px] uppercase tracking-wider ${actionType === 'check-in' ? 'bg-emerald-600' : 'bg-red-600'}`}>
                 Giờ {actionType === 'check-in' ? 'vào' : 'ra'} ca:
               </label>
             </div>
