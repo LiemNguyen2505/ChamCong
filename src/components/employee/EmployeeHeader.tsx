@@ -26,7 +26,7 @@ export const EmployeeHeader: React.FC<EmployeeHeaderProps> = ({
   onShowNotifications
 }) => {
   return (
-    <header className={`h-auto whitespace-nowrap ${theme.accent} flex flex-col px-4 md:px-8 flex-none z-40 shadow-md w-full left-0 transition-colors duration-500 pt-3 pb-3 md:pt-4 md:pb-4`}>
+    <header className={`h-auto whitespace-nowrap ${theme.accent} flex flex-col px-4 md:px-8 flex-none z-40 shadow-md w-full left-0 transition-colors duration-500 pt-3 pb-3 md:pt-3 md:pb-4`}>
       {/* Row 1: Branch Name and Action Icons */}
       <div className="flex items-center justify-between w-full">
         <div className="flex items-center gap-2">
@@ -82,7 +82,7 @@ export const EmployeeHeader: React.FC<EmployeeHeaderProps> = ({
       </div>
 
       {/* Row 2: Greeting and Clock Centered */}
-      <div className="flex items-center justify-between w-full mt-2 relative">
+      <div className="flex items-center justify-between w-full -mt-3 md:-mt-2 relative">
         <div className="min-w-0">
           {loggedInEmployee ? (
             <span className="text-[14px] md:text-base font-medium text-white/90 italic">
