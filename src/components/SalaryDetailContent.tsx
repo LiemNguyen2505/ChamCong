@@ -638,7 +638,7 @@ export default function SalaryDetailContent({
       </div>
 
       {/* 3. TỔNG LÃNH */}
-      <div className={`${currentStats.actualSalary < 0 ? 'bg-rose-900 shadow-rose-900/20' : `${adminTheme?.accent || 'bg-[#5c3529]'} shadow-stone-900/10`} rounded-t-[2rem] rounded-b-[2rem] p-5 pb-[min(env(safe-area-inset-bottom,20px)+20px,20px)] sm:pb-5 text-white shadow-[0_-10px_40px_rgba(0,0,0,0.15)] space-y-2 sticky bottom-0 -mx-3 -mb-3 mt-4 transition-all duration-500 z-50`}>
+      <div className={`${currentStats.actualSalary < 0 ? 'bg-rose-900 shadow-rose-900/20' : `${theme?.accent || adminTheme?.accent || 'bg-[#5c3529]'} shadow-stone-900/10`} rounded-t-[2rem] rounded-b-[2rem] p-5 pb-[min(env(safe-area-inset-bottom,20px)+20px,20px)] sm:pb-5 text-white shadow-[0_-10px_40px_rgba(0,0,0,0.15)] space-y-2 sticky bottom-0 -mx-3 -mb-3 mt-4 transition-all duration-500 z-50`}>
         <div className="flex justify-between items-center px-2">
            <div className="space-y-0.5">
              <p className="text-base font-black text-white uppercase tracking-[0.2em]">Thực lãnh</p>
