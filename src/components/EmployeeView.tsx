@@ -48,7 +48,7 @@ export default function EmployeeView({
   isLoading: boolean
 }) {
   const navigate = useNavigate();
-  const [kioskBranch, setKioskBranch] = useState<string | null>(localStorage.getItem('kioskBranch') || 'Góc Phố');
+  const [kioskBranch, setKioskBranch] = useState<string | null>(localStorage.getItem('kioskBranch'));
   const [tapCount, setTapCount] = useState(0);
   const tapTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -126,6 +126,15 @@ export default function EmployeeView({
     handleConfirmAction
   } = useEmployeeAttendance(loggedInEmployee, kioskBranch, globalData.lichLamViecs, latestLog, fetchInitialData, admins);
 
+  useEffect(() => {
+    if (loggedInEmployee && loggedInEmployee.locationId) {
+      if (loggedInEmployee.locationId !== kioskBranch) {
+        setKioskBranch(loggedInEmployee.locationId);
+        localStorage.setItem('kioskBranch', loggedInEmployee.locationId);
+      }
+    }
+  }, [loggedInEmployee, kioskBranch]);
+
   const [selectedMonth, setSelectedMonth] = useState(format(new Date(), 'yyyy-MM'));
 
   const { monthlyStats } = useEmployeeSalary(loggedInEmployee, monthTimesheets, payrollAdjustments, holidays, selectedMonth);
@@ -182,6 +191,7 @@ export default function EmployeeView({
   const handleBackToBranchSelection = () => {
     localStorage.removeItem('kioskBranch');
     setKioskBranch(null);
+    handleLogout();
   };
 
   const { notifications: navNotifications, markAsRead, markAllAsRead } = useNotifications(
@@ -276,6 +286,7 @@ export default function EmployeeView({
                 showDeviceError={showDeviceError}
                 onLogin={handleLogin}
                 setShowResetPinModal={setShowResetPinModal}
+                kioskBranch={kioskBranch || ''}
               />
             ) : (
               <EmployeeAttendancePanel 
