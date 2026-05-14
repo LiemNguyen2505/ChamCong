@@ -11,7 +11,7 @@ export const EmployeeClock = () => {
   }, []);
 
   return (
-    <div className="text-2xl md:text-3xl font-mono font-black tracking-wider text-white flex items-center">
+    <div className="text-xl md:text-2xl font-mono font-black tracking-wider text-white flex items-center">
       <span>{format(time, 'HH')}</span>
       <span className="animate-pulse-clock mx-0.5">:</span>
       <span>{format(time, 'mm')}</span>
