@@ -27,6 +27,8 @@ export const EmployeeViolationTracker: React.FC<EmployeeViolationTrackerProps> =
   const [isProcessing, setIsProcessing] = React.useState<string | null>(null);
   const [showRules, setShowRules] = React.useState(false);
   const [showHistory, setShowHistory] = React.useState(false);
+  const [showRejectConfirm, setShowRejectConfirm] = React.useState(false);
+  const [selectedViolationToReject, setSelectedViolationToReject] = React.useState<Violation | null>(null);
   const count = violations.length;
   
   const todayStr = format(new Date(), 'yyyy-MM-dd');
@@ -46,8 +48,14 @@ export const EmployeeViolationTracker: React.FC<EmployeeViolationTrackerProps> =
   const todayItems = allItems.filter(item => item.date === todayStr);
   const olderItems = allItems.filter(item => item.date !== todayStr);
 
-  const handleReject = async (violation: Violation) => {
-    if (!window.confirm(`Bạn có chắc chắn không thừa nhận lỗi "${violation.type}"? Quản lý sẽ nhận được phản hồi của bạn.`)) return;
+  const handleReject = (violation: Violation) => {
+    setSelectedViolationToReject(violation);
+    setShowRejectConfirm(true);
+  };
+
+  const confirmReject = async () => {
+    if (!selectedViolationToReject) return;
+    const violation = selectedViolationToReject;
     
     setIsProcessing(violation.id);
     try {
@@ -58,20 +66,22 @@ export const EmployeeViolationTracker: React.FC<EmployeeViolationTrackerProps> =
 
       // Send notification to Admin and Super Admin
       await addDoc(collection(db, 'Notifications'), {
-        recipientId: 'all_admins',
-        locationId: violation.locationId || employeeInfo?.locationId || 'All',
+        recipientId: 'admin',
+        locationId: violation.locationId || employeeInfo?.locationId || 'all',
         title: 'Nhân viên từ chối nhận lỗi',
         message: `Nhân viên ${employeeInfo?.fullName || 'Ẩn danh'} TỪ CHỐI NHẬN lỗi: ${violation.type} ngày ${safeFormat(violation.date, 'dd/MM')}. Vui lòng kiểm tra lại.`,
         type: 'support',
         priority: 'high',
         isRead: false,
         createdAt: serverTimestamp(),
-        senderId: employeeInfo?.id,
+        senderId: employeeInfo?.id || employeeInfo?.empId,
         relatedId: violation.id
       });
 
       toast.success('Đã gửi thông báo từ chối lỗi đến Quản lý');
       if (onRefresh) onRefresh();
+      setShowRejectConfirm(false);
+      setSelectedViolationToReject(null);
     } catch (error) {
       console.error('Error rejecting violation:', error);
       toast.error('Lỗi khi gửi phản hồi');
@@ -192,7 +202,7 @@ export const EmployeeViolationTracker: React.FC<EmployeeViolationTrackerProps> =
           {(!monthlyStats?.lateDetails?.length && !violations.length) ? (
             <div className="py-2 flex items-center justify-center gap-3 bg-emerald-50 rounded-xl border border-emerald-100">
               <CheckCircle className="w-4 h-4 text-emerald-500" />
-              <span className="text-[10px] font-black text-emerald-600 uppercase tracking-widest">Tuyệt vời! Không có vi phạm</span>
+              <span className="text-[10px] font-black text-emerald-600 uppercase tracking-widest text-center px-4">Tuyệt vời! Bạn là nhân viên có tinh thần trách nhiệm cao</span>
             </div>
           ) : (
             <div className="space-y-3">
@@ -456,6 +466,62 @@ export const EmployeeViolationTracker: React.FC<EmployeeViolationTrackerProps> =
                   className="w-full py-4 bg-slate-900 text-white font-black rounded-2xl shadow-xl active:scale-95 transition-all uppercase tracking-widest"
                 >
                   ĐÃ HIỂU QUY ĐỊNH
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+
+        {showRejectConfirm && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => {
+                if (!isProcessing) {
+                  setShowRejectConfirm(false);
+                  setSelectedViolationToReject(null);
+                }
+              }}
+              className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm"
+            />
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.9, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.9, y: 20 }}
+              className="relative w-full max-w-sm bg-white rounded-[2.5rem] shadow-2xl overflow-hidden border border-slate-100 p-8 text-center"
+            >
+              <div className="w-16 h-16 bg-rose-50 rounded-full flex items-center justify-center mx-auto mb-6">
+                <ShieldAlert className="w-8 h-8 text-rose-500" />
+              </div>
+              
+              <h3 className="text-lg font-black text-slate-900 uppercase tracking-tight mb-2">Từ chối vi phạm</h3>
+              <p className="text-sm text-slate-500 font-medium leading-relaxed mb-8">
+                Bạn vừa từ chối lỗi <span className="text-rose-600 font-bold">"{selectedViolationToReject?.type}"</span>. Thông báo sẽ được gửi cho Quản lý để kiểm tra lại.
+              </p>
+
+              <div className="grid grid-cols-2 gap-3">
+                <button 
+                  onClick={() => {
+                    setShowRejectConfirm(false);
+                    setSelectedViolationToReject(null);
+                  }}
+                  disabled={!!isProcessing}
+                  className="py-4 bg-slate-100 text-slate-500 font-black rounded-2xl active:scale-95 transition-all uppercase tracking-widest text-xs"
+                >
+                  Hủy
+                </button>
+                <button 
+                  onClick={confirmReject}
+                  disabled={!!isProcessing}
+                  className="py-4 bg-rose-600 text-white font-black rounded-2xl shadow-lg shadow-rose-200 active:scale-95 transition-all uppercase tracking-widest text-xs flex justify-center items-center"
+                >
+                  {isProcessing ? (
+                    <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                  ) : (
+                    'Xác nhận'
+                  )}
                 </button>
               </div>
             </motion.div>
