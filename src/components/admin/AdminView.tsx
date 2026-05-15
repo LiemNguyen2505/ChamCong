@@ -26,6 +26,7 @@ import { MonthlyAttendanceTable } from '../MonthlyAttendanceTable';
 import { Dashboard } from '../Dashboard';
 import { AdminManagement } from './AdminManagement';
 import { ViolationManagement } from '../ViolationManagement';
+import { RegulationsTab } from './RegulationsTab';
 import { SystemLogs } from '../SystemLogs';
 import { Alerts } from '../Alerts';
 import { AttendanceTab } from '../AttendanceTab';
@@ -604,6 +605,11 @@ export default function AdminView({
             activeTab={activeTab}
             currentAdmin={currentAdmin}
             auditLogs={auditLogs}
+          />
+
+          <RegulationsTab 
+            activeTab={activeTab}
+            adminTheme={adminTheme}
           />
 
       <ChangePinModal
