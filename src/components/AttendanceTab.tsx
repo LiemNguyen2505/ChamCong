@@ -2,7 +2,7 @@ import React from 'react';
 import { format } from 'date-fns';
 import { vi } from 'date-fns/locale';
 import { motion } from 'motion/react';
-import { Plus, Download, Calendar, X, ChevronLeft, ChevronRight, CheckCircle2, Edit2, Trash2, Smartphone, Clock, AlertCircle, ChevronDown, FileCheck, Image as ImageIcon, MapPin } from 'lucide-react';
+import { Plus, Download, Calendar, X, ChevronLeft, ChevronRight, CheckCircle2, Edit2, Trash2, Smartphone, Clock, AlertCircle, ChevronDown, FileCheck, Image as ImageIcon, MapPin, ArrowLeft } from 'lucide-react';
 import { MonthlyAttendanceTable } from './MonthlyAttendanceTable';
 import { Employee, Timesheet, AdminAccount } from '../types/admin';
 import { safeFormat, safeParseDate } from '../utils/dateUtils';
@@ -230,15 +230,40 @@ export const AttendanceTab: React.FC<AttendanceTabProps> = ({
           <div className="space-y-4 flex-1">
             {/* Desktop Title */}
             <h2 className="hidden md:flex text-xl md:text-3xl font-black text-slate-900 tracking-tight items-center gap-3">
+              {(historyDay || historyEmployee) && (
+                <button
+                  onClick={() => {
+                    setHistoryDay(null);
+                    setHistoryEmployee(null);
+                  }}
+                  className="p-2 hover:bg-slate-100 rounded-full transition-colors text-slate-500"
+                  title="Quay lại"
+                >
+                  <ArrowLeft className="w-6 h-6 md:w-8 md:h-8" />
+                </button>
+              )}
               <Calendar className="w-6 h-6 md:w-8 md:h-8 text-blue-600" />
-              <span className="uppercase md:normal-case">Bảng chấm công tháng</span>
+              <span className="uppercase">Bảng Chấm Công</span>
             </h2>
 
             {/* Mobile Row 1: Title + Month-Year */}
             <div className="md:hidden flex items-center justify-between gap-2">
-              <h2 className="text-[15px] font-black text-slate-800 tracking-tight leading-none">
-                Bảng chấm công tháng
-              </h2>
+              <div className="flex items-center gap-2">
+                {(historyDay || historyEmployee) && (
+                  <button
+                    onClick={() => {
+                      setHistoryDay(null);
+                      setHistoryEmployee(null);
+                    }}
+                    className="p-1 hover:bg-slate-100 rounded-full transition-colors text-slate-500"
+                  >
+                    <ArrowLeft className="w-5 h-5" />
+                  </button>
+                )}
+                <h2 className="text-[15px] font-black text-slate-800 tracking-tight leading-none uppercase">
+                  Bảng Chấm Công
+                </h2>
+              </div>
               <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-xl shadow-inner border border-slate-200">
                 <button
                   onClick={handlePrevMonth}
@@ -286,18 +311,7 @@ export const AttendanceTab: React.FC<AttendanceTabProps> = ({
 
           <div className="flex flex-col gap-3">
             <div className="flex flex-wrap items-center gap-3 w-full">
-              {(historyDay || historyEmployee) && (
-                <button
-                  onClick={() => {
-                    setHistoryDay(null);
-                    setHistoryEmployee(null);
-                  }}
-                  className="hidden md:flex items-center gap-2 px-5 py-2.5 bg-slate-800 text-white rounded-2xl text-xs font-black uppercase tracking-widest hover:bg-slate-700 transition-all shadow-lg active:scale-95"
-                >
-                  <ChevronLeft className="w-4 h-4" />
-                  <span>Quay lại tổng quát</span>
-                </button>
-              )}
+              {/* Back button removed as it's now an arrow in the header */}
               
               {/* Mobile Row 2: Selected Employee + Calendar + ManualCheckin + Excel */}
               <div className="md:hidden w-full grid grid-cols-[1fr_auto_auto_auto] items-center gap-2">
