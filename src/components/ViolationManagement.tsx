@@ -149,10 +149,17 @@ export const ViolationManagement: React.FC<ViolationManagementProps> = ({
                         <td className="px-4 py-4">
                           <span className="font-black text-slate-900 uppercase">{emp?.fullName || 'N/A'}</span>
                         </td>
-                        <td className="px-4 py-4">
-                          <span className="px-3 py-1 bg-red-50 text-red-600 rounded-full text-[10px] font-black uppercase tracking-wider border border-red-100">
-                            {v.type}
-                          </span>
+                        <td className="px-4 py-4 uppercase">
+                          <div className="flex flex-col gap-1">
+                            <span className="px-3 py-1 bg-red-50 text-red-600 rounded-full text-[10px] font-black tracking-wider border border-red-100 w-fit">
+                              {v.type}
+                            </span>
+                            {v.isRejected && (
+                              <span className="px-3 py-1 bg-amber-50 text-amber-600 rounded-full text-[9px] font-black tracking-wider border border-amber-100 w-fit">
+                                NHÂN VIÊN KHIẾU NẠI
+                              </span>
+                            )}
+                          </div>
                         </td>
                         <td className="px-4 py-4 text-slate-500 italic font-medium max-w-[200px] truncate">
                           {v.note || '-'}
@@ -205,9 +212,16 @@ export const ViolationManagement: React.FC<ViolationManagementProps> = ({
                           {emp?.fullName || 'N/A'}
                         </h4>
                       </div>
-                      <span className="shrink-0 px-3 py-1 bg-red-50 text-red-600 rounded-full text-[9px] font-black uppercase tracking-wider border border-red-100">
-                        {v.type}
-                      </span>
+                      <div className="flex flex-col gap-1 items-end shrink-0">
+                        <span className="px-3 py-1 bg-red-50 text-red-600 rounded-full text-[9px] font-black uppercase tracking-wider border border-red-100">
+                          {v.type}
+                        </span>
+                        {v.isRejected && (
+                          <span className="px-3 py-1 bg-amber-50 text-amber-600 rounded-full text-[8px] font-black tracking-wider border border-amber-100">
+                            KHIẾU NẠI
+                          </span>
+                        )}
+                      </div>
                     </div>
 
                     {v.note && (
