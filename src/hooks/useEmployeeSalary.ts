@@ -7,7 +7,8 @@ export const useEmployeeSalary = (
   monthTimesheets: any[],
   payrollAdjustments: any[],
   holidays: any[],
-  targetMonth?: string
+  targetMonth?: string,
+  violations: any[] = []
 ) => {
   const [monthlyStats, setMonthlyStats] = useState({
     totalHours: 0,
@@ -35,7 +36,9 @@ export const useEmployeeSalary = (
     finalExtraAdditions: 0,
     finalNote: '',
     materialLossNote: '',
-    hoursForTtn: 0
+    hoursForTtn: 0,
+    phonePenaltyCount: 0,
+    phonePenaltyMinutes: 0
   });
 
   useEffect(() => {
@@ -48,9 +51,14 @@ export const useEmployeeSalary = (
       cc.date.startsWith(filterMonth)
     );
     
-    const stats = calculateNetSalary(loggedInEmployee, filterMonth, empTimesheets, payrollAdjustments, holidays);
+    const empViolations = violations.filter(v => 
+      (v.empId === loggedInEmployee.id || v.empId === loggedInEmployee.empId) && 
+      v.monthYear === filterMonth
+    );
+    
+    const stats = calculateNetSalary(loggedInEmployee, filterMonth, empTimesheets, payrollAdjustments, holidays, {}, empViolations);
     setMonthlyStats(stats);
-  }, [monthTimesheets, loggedInEmployee, holidays, payrollAdjustments, targetMonth]);
+  }, [monthTimesheets, loggedInEmployee, holidays, payrollAdjustments, targetMonth, violations]);
 
   return { monthlyStats };
 };
