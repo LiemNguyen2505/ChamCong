@@ -127,6 +127,9 @@ export const EmployeeManagement: React.FC<EmployeeManagementProps> = ({
         empId: '',
         phone: '',
         fullName: '',
+        cccd: '',
+        bankAccount: '',
+        notes: '',
         hourlyRate: 0,
         joinDate: format(new Date(), 'yyyy-MM-dd'),
         locationId: currentAdmin?.role === 'SuperAdmin' ? 'Góc Phố' : currentAdmin?.locationIds?.[0] || 'Góc Phố',
@@ -135,6 +138,7 @@ export const EmployeeManagement: React.FC<EmployeeManagementProps> = ({
         shiftsPerWeek: 0
       });
       setLuongTheoGioStr('');
+      setThuongTrachNhiemStr('');
       setShowAddEmployeeModal(false);
     } catch (error) {
       console.error(error);
@@ -304,12 +308,18 @@ export const EmployeeManagement: React.FC<EmployeeManagementProps> = ({
                   empId: '',
                   phone: '',
                   fullName: '',
+                  cccd: '',
+                  bankAccount: '',
+                  notes: '',
                   hourlyRate: 0,
                   joinDate: format(new Date(), 'yyyy-MM-dd'),
                   locationId: currentAdmin?.role === 'SuperAdmin' ? 'Góc Phố' : currentAdmin?.locationIds?.[0] || 'Góc Phố',
-                  workType: 'Part Time'
+                  defaultRole: 'PV',
+                  workType: 'Part Time',
+                  shiftsPerWeek: 0
                 });
                 setLuongTheoGioStr('');
+                setThuongTrachNhiemStr('');
                 setShowAddEmployeeModal(true);
               }}
               className={`flex items-center justify-center p-2 h-[41px] ${adminTheme.button} text-white rounded-xl text-sm font-bold shadow-lg ${adminTheme.shadow}`}
@@ -660,6 +670,47 @@ export const EmployeeManagement: React.FC<EmployeeManagementProps> = ({
                 </div>
               </div>
 
+              <div className="bg-slate-50 p-4 rounded-xl border border-slate-200">
+                <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-4">Cấu hình lương & Ghi chú</h3>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs font-black text-slate-500 uppercase mb-1.5 ml-1">Lương Cơ Bản (Mỗi Giờ)</label>
+                    <div className="relative">
+                      <input
+                        type="text"
+                        className="w-full pl-4 pr-12 py-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none font-bold bg-white"
+                        value={luongTheoGioStr}
+                        onChange={e => setLuongTheoGioStr(e.target.value.replace(/\D/g, '').replace(/\B(?=(\d{3})+(?!\d))/g, ","))}
+                        placeholder="0"
+                      />
+                      <span className="absolute right-4 top-1/2 -translate-y-1/2 text-[10px] font-black text-slate-400">VNĐ/H</span>
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-black text-slate-500 uppercase mb-1.5 ml-1">Thưởng Trách Nhiệm</label>
+                    <div className="relative">
+                      <input
+                        type="text"
+                        className="w-full pl-4 pr-12 py-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none font-bold bg-white"
+                        value={thuongTrachNhiemStr}
+                        onChange={e => setThuongTrachNhiemStr(e.target.value.replace(/\D/g, '').replace(/\B(?=(\d{3})+(?!\d))/g, ","))}
+                        placeholder="0"
+                      />
+                      <span className="absolute right-4 top-1/2 -translate-y-1/2 text-[10px] font-black text-slate-400">VNĐ/T</span>
+                    </div>
+                  </div>
+                  <div className="col-span-1 sm:col-span-2">
+                    <label className="block text-xs font-black text-slate-500 uppercase mb-1.5 ml-1">Ghi chú</label>
+                    <textarea 
+                      value={newEmployee.notes || ''} 
+                      onChange={e => setNewEmployee({ ...newEmployee, notes: e.target.value })} 
+                      className="w-full px-4 py-2 border border-slate-200 rounded-xl font-medium text-sm focus:ring-2 focus:ring-blue-500 outline-none min-h-[80px] resize-none" 
+                      placeholder="Ghi chú thêm..." 
+                    />
+                  </div>
+                </div>
+              </div>
+
               <div className="flex justify-end gap-3 pt-6 border-t border-slate-100">
                 <button type="button" onClick={() => setShowAddEmployeeModal(false)} className="px-6 py-2.5 bg-slate-100 text-slate-600 rounded-xl font-black text-xs uppercase tracking-widest">Hủy</button>
                 <button type="submit" disabled={isSubmitting} className={`px-6 py-2.5 ${adminTheme.button} text-white rounded-xl font-black text-xs uppercase tracking-widest shadow-lg ${adminTheme.shadow}`}>
@@ -673,178 +724,127 @@ export const EmployeeManagement: React.FC<EmployeeManagementProps> = ({
 
       {/* Edit Employee Modal */}
       {showEditEmployeeModal && editingEmployee && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50 overflow-y-auto font-sans" onMouseDown={(e) => { if (e.target === e.currentTarget) setShowEditEmployeeModal(false); }}>
-          <div className="bg-white rounded-[2rem] w-full max-w-2xl shadow-2xl flex flex-col max-h-[90vh] overflow-hidden">
-            <div className={`px-8 py-6 border-b border-white/10 flex items-center justify-between shrink-0 ${adminTheme.header}`}>
-              <h2 className="text-xl font-black text-white uppercase tracking-tight">Sửa thông tin nhân viên</h2>
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50" onMouseDown={(e) => { if (e.target === e.currentTarget) setShowEditEmployeeModal(false); }}>
+          <div className="bg-white rounded-2xl w-full max-w-2xl max-h-[90vh] flex flex-col overflow-hidden shadow-2xl border border-white/10">
+            <div className={`flex items-center justify-between p-6 border-b border-white/10 ${adminTheme.header}`}>
+              <h2 className="text-xl font-bold text-white uppercase tracking-tight">Sửa thông tin nhân viên</h2>
               <button 
                 onClick={() => setShowEditEmployeeModal(false)}
-                className="p-2.5 hover:bg-white/10 rounded-full transition-colors text-white/70"
+                className="p-2 hover:bg-white/10 rounded-full text-white/70 transition-colors"
               >
-                <X className="w-6 h-6 text-white" />
+                <X className="w-5 h-5 text-white" />
               </button>
             </div>
-            
-            <form onSubmit={handleUpdateEmployee} className="flex-1 overflow-y-auto p-8 space-y-8 custom-scrollbar">
-              {/* Group 1: Cơ bản */}
-              <div className="space-y-4">
-                <div className="flex items-center gap-2 mb-4">
-                  <div className="w-1.5 h-6 bg-blue-500 rounded-full" />
-                  <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Thông tin cá nhân</h3>
-                </div>
-                
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="col-span-2">
-                    <label className="block text-[10px] font-black text-slate-500 uppercase mb-1.5 ml-1">Họ Tên Nhân Viên</label>
-                    <input
-                      type="text"
-                      className="w-full px-5 py-3.5 bg-slate-50 border border-slate-100 rounded-2xl focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 outline-none text-sm font-bold text-slate-700 transition-all"
-                      value={editingEmployee.fullName}
-                      onChange={e => setEditingEmployee({ ...editingEmployee, fullName: e.target.value })}
-                      required
-                    />
+            <form onSubmit={handleUpdateEmployee} className="p-6 overflow-y-auto space-y-6">
+              <div className="bg-slate-50 p-4 rounded-xl border border-slate-200">
+                <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-4">Thông tin cơ bản</h3>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="col-span-1 sm:col-span-2">
+                    <label className="block text-xs font-black text-slate-500 uppercase mb-1.5 ml-1">Họ Tên <span className="text-red-500">*</span></label>
+                    <input type="text" required value={editingEmployee.fullName} onChange={e => setEditingEmployee({ ...editingEmployee, fullName: e.target.value })} className="w-full px-4 py-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none font-bold" placeholder="Nhập họ và tên" />
                   </div>
-                  <div>
-                    <label className="block text-[10px] font-black text-slate-500 uppercase mb-1.5 ml-1">Số Điện Thoại</label>
-                    <input
-                      type="tel"
-                      className="w-full px-5 py-3.5 bg-slate-50 border border-slate-100 rounded-2xl outline-none text-sm font-mono font-bold text-slate-700"
-                      value={editingEmployee.phone}
-                      onChange={e => setEditingEmployee({ ...editingEmployee, phone: e.target.value.replace(/\D/g, '') })}
-                      required
-                    />
+                  <div className="grid grid-cols-2 gap-4 col-span-1 sm:col-span-2">
+                    <div>
+                      <label className="block text-xs font-black text-slate-500 uppercase mb-1.5 ml-1">Số Điện Thoại <span className="text-red-500">*</span></label>
+                      <input type="tel" required value={editingEmployee.phone || ''} onChange={e => setEditingEmployee({ ...editingEmployee, phone: e.target.value.replace(/\D/g, '') })} className="w-full px-4 py-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none font-bold" placeholder="Nhập SĐT" />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-black text-slate-500 uppercase mb-1.5 ml-1">Số CCCD</label>
+                      <input type="text" value={editingEmployee.cccd || ''} onChange={e => setEditingEmployee({ ...editingEmployee, cccd: e.target.value.replace(/\D/g, '') })} className="w-full px-4 py-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none font-bold" placeholder="Nhập số CCCD" />
+                    </div>
                   </div>
-                  <div>
-                    <label className="block text-[10px] font-black text-slate-500 uppercase mb-1.5 ml-1">Số CCCD</label>
-                    <input
-                      type="text"
-                      className="w-full px-5 py-3.5 bg-slate-50 border border-slate-100 rounded-2xl outline-none text-sm font-mono font-bold text-slate-700"
-                      value={editingEmployee.cccd || ''}
-                      onChange={e => setEditingEmployee({ ...editingEmployee, cccd: e.target.value.replace(/\D/g, '') })}
-                    />
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-xs font-black text-slate-500 uppercase mb-1.5 ml-1">Chi nhánh <span className="text-red-500">*</span></label>
+                      <select value={editingEmployee.locationId} onChange={e => setEditingEmployee({ ...editingEmployee, locationId: e.target.value })} className="w-full px-4 py-2.5 border border-slate-200 rounded-xl font-bold bg-white">
+                        {getAllowedBranches().map(branch => <option key={branch} value={branch}>{branch}</option>)}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-xs font-black text-slate-500 uppercase mb-1.5 ml-1">Số TK Ngân Hàng</label>
+                      <input type="text" value={editingEmployee.bankAccount || ''} onChange={e => setEditingEmployee({ ...editingEmployee, bankAccount: e.target.value })} className="w-full px-4 py-2.5 border border-slate-200 rounded-xl font-bold" placeholder="Số TK" />
+                    </div>
                   </div>
                 </div>
               </div>
 
-              {/* Group 2: Công việc */}
-              <div className="space-y-4 pt-4 border-t border-slate-50">
-                <div className="flex items-center gap-2 mb-4">
-                  <div className="w-1.5 h-6 bg-emerald-500 rounded-full" />
-                  <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Cấu hình công việc</h3>
-                </div>
-
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-[10px] font-black text-slate-500 uppercase mb-1.5 ml-1">Lương Cơ Bản (Mỗi Giờ)</label>
-                    <div className="relative">
-                      <input
-                        type="text"
-                        className="w-full pl-5 pr-12 py-3.5 bg-emerald-50/30 border border-emerald-100 rounded-2xl focus:ring-4 focus:ring-emerald-500/10 focus:border-emerald-500 outline-none text-sm font-black text-emerald-700"
-                        value={luongTheoGioStr}
-                        onChange={e => setLuongTheoGioStr(e.target.value.replace(/\D/g, '').replace(/\B(?=(\d{3})+(?!\d))/g, ","))}
-                      />
-                      <span className="absolute right-5 top-1/2 -translate-y-1/2 text-[10px] font-black text-emerald-600">VNĐ/H</span>
+              <div className="bg-slate-50 p-4 rounded-xl border border-slate-200">
+                <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-4">Thông tin bổ sung</h3>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-xs font-black text-slate-500 uppercase mb-1.5 ml-1">Số Ca/Tuần</label>
+                      <input type="number" value={editingEmployee.shiftsPerWeek || ''} onChange={e => { let val = parseInt(e.target.value); if (isNaN(val)) val = 0; if (val > 21) val = 21; setEditingEmployee({ ...editingEmployee, shiftsPerWeek: val }); }} className="w-full px-3 py-2.5 border border-slate-200 rounded-xl font-bold" placeholder="Số ca" />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-black text-slate-500 uppercase mb-1.5 ml-1">Ngày Vào Làm</label>
+                      <input type="date" value={editingEmployee.joinDate || ''} onChange={e => setEditingEmployee({ ...editingEmployee, joinDate: e.target.value })} className="w-full px-3 py-2.5 border border-slate-200 rounded-xl font-bold" />
                     </div>
                   </div>
-                  <div>
-                    <label className="block text-[10px] font-black text-slate-500 uppercase mb-1.5 ml-1">Thưởng Trách Nhiệm</label>
-                    <div className="relative">
-                      <input
-                        type="text"
-                        className="w-full pl-5 pr-12 py-3.5 bg-amber-50/30 border border-amber-100 rounded-2xl focus:ring-4 focus:ring-amber-500/10 focus:border-amber-500 outline-none text-sm font-black text-amber-700"
-                        value={thuongTrachNhiemStr}
-                        onChange={e => setThuongTrachNhiemStr(e.target.value.replace(/\D/g, '').replace(/\B(?=(\d{3})+(?!\d))/g, ","))}
-                      />
-                      <span className="absolute right-5 top-1/2 -translate-y-1/2 text-[10px] font-black text-amber-600">VNĐ/T</span>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-xs font-black text-slate-500 uppercase mb-1.5 ml-1">Vị trí</label>
+                      <select value={(editingEmployee.defaultRole || 'PV')} onChange={e => setEditingEmployee({ ...editingEmployee, defaultRole: e.target.value as 'QUẦY' | 'PV' })} className="w-full px-3 py-2.5 border border-slate-200 rounded-xl font-bold bg-white">
+                        <option value="QUẦY">QUẦY</option>
+                        <option value="PV">PHỤC VỤ</option>
+                      </select>
                     </div>
-                  </div>
-                  <div>
-                    <label className="block text-[10px] font-black text-slate-500 uppercase mb-1.5 ml-1">Vị Trí Công Việc</label>
-                    <select 
-                      className="w-full px-5 py-3.5 bg-slate-50 border border-slate-100 rounded-2xl font-bold text-sm text-slate-700"
-                      value={editingEmployee.defaultRole}
-                      onChange={e => setEditingEmployee({ ...editingEmployee, defaultRole: e.target.value as 'QUẦY' | 'PV' })}
-                    >
-                      <option value="QUẦY">Quầy (Pha chế)</option>
-                      <option value="PV">Phục vụ (Sảnh)</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-[10px] font-black text-slate-500 uppercase mb-1.5 ml-1">Chi Nhánh</label>
-                    <select 
-                      className="w-full px-5 py-3.5 bg-slate-50 border border-slate-100 rounded-2xl font-bold text-sm text-slate-700"
-                      value={editingEmployee.locationId}
-                      onChange={e => setEditingEmployee({ ...editingEmployee, locationId: e.target.value })}
-                    >
-                      {getAllowedBranches().map(b => (
-                        <option key={b} value={b}>{b}</option>
-                      ))}
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-[10px] font-black text-slate-500 uppercase mb-1.5 ml-1">Số Ca / Tuần</label>
-                    <input
-                      type="number"
-                      className="w-full px-5 py-3.5 bg-slate-50 border border-slate-100 rounded-2xl outline-none text-sm font-bold text-slate-700"
-                      value={editingEmployee.shiftsPerWeek || ''}
-                      onChange={e => setEditingEmployee({ ...editingEmployee, shiftsPerWeek: parseInt(e.target.value) || 0 })}
-                    />
-                  </div>
-                  <div>
-                     <label className="block text-[10px] font-black text-slate-500 uppercase mb-1.5 ml-1">Loại hình</label>
-                     <select value={(editingEmployee.workType || 'Part Time')} onChange={e => setEditingEmployee({ ...editingEmployee, workType: e.target.value as 'Part Time' | 'Full Time' })} className="w-full px-5 py-3.5 bg-slate-50 border border-slate-100 rounded-2xl font-bold text-sm text-slate-700">
+                    <div>
+                      <label className="block text-xs font-black text-slate-500 uppercase mb-1.5 ml-1">Loại hình</label>
+                      <select value={(editingEmployee.workType || 'Part Time')} onChange={e => setEditingEmployee({ ...editingEmployee, workType: e.target.value as 'Part Time' | 'Full Time' })} className="w-full px-3 py-2.5 border border-slate-200 rounded-xl font-bold bg-white">
                         <option value="Part Time">Part Time</option>
                         <option value="Full Time">Full Time</option>
                       </select>
+                    </div>
                   </div>
                 </div>
               </div>
 
-               {/* Group 3: Ngân hàng */}
-               <div className="space-y-4 pt-4 border-t border-slate-50">
-                <div className="flex items-center gap-2 mb-4">
-                  <div className="w-1.5 h-6 bg-purple-500 rounded-full" />
-                  <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Tài khoản ngân hàng</h3>
-                </div>
-                <div>
-                  <label className="block text-[10px] font-black text-slate-500 uppercase mb-1.5 ml-1">Số tài khoản & Tên ngân hàng</label>
-                  <input
-                    type="text"
-                    className="w-full px-5 py-3.5 bg-slate-50 border border-slate-100 rounded-2xl outline-none text-sm font-bold text-slate-700"
-                    value={editingEmployee.bankAccount || ''}
-                    onChange={e => setEditingEmployee({ ...editingEmployee, bankAccount: e.target.value })}
-                    placeholder="VD: 123456789 - Vietcombank"
-                  />
+              <div className="bg-slate-50 p-4 rounded-xl border border-slate-200">
+                <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-4">Cấu hình lương & Ghi chú</h3>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs font-black text-slate-500 uppercase mb-1.5 ml-1">Lương Cơ Bản (Mỗi Giờ)</label>
+                    <div className="relative">
+                      <input
+                        type="text"
+                        className="w-full pl-4 pr-12 py-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none font-bold bg-white"
+                        value={luongTheoGioStr}
+                        onChange={e => setLuongTheoGioStr(e.target.value.replace(/\D/g, '').replace(/\B(?=(\d{3})+(?!\d))/g, ","))}
+                        placeholder="0"
+                      />
+                      <span className="absolute right-4 top-1/2 -translate-y-1/2 text-[10px] font-black text-slate-400">VNĐ/H</span>
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-black text-slate-500 uppercase mb-1.5 ml-1">Thưởng Trách Nhiệm</label>
+                    <div className="relative">
+                      <input
+                        type="text"
+                        className="w-full pl-4 pr-12 py-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none font-bold bg-white"
+                        value={thuongTrachNhiemStr}
+                        onChange={e => setThuongTrachNhiemStr(e.target.value.replace(/\D/g, '').replace(/\B(?=(\d{3})+(?!\d))/g, ","))}
+                        placeholder="0"
+                      />
+                      <span className="absolute right-4 top-1/2 -translate-y-1/2 text-[10px] font-black text-slate-400">VNĐ/T</span>
+                    </div>
+                  </div>
+                  <div className="col-span-1 sm:col-span-2">
+                    <label className="block text-xs font-black text-slate-500 uppercase mb-1.5 ml-1">Ghi chú</label>
+                    <textarea 
+                      value={editingEmployee.notes || ''} 
+                      onChange={e => setEditingEmployee({ ...editingEmployee, notes: e.target.value })} 
+                      className="w-full px-4 py-2 border border-slate-200 rounded-xl font-medium text-sm focus:ring-2 focus:ring-blue-500 outline-none min-h-[80px] resize-none" 
+                      placeholder="Ghi chú thêm..." 
+                    />
+                  </div>
                 </div>
               </div>
 
-              {/* Group 4: Ghi chú */}
-              <div className="space-y-2 pt-4 border-t border-slate-50">
-                <label className="block text-[10px] font-black text-slate-500 uppercase mb-1.5 ml-1 font-sans">Ghi chú</label>
-                <textarea
-                  className="w-full px-5 py-3.5 bg-slate-50 border border-slate-100 rounded-2xl outline-none text-sm font-medium text-slate-600 resize-none min-h-[100px]"
-                  value={editingEmployee.notes || ''}
-                  onChange={e => setEditingEmployee({ ...editingEmployee, notes: e.target.value })}
-                  placeholder="Nhập ghi chú thêm về nhân viên này..."
-                />
-              </div>
-
-              <div className="flex gap-4 pt-4 pb-4">
-                <button
-                  type="button"
-                  onClick={() => setShowEditEmployeeModal(false)}
-                  className="flex-1 py-4 bg-slate-100 hover:bg-slate-200 text-slate-500 text-xs font-black uppercase tracking-widest rounded-2xl transition-all"
-                >
-                  Hủy bỏ
-                </button>
-                <button
-                  type="submit"
-                  disabled={isSubmitting}
-                  className={`flex-[2] py-4 ${adminTheme.button} text-white text-xs font-black uppercase tracking-widest rounded-2xl shadow-xl ${adminTheme.shadow} transition-all active:scale-95 flex items-center justify-center gap-2`}
-                >
-                  {isSubmitting ? (
-                    <RefreshCw className="w-4 h-4 animate-spin" />
-                  ) : 'LƯU THAY ĐỔI'}
+              <div className="flex justify-end gap-3 pt-6 border-t border-slate-100">
+                <button type="button" onClick={() => setShowEditEmployeeModal(false)} className="px-6 py-2.5 bg-slate-100 text-slate-600 rounded-xl font-black text-xs uppercase tracking-widest">Hủy</button>
+                <button type="submit" disabled={isSubmitting} className={`px-6 py-2.5 ${adminTheme.button} text-white rounded-xl font-black text-xs uppercase tracking-widest shadow-lg ${adminTheme.shadow}`}>
+                  {isSubmitting ? 'ĐANG LƯU...' : 'LƯU THAY ĐỔI'}
                 </button>
               </div>
             </form>
