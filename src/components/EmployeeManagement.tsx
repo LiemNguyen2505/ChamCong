@@ -671,40 +671,14 @@ export const EmployeeManagement: React.FC<EmployeeManagementProps> = ({
               </div>
 
               <div className="bg-slate-50 p-4 rounded-xl border border-slate-200">
-                <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-4">Cấu hình lương & Ghi chú</h3>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-xs font-black text-slate-500 uppercase mb-1.5 ml-1">Lương Cơ Bản (Mỗi Giờ)</label>
-                    <div className="relative">
-                      <input
-                        type="text"
-                        className="w-full pl-4 pr-12 py-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none font-bold bg-white"
-                        value={luongTheoGioStr}
-                        onChange={e => setLuongTheoGioStr(e.target.value.replace(/\D/g, '').replace(/\B(?=(\d{3})+(?!\d))/g, ","))}
-                        placeholder="0"
-                      />
-                      <span className="absolute right-4 top-1/2 -translate-y-1/2 text-[10px] font-black text-slate-400">VNĐ/H</span>
-                    </div>
-                  </div>
-                  <div>
-                    <label className="block text-xs font-black text-slate-500 uppercase mb-1.5 ml-1">Thưởng Trách Nhiệm</label>
-                    <div className="relative">
-                      <input
-                        type="text"
-                        className="w-full pl-4 pr-12 py-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none font-bold bg-white"
-                        value={thuongTrachNhiemStr}
-                        onChange={e => setThuongTrachNhiemStr(e.target.value.replace(/\D/g, '').replace(/\B(?=(\d{3})+(?!\d))/g, ","))}
-                        placeholder="0"
-                      />
-                      <span className="absolute right-4 top-1/2 -translate-y-1/2 text-[10px] font-black text-slate-400">VNĐ/T</span>
-                    </div>
-                  </div>
+                <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-4">Ghi chú</h3>
+                <div className="space-y-4">
                   <div className="col-span-1 sm:col-span-2">
                     <label className="block text-xs font-black text-slate-500 uppercase mb-1.5 ml-1">Ghi chú</label>
                     <textarea 
                       value={newEmployee.notes || ''} 
                       onChange={e => setNewEmployee({ ...newEmployee, notes: e.target.value })} 
-                      className="w-full px-4 py-2 border border-slate-200 rounded-xl font-medium text-sm focus:ring-2 focus:ring-blue-500 outline-none min-h-[80px] resize-none" 
+                      className="w-full px-4 py-2 border border-slate-200 rounded-xl font-medium text-sm focus:ring-2 focus:ring-blue-500 outline-none min-h-[80px] resize-none bg-white" 
                       placeholder="Ghi chú thêm..." 
                     />
                   </div>
@@ -801,40 +775,14 @@ export const EmployeeManagement: React.FC<EmployeeManagementProps> = ({
               </div>
 
               <div className="bg-slate-50 p-4 rounded-xl border border-slate-200">
-                <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-4">Cấu hình lương & Ghi chú</h3>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-xs font-black text-slate-500 uppercase mb-1.5 ml-1">Lương Cơ Bản (Mỗi Giờ)</label>
-                    <div className="relative">
-                      <input
-                        type="text"
-                        className="w-full pl-4 pr-12 py-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none font-bold bg-white"
-                        value={luongTheoGioStr}
-                        onChange={e => setLuongTheoGioStr(e.target.value.replace(/\D/g, '').replace(/\B(?=(\d{3})+(?!\d))/g, ","))}
-                        placeholder="0"
-                      />
-                      <span className="absolute right-4 top-1/2 -translate-y-1/2 text-[10px] font-black text-slate-400">VNĐ/H</span>
-                    </div>
-                  </div>
-                  <div>
-                    <label className="block text-xs font-black text-slate-500 uppercase mb-1.5 ml-1">Thưởng Trách Nhiệm</label>
-                    <div className="relative">
-                      <input
-                        type="text"
-                        className="w-full pl-4 pr-12 py-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none font-bold bg-white"
-                        value={thuongTrachNhiemStr}
-                        onChange={e => setThuongTrachNhiemStr(e.target.value.replace(/\D/g, '').replace(/\B(?=(\d{3})+(?!\d))/g, ","))}
-                        placeholder="0"
-                      />
-                      <span className="absolute right-4 top-1/2 -translate-y-1/2 text-[10px] font-black text-slate-400">VNĐ/T</span>
-                    </div>
-                  </div>
+                <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-4">Ghi chú</h3>
+                <div className="space-y-4">
                   <div className="col-span-1 sm:col-span-2">
                     <label className="block text-xs font-black text-slate-500 uppercase mb-1.5 ml-1">Ghi chú</label>
                     <textarea 
                       value={editingEmployee.notes || ''} 
                       onChange={e => setEditingEmployee({ ...editingEmployee, notes: e.target.value })} 
-                      className="w-full px-4 py-2 border border-slate-200 rounded-xl font-medium text-sm focus:ring-2 focus:ring-blue-500 outline-none min-h-[80px] resize-none" 
+                      className="w-full px-4 py-2 border border-slate-200 rounded-xl font-medium text-sm focus:ring-2 focus:ring-blue-500 outline-none min-h-[80px] resize-none bg-white" 
                       placeholder="Ghi chú thêm..." 
                     />
                   </div>
