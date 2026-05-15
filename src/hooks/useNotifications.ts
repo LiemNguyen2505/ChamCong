@@ -10,7 +10,8 @@ import {
   doc, 
   updateDoc, 
   addDoc, 
-  serverTimestamp 
+  serverTimestamp,
+  arrayUnion 
 } from 'firebase/firestore';
 import { AppNotification } from '../types/admin';
 
@@ -31,22 +32,24 @@ export const useNotifications = (
     let q;
     const notificationsRef = collection(db, 'Notifications');
 
-    if (role === 'SuperAdmin') {
-      // Super Admin sees all notifications, but we can still filter for relevant ones if needed
-      q = query(
-        notificationsRef,
-        orderBy('createdAt', 'desc'),
-        limit(50)
-      );
-    } else if (role === 'Admin' || role === 'BranchAdmin') {
-      // Admin sees notifications for their branches
-      const branches = locationIds.length > 0 ? locationIds : ['all'];
-      q = query(
-        notificationsRef,
-        where('locationId', 'in', [...branches, 'all']),
-        orderBy('createdAt', 'desc'),
-        limit(50)
-      );
+    if (role === 'SuperAdmin' || role === 'Admin' || role === 'BranchAdmin') {
+      // Admins see notifications for their branches or 'all'
+      // Note: Firestore doesn't support multiple 'in' clauses
+      if (role === 'SuperAdmin') {
+        q = query(
+          notificationsRef,
+          orderBy('createdAt', 'desc'),
+          limit(100)
+        );
+      } else {
+        const branches = locationIds.length > 0 ? locationIds : ['all'];
+        q = query(
+          notificationsRef,
+          where('locationId', 'in', [...branches, 'all', 'All']),
+          orderBy('createdAt', 'desc'),
+          limit(100)
+        );
+      }
     } else {
       // Employee sees notifications addressed to them individually
       q = query(
@@ -65,11 +68,22 @@ export const useNotifications = (
 
       // Filter for Admin/SuperAdmin to only show notifications meant for them
       if (role === 'SuperAdmin' || role === 'Admin' || role === 'BranchAdmin') {
-        fetched = fetched.filter(n => n.recipientId === 'admin' || n.recipientId === userId);
+        fetched = fetched.filter(n => 
+          n.recipientId === 'admin' || 
+          n.recipientId === 'all_admins' || 
+          n.recipientId === 'all' ||
+          n.recipientId === userId ||
+          (role === 'SuperAdmin' && (n.recipientId === 'admin' || n.recipientId === 'all_admins'))
+        );
       }
+
+      const processedNotifications = fetched.map(n => ({
+        ...n,
+        isRead: n.readBy ? n.readBy.includes(userId) : n.isRead
+      }));
       
-      setNotifications(fetched);
-      setUnreadCount(fetched.filter(n => !n.isRead).length);
+      setNotifications(processedNotifications);
+      setUnreadCount(processedNotifications.filter(n => !n.isRead).length);
     }, (error) => {
       console.error("Notification listener error:", error);
     });
@@ -78,21 +92,37 @@ export const useNotifications = (
   }, [role, userId, JSON.stringify(locationIds)]);
 
   const markAsRead = async (notificationId: string) => {
+    if (!userId) return;
     try {
-      await updateDoc(doc(db, 'Notifications', notificationId), {
-        isRead: true
-      });
+      const notification = notifications.find(n => n.id === notificationId);
+      const updateData: any = {
+        readBy: arrayUnion(userId)
+      };
+      
+      // If it's a direct notification to this user, also set isRead for backward compatibility
+      if (notification?.recipientId === userId) {
+        updateData.isRead = true;
+      }
+      
+      await updateDoc(doc(db, 'Notifications', notificationId), updateData);
     } catch (error) {
       console.error("Error marking notification as read:", error);
     }
   };
 
   const markAllAsRead = async () => {
+    if (!userId) return;
     try {
       const unread = notifications.filter(n => !n.isRead);
-      const promises = unread.map(n => 
-        updateDoc(doc(db, 'Notifications', n.id), { isRead: true })
-      );
+      const promises = unread.map(n => {
+        const updateData: any = {
+          readBy: arrayUnion(userId)
+        };
+        if (n.recipientId === userId) {
+          updateData.isRead = true;
+        }
+        return updateDoc(doc(db, 'Notifications', n.id), updateData);
+      });
       await Promise.all(promises);
     } catch (error) {
       console.error("Error marking all as read:", error);
