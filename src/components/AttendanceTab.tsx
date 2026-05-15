@@ -799,6 +799,12 @@ export const AttendanceTab: React.FC<AttendanceTabProps> = ({
           <div className="md:hidden space-y-8 px-3">
             {(() => {
               const dayLogs = filteredChamCongs.filter(cc => cc.date === historyDay);
+              
+              const approvedHrs = dayLogs.filter(log => log.status !== 'pending_approval').reduce((sum, log) => sum + (log.totalHours || 0), 0);
+              const pendingHrs = dayLogs.filter(log => log.status === 'pending_approval').reduce((sum, log) => sum + (log.totalHours || 0), 0);
+              const lateMins = dayLogs.reduce((sum, log) => sum + (log.lateMinutes || 0), 0);
+              const phoneViolations = dayLogs.reduce((sum, log) => sum + (log.SoLanRoiApp || 0), 0);
+
               const getShiftType = (timeStr: string | null) => {
                 if (!timeStr) return 'Ca Khác';
                 const hour = new Date(timeStr).getHours();
@@ -817,111 +823,139 @@ export const AttendanceTab: React.FC<AttendanceTabProps> = ({
                   Không có dữ liệu chấm công cho ngày này.
                 </div>
               );
-              return Object.entries(shifts).map(([shiftName, logs]) => {
-                if (logs.length === 0) return null;
-                return (
-                  <div key={shiftName} className="space-y-4">
-                    <div className="flex items-center gap-3 px-2">
-                      <div className={`w-2 h-6 rounded-full ${shiftName === 'Ca Sáng' ? 'bg-amber-400' : shiftName === 'Ca Trưa' ? 'bg-orange-500' : shiftName === 'Ca Tối' ? 'bg-indigo-600' : 'bg-slate-400'}`} />
-                      <h3 className="text-sm font-black text-slate-900 uppercase tracking-widest">{shiftName}</h3>
-                      <span className="text-[10px] bg-slate-100 text-slate-500 px-2 py-0.5 rounded-full font-bold">{logs.length} NV</span>
+              return (
+                <>
+                  {/* Summary Card */}
+                  <div className="grid grid-cols-2 gap-3 mb-6">
+                    <div className="bg-emerald-50 p-4 rounded-3xl border border-emerald-100 shadow-sm flex flex-col items-center">
+                      <span className="text-[10px] font-black text-emerald-600 uppercase tracking-widest mb-1">Tổng giờ công</span>
+                      <div className="flex items-baseline gap-1">
+                        <span className="text-2xl font-black text-emerald-700">{approvedHrs.toFixed(1)}h</span>
+                        {pendingHrs > 0 && <span className="text-[10px] font-bold text-amber-500">(+{pendingHrs.toFixed(1)}?)</span>}
+                      </div>
                     </div>
-                    <div className="space-y-4">
-                      {logs.sort((a,b) => {
-                        const nameA = nhanViens.find(nv => nv.empId === a.empId)?.fullName || '';
-                        const nameB = nhanViens.find(nv => nv.empId === b.empId)?.fullName || '';
-                        return nameA.localeCompare(nameB);
-                      }).map((log, logIdx) => {
-                        const employee = nhanViens.find(nv => nv.empId === log.empId);
-                        return (
-                          <div key={log.id} className="attendance-card bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden animate-in fade-in slide-in-from-right-4" style={{ animationDelay: `${logIdx * 50}ms` }}>
-                            <div className="p-4">
-                              <div className="flex justify-between items-center mb-3">
-                                <div onClick={() => {
-                                  if (employee) {
-                                    setHistoryEmployee(employee);
-                                    setHistoryDay(null);
-                                    setMobileHistoryMode('employee');
-                                  }
-                                }}>
-                                  <h4 className={`font-black ${adminTheme.text} text-sm uppercase leading-tight`}>{employee?.fullName || 'Không rõ'}</h4>
-                                  <div className="flex flex-wrap gap-1 mt-1">
-                                    {log.status === 'pending_approval' && <span className="px-1.5 py-0.5 bg-amber-100 text-amber-700 text-[8px] font-black rounded uppercase tracking-wider">Duyệt</span>}
-                                    {log.isAbandonedShift && <span className="px-1.5 py-0.5 bg-rose-100 text-rose-700 text-[8px] font-black rounded uppercase tracking-wider">Bỏ</span>}
-                                  </div>
-                                </div>
-                                <div className="text-right">
-                                  <span className={`text-sm font-black ${adminTheme.text} tabular-nums`}>{log.totalHours?.toFixed(2)}</span>
-                                  <span className="text-[8px] text-slate-400 font-black uppercase tracking-tighter block -mt-1">Giờ</span>
-                                </div>
-                              </div>
-                              <div className="flex items-center justify-between gap-2 mb-2 p-1.5 bg-slate-50/80 rounded-2xl border border-slate-100">
-                                <div className="flex items-center gap-3 flex-1">
-                                  <div className="flex items-center gap-1.5 border-r border-slate-200 pr-3">
-                                    <span className="text-[9px] font-black text-slate-400 uppercase">Vào</span>
-                                    <span className="text-xs font-bold text-slate-700">{log.checkInTime ? safeFormat(log.checkInTime, 'HH:mm', '00:00', log.date) : '--:--'}</span>
-                                    {isAdminOrSuperAdmin && (log.photoCheckIn || log.AnhVaoCa) && (
-                                      <button 
-                                        onClick={() => setPreviewPhoto({
-                                          url: log.photoCheckIn || log.AnhVaoCa!,
-                                          employeeName: employee?.fullName || 'Không rõ',
-                                          time: `Vào ca: ${log.checkInTime || '-'}`,
-                                          location: log.locationId,
-                                          gps: log.gpsIn
-                                        })}
-                                        className="active:scale-95 transition-all flex-shrink-0"
-                                      >
-                                        <img src={log.photoCheckIn || log.AnhVaoCa!} className="w-6 h-6 rounded-full object-cover border border-slate-200 ring-2 ring-white" alt="In" />
-                                      </button>
-                                    )}
-                                  </div>
-                                  <div className="flex items-center gap-1.5 pl-1">
-                                    <span className="text-[9px] font-black text-slate-400 uppercase">Ra</span>
-                                    <span className="text-xs font-bold text-slate-700">{log.checkOutTime ? safeFormat(log.checkOutTime, 'HH:mm', '00:00', log.date) : '--:--'}</span>
-                                    {isAdminOrSuperAdmin && (log.photoCheckOut || log.AnhRaCa) && (
-                                      <button 
-                                        onClick={() => setPreviewPhoto({
-                                          url: log.photoCheckOut || log.AnhRaCa!,
-                                          employeeName: employee?.fullName || 'Không rõ',
-                                          time: `Ra ca: ${log.checkOutTime || '-'}`,
-                                          location: log.locationId,
-                                          gps: log.gpsOut
-                                        })}
-                                        className="active:scale-95 transition-all flex-shrink-0"
-                                      >
-                                        <img src={log.photoCheckOut || log.AnhRaCa!} className="w-6 h-6 rounded-full object-cover border border-slate-200 ring-2 ring-white" alt="Out" />
-                                      </button>
-                                    )}
-                                  </div>
-                                </div>
-                                <span className={`text-xs font-black ${adminTheme.text} tabular-nums whitespace-nowrap bg-white px-2 py-1 rounded-lg border border-slate-100 shadow-sm`}>{log.totalHours?.toFixed(1)}h</span>
-                              </div>
-                              <div className="flex flex-wrap gap-2 pt-2 border-t border-slate-50">
-                                {log.SoLanRoiApp > 0 && (
-                                  <div className="flex items-center gap-1 px-2 py-0.5 bg-rose-50 border border-rose-100 rounded-full">
-                                    <Smartphone className="w-3 h-3 text-rose-500" />
-                                    <span className="text-[12px] font-black text-rose-600 uppercase tracking-tighter">
-                                      ĐT: {log.SoLanRoiApp} lần
-                                    </span>
-                                  </div>
-                                )}
-                                {((log.lateMinutes || (log.latePenaltyMinutes ? log.latePenaltyMinutes / 2 : 0)) > 0) && (
-                                  <div className="flex items-center gap-1 px-2 py-0.5 bg-orange-50 border border-orange-100 rounded-full">
-                                    <Clock className="w-3 h-3 text-orange-500" />
-                                    <span className="text-[12px] font-black text-orange-600 uppercase tracking-tighter">
-                                      TRỄ {formatMinutes(log.lateMinutes !== undefined ? log.lateMinutes : (log.latePenaltyMinutes ? log.latePenaltyMinutes / 2 : 0))}
-                                    </span>
-                                  </div>
-                                )}
-                              </div>
-                            </div>
-                          </div>
-                        );
-                      })}
+                    <div className="bg-rose-50 p-4 rounded-3xl border border-rose-100 shadow-sm flex flex-col items-center">
+                      <span className="text-[10px] font-black text-rose-600 uppercase tracking-widest mb-1">Vi phạm (Ngày)</span>
+                      <div className="flex gap-4">
+                        <div className="text-center">
+                          <p className="text-lg font-black text-rose-700 leading-none">{formatMinutes(lateMins)}</p>
+                          <p className="text-[8px] font-bold text-rose-400 uppercase mt-1">Trễ</p>
+                        </div>
+                        <div className="text-center">
+                          <p className="text-lg font-black text-rose-700 leading-none">{phoneViolations}</p>
+                          <p className="text-[8px] font-bold text-rose-400 uppercase mt-1">ĐT</p>
+                        </div>
+                      </div>
                     </div>
                   </div>
-                );
-              });
+
+                  {Object.entries(shifts).map(([shiftName, logs]) => {
+                    if (logs.length === 0) return null;
+                    return (
+                      <div key={shiftName} className="space-y-4">
+                        <div className="flex items-center gap-3 px-2">
+                          <div className={`w-2 h-6 rounded-full ${shiftName === 'Ca Sáng' ? 'bg-amber-400' : shiftName === 'Ca Trưa' ? 'bg-orange-500' : shiftName === 'Ca Tối' ? 'bg-indigo-600' : 'bg-slate-400'}`} />
+                          <h3 className="text-sm font-black text-slate-900 uppercase tracking-widest">{shiftName}</h3>
+                          <span className="text-[10px] bg-slate-100 text-slate-500 px-2 py-0.5 rounded-full font-bold">{logs.length} NV</span>
+                        </div>
+                        <div className="space-y-4">
+                          {logs.sort((a,b) => {
+                            const nameA = nhanViens.find(nv => nv.empId === a.empId)?.fullName || '';
+                            const nameB = nhanViens.find(nv => nv.empId === b.empId)?.fullName || '';
+                            return nameA.localeCompare(nameB);
+                          }).map((log, logIdx) => {
+                            const employee = nhanViens.find(nv => nv.empId === log.empId);
+                            return (
+                              <div key={log.id} className="attendance-card bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden animate-in fade-in slide-in-from-right-4" style={{ animationDelay: `${logIdx * 50}ms` }}>
+                                <div className="p-4">
+                                  <div className="flex justify-between items-center mb-3">
+                                    <div onClick={() => {
+                                      if (employee) {
+                                        setHistoryEmployee(employee);
+                                        setHistoryDay(null);
+                                        setMobileHistoryMode('employee');
+                                      }
+                                    }}>
+                                      <h4 className={`font-black ${adminTheme.text} text-sm uppercase leading-tight`}>{employee?.fullName || 'Không rõ'}</h4>
+                                      <div className="flex flex-wrap gap-1 mt-1">
+                                        {log.status === 'pending_approval' && <span className="px-1.5 py-0.5 bg-amber-100 text-amber-700 text-[8px] font-black rounded uppercase tracking-wider">Duyệt</span>}
+                                        {log.isAbandonedShift && <span className="px-1.5 py-0.5 bg-rose-100 text-rose-700 text-[8px] font-black rounded uppercase tracking-wider">Bỏ</span>}
+                                      </div>
+                                    </div>
+                                    <div className="text-right">
+                                      <span className={`text-sm font-black ${adminTheme.text} tabular-nums`}>{log.totalHours?.toFixed(2)}</span>
+                                      <span className="text-[8px] text-slate-400 font-black uppercase tracking-tighter block -mt-1">Giờ</span>
+                                    </div>
+                                  </div>
+                                  <div className="flex items-center justify-between gap-2 mb-2 p-1.5 bg-slate-50/80 rounded-2xl border border-slate-100">
+                                    <div className="flex items-center gap-3 flex-1">
+                                      <div className="flex items-center gap-1.5 border-r border-slate-200 pr-3">
+                                        <span className="text-[9px] font-black text-slate-400 uppercase">Vào</span>
+                                        <span className="text-xs font-bold text-slate-700">{log.checkInTime ? safeFormat(log.checkInTime, 'HH:mm', '00:00', log.date) : '--:--'}</span>
+                                        {isAdminOrSuperAdmin && (log.photoCheckIn || log.AnhVaoCa) && (
+                                          <button 
+                                            onClick={() => setPreviewPhoto({
+                                              url: log.photoCheckIn || log.AnhVaoCa!,
+                                              employeeName: employee?.fullName || 'Không rõ',
+                                              time: `Vào ca: ${log.checkInTime || '-'}`,
+                                              location: log.locationId,
+                                              gps: log.gpsIn
+                                            })}
+                                            className="active:scale-95 transition-all flex-shrink-0"
+                                          >
+                                            <img src={log.photoCheckIn || log.AnhVaoCa!} className="w-6 h-6 rounded-full object-cover border border-slate-200 ring-2 ring-white" alt="In" />
+                                          </button>
+                                        )}
+                                      </div>
+                                      <div className="flex items-center gap-1.5 pl-1">
+                                        <span className="text-[9px] font-black text-slate-400 uppercase">Ra</span>
+                                        <span className="text-xs font-bold text-slate-700">{log.checkOutTime ? safeFormat(log.checkOutTime, 'HH:mm', '00:00', log.date) : '--:--'}</span>
+                                        {isAdminOrSuperAdmin && (log.photoCheckOut || log.AnhRaCa) && (
+                                          <button 
+                                            onClick={() => setPreviewPhoto({
+                                              url: log.photoCheckOut || log.AnhRaCa!,
+                                              employeeName: employee?.fullName || 'Không rõ',
+                                              time: `Ra ca: ${log.checkOutTime || '-'}`,
+                                              location: log.locationId,
+                                              gps: log.gpsOut
+                                            })}
+                                            className="active:scale-95 transition-all flex-shrink-0"
+                                          >
+                                            <img src={log.photoCheckOut || log.AnhRaCa!} className="w-6 h-6 rounded-full object-cover border border-slate-200 ring-2 ring-white" alt="Out" />
+                                          </button>
+                                        )}
+                                      </div>
+                                    </div>
+                                    <span className={`text-xs font-black ${adminTheme.text} tabular-nums whitespace-nowrap bg-white px-2 py-1 rounded-lg border border-slate-100 shadow-sm`}>{log.totalHours?.toFixed(1)}h</span>
+                                  </div>
+                                  <div className="flex flex-wrap gap-2 pt-2 border-t border-slate-50">
+                                    {log.SoLanRoiApp > 0 && (
+                                      <div className="flex items-center gap-1 px-2 py-0.5 bg-rose-50 border border-rose-100 rounded-full">
+                                        <Smartphone className="w-3 h-3 text-rose-500" />
+                                        <span className="text-[12px] font-black text-rose-600 uppercase tracking-tighter">
+                                          ĐT: {log.SoLanRoiApp} lần
+                                        </span>
+                                      </div>
+                                    )}
+                                    {((log.lateMinutes || (log.latePenaltyMinutes ? log.latePenaltyMinutes / 2 : 0)) > 0) && (
+                                      <div className="flex items-center gap-1 px-2 py-0.5 bg-orange-50 border border-orange-100 rounded-full">
+                                        <Clock className="w-3 h-3 text-orange-500" />
+                                        <span className="text-[12px] font-black text-orange-600 uppercase tracking-tighter">
+                                          TRỄ {formatMinutes(log.lateMinutes !== undefined ? log.lateMinutes : (log.latePenaltyMinutes ? log.latePenaltyMinutes / 2 : 0))}
+                                        </span>
+                                      </div>
+                                    )}
+                                  </div>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </>
+              );
             })()}
           </div>
         </div>
@@ -1112,85 +1146,115 @@ export const AttendanceTab: React.FC<AttendanceTabProps> = ({
                 </div>
 
                 {/* Mobile Card List View - Grouped by Date */}
-                <div className="md:hidden space-y-3 pb-8 max-h-[85vh] overflow-y-auto custom-scrollbar px-1">
+                <div className="md:hidden space-y-3 pb-8 px-1">
                   {(() => {
                     if (sortedLogs.length === 0) return (
                       <div className="p-8 text-center text-slate-400 italic">Không có dữ liệu chấm công.</div>
                     );
 
-                    const groupedLogs: { [date: string]: any[] } = {};
-                    sortedLogs.forEach(log => {
-                      if (!groupedLogs[log.date]) groupedLogs[log.date] = [];
-                      groupedLogs[log.date].push(log);
-                    });
-
-                    return Object.entries(groupedLogs).sort((a,b) => b[0].localeCompare(a[0])).map(([dateValue, logsInDay]) => {
-                      const dayTotalHours = logsInDay.reduce((sum, l) => sum + (l.totalHours || 0), 0);
-                      const dateObj = safeParseDate(dateValue);
-                      const fullDayNames = ['CN', 'Thứ 2', 'Thứ 3', 'Thứ 4', 'Thứ 5', 'Thứ 6', 'Thứ 7'];
-                      const dayLabel = fullDayNames[dateObj.getDay()];
-                      const shortDate = format(dateObj, 'dd/MM');
-
-                      return (
-                        <div key={dateValue} className="mx-1 attendance-card bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden animate-in fade-in slide-in-from-bottom-2">
-                          <div className="px-3 py-2 bg-slate-50/80 flex justify-between items-center border-b border-slate-100">
-                            <span className="text-[10px] font-black text-slate-900 uppercase">{dayLabel}, {shortDate}</span>
-                            <span className={`text-[11px] font-black ${adminTheme.text}`}>{dayTotalHours.toFixed(2)}h</span>
+                    return (
+                      <>
+                        {/* Summary Card */}
+                        <div className="grid grid-cols-2 gap-3 mb-4 mx-1">
+                          <div className="bg-emerald-50 p-4 rounded-3xl border border-emerald-100 shadow-sm flex flex-col items-center">
+                            <span className="text-[10px] font-black text-emerald-600 uppercase tracking-widest mb-1">Tổng giờ công</span>
+                            <div className="flex items-baseline gap-1">
+                              <span className="text-2xl font-black text-emerald-700">{totalHours.toFixed(1)}h</span>
+                              {pendingHours > 0 && <span className="text-[10px] font-bold text-amber-500">(+{pendingHours.toFixed(1)}?)</span>}
+                            </div>
                           </div>
-                          <div className="divide-y divide-slate-50">
-                            {logsInDay.map((log) => (
-                              <div key={log.id} className="p-2 space-y-1.5 border-b border-slate-50 last:border-0 hover:bg-slate-50/50 transition-colors">
-                              <div className="flex items-center justify-between gap-1 p-1 bg-slate-50/50 rounded-xl border border-slate-100">
-                                <div className="flex items-center gap-3 flex-1 overflow-hidden">
-                                  <div className="flex items-center gap-1.5 border-r border-slate-200 pr-2 min-w-0">
-                                    <span className="text-[9px] text-slate-400 font-black uppercase">Vào</span>
-                                    <span className="text-[11px] font-black text-slate-700 whitespace-nowrap leading-none">{log.checkInTime ? safeFormat(log.checkInTime, 'HH:mm', '--:--', log.date) : '--:--'}</span>
-                                    {isAdminOrSuperAdmin && (log.photoCheckIn || log.AnhVaoCa) && (
-                                      <button 
-                                        onClick={() => setPreviewPhoto({
-                                          url: log.photoCheckIn || log.AnhVaoCa!,
-                                          employeeName: historyEmployee.fullName,
-                                          time: `Vào ca: ${log.checkInTime || '-'}`,
-                                          location: log.locationId,
-                                          gps: log.gpsIn
-                                        })}
-                                        className="active:scale-95 transition-all flex-shrink-0 ml-0.5"
-                                      >
-                                        <img src={log.photoCheckIn || log.AnhVaoCa!} className="w-6 h-6 rounded-lg object-cover border border-slate-200 shadow-sm" alt="In" />
-                                      </button>
-                                    )}
-                                  </div>
-                                  <div className="flex items-center gap-1.5 min-w-0">
-                                    <span className="text-[9px] text-slate-400 font-black uppercase leading-none">Ra</span>
-                                    <span className="text-[11px] font-black text-slate-700 whitespace-nowrap leading-none">{log.checkOutTime ? safeFormat(log.checkOutTime, 'HH:mm', '--:--', log.date) : '--:--'}</span>
-                                    {isAdminOrSuperAdmin && (log.photoCheckOut || log.AnhRaCa) && (
-                                      <button 
-                                        onClick={() => setPreviewPhoto({
-                                          url: log.photoCheckOut || log.AnhRaCa!,
-                                          employeeName: historyEmployee.fullName,
-                                          time: `Ra ca: ${log.checkOutTime || '-'}`,
-                                          location: log.locationId,
-                                          gps: log.gpsOut
-                                        })}
-                                        className="active:scale-95 transition-all flex-shrink-0 ml-0.5"
-                                      >
-                                        <img src={log.photoCheckOut || log.AnhRaCa!} className="w-6 h-6 rounded-lg object-cover border border-slate-200 shadow-sm" alt="Out" />
-                                      </button>
-                                    )}
-                                  </div>
-                                </div>
-                                <span className={`text-[11px] font-black ${adminTheme.text} whitespace-nowrap bg-white px-1.5 py-0.5 rounded shadow-sm border border-slate-100`}>{log.totalHours?.toFixed(1)}h</span>
+                          <div className="bg-rose-50 p-4 rounded-3xl border border-rose-100 shadow-sm flex flex-col items-center">
+                            <span className="text-[10px] font-black text-rose-600 uppercase tracking-widest mb-1">Vi phạm (Tháng)</span>
+                            <div className="flex gap-4">
+                              <div className="text-center">
+                                <p className="text-lg font-black text-rose-700 leading-none">{formatMinutes(totalLate)}</p>
+                                <p className="text-[8px] font-bold text-rose-400 uppercase mt-1">Trễ</p>
                               </div>
-                                <div className="flex flex-wrap gap-1">
-                                  {log.SoLanRoiApp > 0 && <span className="px-1.5 py-0.5 bg-rose-50 text-rose-600 text-[8px] font-black rounded-full border border-rose-100">ĐT: {log.SoLanRoiApp} l</span>}
-                                  {((log.lateMinutes || (log.latePenaltyMinutes ? log.latePenaltyMinutes / 2 : 0)) > 0) && <span className="px-1.5 py-0.5 bg-orange-50 text-orange-600 text-[8px] font-black rounded-full border border-orange-100">TRỄ: {formatMinutes(log.lateMinutes !== undefined ? log.lateMinutes : (log.latePenaltyMinutes ? log.latePenaltyMinutes / 2 : 0))}</span>}
-                                </div>
+                              <div className="text-center">
+                                <p className="text-lg font-black text-rose-700 leading-none">{totalPhone}</p>
+                                <p className="text-[8px] font-bold text-rose-400 uppercase mt-1">ĐT</p>
                               </div>
-                            ))}
+                            </div>
                           </div>
                         </div>
-                      );
-                    });
+
+                        {(() => {
+                          const groupedLogs: { [date: string]: any[] } = {};
+                          sortedLogs.forEach(log => {
+                            if (!groupedLogs[log.date]) groupedLogs[log.date] = [];
+                            groupedLogs[log.date].push(log);
+                          });
+
+                          return Object.entries(groupedLogs).sort((a,b) => b[0].localeCompare(a[0])).map(([dateValue, logsInDay]) => {
+                            const dayTotalHours = logsInDay.reduce((sum, l) => sum + (l.totalHours || 0), 0);
+                            const dateObj = safeParseDate(dateValue);
+                            const fullDayNames = ['CN', 'Thứ 2', 'Thứ 3', 'Thứ 4', 'Thứ 5', 'Thứ 6', 'Thứ 7'];
+                            const dayLabel = fullDayNames[dateObj.getDay()];
+                            const shortDate = format(dateObj, 'dd/MM');
+
+                            return (
+                              <div key={dateValue} className="mx-1 attendance-card bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden animate-in fade-in slide-in-from-bottom-2">
+                                <div className="px-3 py-2 bg-slate-50/80 flex justify-between items-center border-b border-slate-100">
+                                  <span className="text-[10px] font-black text-slate-900 uppercase">{dayLabel}, {shortDate}</span>
+                                  <span className={`text-[11px] font-black ${adminTheme.text}`}>{dayTotalHours.toFixed(2)}h</span>
+                                </div>
+                                <div className="divide-y divide-slate-50">
+                                  {logsInDay.map((log) => (
+                                    <div key={log.id} className="p-2 space-y-1.5 border-b border-slate-50 last:border-0 hover:bg-slate-50/50 transition-colors">
+                                    <div className="flex items-center justify-between gap-1 p-1 bg-slate-50/50 rounded-xl border border-slate-100">
+                                      <div className="flex items-center gap-3 flex-1 overflow-hidden">
+                                        <div className="flex items-center gap-1.5 border-r border-slate-200 pr-2 min-w-0">
+                                          <span className="text-[9px] text-slate-400 font-black uppercase">Vào</span>
+                                          <span className="text-[11px] font-black text-slate-700 whitespace-nowrap leading-none">{log.checkInTime ? safeFormat(log.checkInTime, 'HH:mm', '--:--', log.date) : '--:--'}</span>
+                                          {isAdminOrSuperAdmin && (log.photoCheckIn || log.AnhVaoCa) && (
+                                            <button 
+                                              onClick={() => setPreviewPhoto({
+                                                url: log.photoCheckIn || log.AnhVaoCa!,
+                                                employeeName: historyEmployee.fullName,
+                                                time: `Vào ca: ${log.checkInTime || '-'}`,
+                                                location: log.locationId,
+                                                gps: log.gpsIn
+                                              })}
+                                              className="active:scale-95 transition-all flex-shrink-0 ml-0.5"
+                                            >
+                                              <img src={log.photoCheckIn || log.AnhVaoCa!} className="w-6 h-6 rounded-lg object-cover border border-slate-200 shadow-sm" alt="In" />
+                                            </button>
+                                          )}
+                                        </div>
+                                        <div className="flex items-center gap-1.5 min-w-0">
+                                          <span className="text-[9px] text-slate-400 font-black uppercase leading-none">Ra</span>
+                                          <span className="text-[11px] font-black text-slate-700 whitespace-nowrap leading-none">{log.checkOutTime ? safeFormat(log.checkOutTime, 'HH:mm', '--:--', log.date) : '--:--'}</span>
+                                          {isAdminOrSuperAdmin && (log.photoCheckOut || log.AnhRaCa) && (
+                                            <button 
+                                              onClick={() => setPreviewPhoto({
+                                                url: log.photoCheckOut || log.AnhRaCa!,
+                                                employeeName: historyEmployee.fullName,
+                                                time: `Ra ca: ${log.checkOutTime || '-'}`,
+                                                location: log.locationId,
+                                                gps: log.gpsOut
+                                              })}
+                                              className="active:scale-95 transition-all flex-shrink-0 ml-0.5"
+                                            >
+                                              <img src={log.photoCheckOut || log.AnhRaCa!} className="w-6 h-6 rounded-lg object-cover border border-slate-200 shadow-sm" alt="Out" />
+                                            </button>
+                                          )}
+                                        </div>
+                                      </div>
+                                      <span className={`text-[11px] font-black ${adminTheme.text} whitespace-nowrap bg-white px-1.5 py-0.5 rounded shadow-sm border border-slate-100`}>{log.totalHours?.toFixed(1)}h</span>
+                                    </div>
+                                      <div className="flex flex-wrap gap-1">
+                                        {log.SoLanRoiApp > 0 && <span className="px-1.5 py-0.5 bg-rose-50 text-rose-600 text-[8px] font-black rounded-full border border-rose-100">ĐT: {log.SoLanRoiApp} l</span>}
+                                        {((log.lateMinutes || (log.latePenaltyMinutes ? log.latePenaltyMinutes / 2 : 0)) > 0) && <span className="px-1.5 py-0.5 bg-orange-50 text-orange-600 text-[8px] font-black rounded-full border border-orange-100">TRỄ: {formatMinutes(log.lateMinutes !== undefined ? log.lateMinutes : (log.latePenaltyMinutes ? log.latePenaltyMinutes / 2 : 0))}</span>}
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            );
+                          });
+                        })()}
+                      </>
+                    );
                   })()}
                 </div>
               </div>
