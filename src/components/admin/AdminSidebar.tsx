@@ -1,5 +1,5 @@
 import React from 'react';
-import { LayoutDashboard, CheckCircle2, Calendar, TableProperties, Users, DollarSign, AlertCircle, ShieldCheck, History as HistoryIcon, X, ChevronLeft, Bell, Mail, RefreshCw } from 'lucide-react';
+import { LayoutDashboard, CheckCircle2, Calendar, TableProperties, Users, DollarSign, AlertCircle, ShieldCheck, History as HistoryIcon, X, ChevronLeft, Bell, Mail, RefreshCw, ShieldAlert } from 'lucide-react';
 
 export const AdminSidebar = ({
   isSidebarCollapsed,
@@ -142,6 +142,13 @@ export const AdminSidebar = ({
               <p className="px-4 text-[10px] font-black text-slate-500 uppercase tracking-widest mb-4">Hệ thống & Cảnh báo</p>
             )}
             
+            <SidebarItem 
+              icon={ShieldAlert} 
+              label="Quy định quán" 
+              active={activeTab === 'quydinh'} 
+              onClick={() => setActiveTab('quydinh')} 
+            />
+
             <button
               onClick={() => {
                 setActiveTab('canhbao');
