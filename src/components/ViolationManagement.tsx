@@ -10,6 +10,7 @@ interface ViolationManagementProps {
   nhanViens: Employee[];
   violations: Violation[];
   handleAddViolation: (violation: { empId: string; type: string; date: string; note?: string }) => Promise<void>;
+  handleDeleteViolation: (violationId: string, reason: string) => Promise<void>;
   adminTheme: any;
   filterMonth: string;
   BranchTabs: React.FC<any>;
@@ -30,11 +31,15 @@ export const ViolationManagement: React.FC<ViolationManagementProps> = ({
   nhanViens,
   violations,
   handleAddViolation,
+  handleDeleteViolation,
   adminTheme,
   filterMonth,
   BranchTabs
 }) => {
   const [showAddModal, setShowAddModal] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [selectedViolationForDelete, setSelectedViolationForDelete] = useState<Violation | null>(null);
+  const [deleteReason, setDeleteReason] = useState('');
   const [selectedEmpId, setSelectedEmpId] = useState('');
   const [selectedViolationType, setSelectedViolationType] = useState('');
   const [customViolation, setCustomViolation] = useState('');
@@ -74,6 +79,16 @@ export const ViolationManagement: React.FC<ViolationManagementProps> = ({
     setCustomNote('');
   };
 
+  const confirmDelete = async () => {
+    if (!selectedViolationForDelete || !deleteReason) return;
+    setIsSubmitting(true);
+    await handleDeleteViolation(selectedViolationForDelete.id, deleteReason);
+    setIsSubmitting(false);
+    setShowDeleteModal(false);
+    setSelectedViolationForDelete(null);
+    setDeleteReason('');
+  };
+
   return (
     <div className="space-y-6 animate-in fade-in duration-500">
       <div className="bg-white p-4 md:p-6 rounded-[2.5rem] shadow-sm border border-stone-200">
@@ -110,21 +125,24 @@ export const ViolationManagement: React.FC<ViolationManagementProps> = ({
         <div className="space-y-4">
           {/* Desktop Table View */}
           <div className="hidden md:block overflow-x-auto rounded-3xl border border-slate-100 shadow-sm">
-            <table className="w-full text-sm text-left min-w-[500px]">
+            <table className="w-full text-sm text-left min-w-[600px]">
               <thead className="bg-slate-50 text-slate-500 uppercase text-[10px] font-black tracking-[0.2em]">
                 <tr>
+                  <th className="px-4 py-4 text-center w-16">STT</th>
                   <th className="px-4 py-4">Ngày ghi nhận</th>
                   <th className="px-4 py-4">Nhân viên</th>
                   <th className="px-4 py-4">Loại vi phạm</th>
                   <th className="px-4 py-4">Ghi chú</th>
+                  <th className="px-4 py-4 text-center w-24">Thao tác</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-50">
                 {filteredViolations.length > 0 ? (
-                  filteredViolations.map((v) => {
+                  filteredViolations.map((v, idx) => {
                     const emp = nhanViens.find(n => n.id === v.empId || n.empId === v.empId);
                     return (
                       <tr key={v.id} className="hover:bg-slate-50/50 transition-colors">
+                        <td className="px-4 py-4 text-center font-bold text-slate-400">{idx + 1}</td>
                         <td className="px-4 py-4 font-bold text-slate-600">
                           {safeFormat(v.date, 'dd/MM/yyyy')}
                         </td>
@@ -139,12 +157,24 @@ export const ViolationManagement: React.FC<ViolationManagementProps> = ({
                         <td className="px-4 py-4 text-slate-500 italic font-medium max-w-[200px] truncate">
                           {v.note || '-'}
                         </td>
+                        <td className="px-4 py-4 text-center">
+                          <button 
+                            onClick={() => {
+                              setSelectedViolationForDelete(v);
+                              setShowDeleteModal(true);
+                            }}
+                            className="p-2 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-xl transition-all"
+                            title="Xóa lỗi vi phạm"
+                          >
+                            <Trash2 className="w-5 h-5" />
+                          </button>
+                        </td>
                       </tr>
                     );
                   })
                 ) : (
                   <tr>
-                    <td colSpan={4} className="px-6 py-12 text-center text-slate-400 font-bold uppercase tracking-widest italic opacity-50">
+                    <td colSpan={6} className="px-6 py-12 text-center text-slate-400 font-bold uppercase tracking-widest italic opacity-50">
                       Chưa có dữ liệu vi phạm trong tháng này
                     </td>
                   </tr>
@@ -164,7 +194,7 @@ export const ViolationManagement: React.FC<ViolationManagementProps> = ({
                     key={v.id}
                     initial={{ opacity: 0, y: 10 }}
                     animate={{ opacity: 1, y: 0 }}
-                    className="p-5 bg-white rounded-[2rem] border border-slate-100 shadow-sm active:scale-[0.98] transition-all"
+                    className="p-5 bg-white rounded-[2rem] border border-slate-100 shadow-sm active:scale-[0.98] transition-all relative group"
                   >
                     <div className="flex justify-between items-start mb-3">
                       <div className="space-y-1">
@@ -187,6 +217,16 @@ export const ViolationManagement: React.FC<ViolationManagementProps> = ({
                         </p>
                       </div>
                     )}
+
+                    <button 
+                      onClick={() => {
+                        setSelectedViolationForDelete(v);
+                        setShowDeleteModal(true);
+                      }}
+                      className="absolute top-2 right-2 p-2 text-red-400 bg-white shadow-sm rounded-full opacity-0 group-hover:opacity-100 md:opacity-100 transition-all border border-red-50"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
                   </motion.div>
                 );
               })
@@ -323,6 +363,66 @@ export const ViolationManagement: React.FC<ViolationManagementProps> = ({
                 >
                   {isSubmitting ? 'ĐANG LƯU...' : 'XÁC NHẬN'}
                 </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+
+        {showDeleteModal && (
+          <div className="fixed inset-0 z-[110] flex items-center justify-center p-4">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setShowDeleteModal(false)}
+              className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm"
+            />
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              className="relative bg-white w-full max-w-md rounded-[2.5rem] shadow-2xl overflow-hidden p-6 md:p-8"
+            >
+              <div className="text-center space-y-4">
+                <div className="w-16 h-16 bg-red-50 rounded-full flex items-center justify-center mx-auto">
+                  <Trash2 className="w-8 h-8 text-red-500" />
+                </div>
+                <div className="space-y-1">
+                  <h3 className="text-xl font-black text-slate-900 uppercase tracking-tight">Xóa lỗi vi phạm</h3>
+                  <p className="text-sm text-slate-500 font-medium italic">
+                    Bạn đang thực hiện xóa lỗi vi phạm cho nhân viên{" "}
+                    <span className="text-red-500 font-black uppercase">
+                      {nhanViens.find(n => n.id === selectedViolationForDelete?.empId || n.empId === selectedViolationForDelete?.empId)?.fullName}
+                    </span>
+                  </p>
+                </div>
+
+                <div className="text-left space-y-1.5 pt-2">
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">Lý do xóa lỗi</label>
+                  <textarea
+                    placeholder="Nhập lý do xóa lỗi (VD: Nhiệt tình hỗ trợ đồng nghiệp...)"
+                    value={deleteReason}
+                    onChange={(e) => setDeleteReason(e.target.value)}
+                    className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-2 focus:ring-red-200 font-medium text-slate-600 min-h-[120px] shadow-inner text-sm"
+                  />
+                  <p className="text-[10px] text-slate-400 italic px-1">* Nhân viên sẽ nhận được thông báo về lý do xóa lỗi này</p>
+                </div>
+
+                <div className="flex gap-3 pt-4">
+                  <button
+                    onClick={() => setShowDeleteModal(false)}
+                    className="flex-1 py-3.5 bg-slate-100 text-slate-500 font-black rounded-2xl hover:bg-slate-200 transition-all uppercase tracking-widest text-[10px]"
+                  >
+                    Hủy
+                  </button>
+                  <button
+                    disabled={!deleteReason || isSubmitting}
+                    onClick={confirmDelete}
+                    className="flex-1 py-3.5 bg-red-600 text-white font-black rounded-2xl shadow-lg hover:shadow-xl transition-all disabled:opacity-50 uppercase tracking-widest text-[10px]"
+                  >
+                    {isSubmitting ? 'ĐANG XỬ LÝ...' : 'XÓA LỖI'}
+                  </button>
+                </div>
               </div>
             </motion.div>
           </div>
