@@ -408,6 +408,37 @@ export function useAdminLogic(globalData: any, fetchInitialData: any, isLoading:
     return raw.filter((pg: any) => adminLocations.includes(pg.branchId));
   }, [globalData.planningGoals, currentAdmin]);
 
+  const [localGoals, setLocalGoals] = useState<{[key: string]: string}>({});
+
+  // Sync local goals when planningGoals prop changes
+  useEffect(() => {
+    if (planningGoals.length === 0) return;
+    const goals: {[key: string]: string} = {};
+    planningGoals.forEach(g => {
+      const goalId = `${g.branchId}_${g.position}`;
+      goals[goalId] = String(g.goalShifts);
+    });
+    setLocalGoals(prev => ({ ...goals, ...prev }));
+  }, [planningGoals]);
+
+  const handleUpdatePlanningGoal = async (position: 'QUẦY' | 'PV', goalShifts: number) => {
+    if (filterBranch === 'All') return;
+    const goalId = `${filterBranch}_${position}`;
+    const loadingToast = toast.loading(`Đang cập nhật mục tiêu ${position}...`);
+    try {
+      await setDoc(doc(db, 'PlanningGoals', goalId), {
+        branchId: filterBranch,
+        position,
+        goalShifts: Number(goalShifts)
+      }, { merge: true });
+      await fetchInitialData(filterMonth, true);
+      toast.success('Đã cập nhật mục tiêu', { id: loadingToast });
+    } catch (error) {
+      console.error('Error updating planning goal:', error);
+      toast.error('Lỗi khi cập nhật mục tiêu', { id: loadingToast });
+    }
+  };
+
   const [showNotifications, setShowNotifications] = useState(false);
   const [headerTapCount, setHeaderTapCount] = useState(0);
   const headerTapTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -609,16 +640,17 @@ export function useAdminLogic(globalData: any, fetchInitialData: any, isLoading:
   const handleAddViolation = async (violation: { empId: string; type: string; date: string; note?: string }) => {
     if (!currentAdmin) return;
     try {
+      const emp = nhanViens.find(nv => nv.id === violation.empId || nv.empId === violation.empId);
       const monthYear = violation.date.substring(0, 7);
       const violationRef = await addDoc(collection(db, 'Violations'), {
         ...violation,
         monthYear,
         adminId: currentAdmin.id,
+        locationId: emp?.locationId || 'all',
         timestamp: serverTimestamp(),
         isConfirmed: false
       });
       
-      const emp = nhanViens.find(nv => nv.id === violation.empId || nv.empId === violation.empId);
       if (emp) {
         await addDoc(collection(db, 'Notifications'), {
           recipientId: emp.id,
@@ -640,6 +672,45 @@ export function useAdminLogic(globalData: any, fetchInitialData: any, isLoading:
     } catch (error) {
       console.error('Error adding violation:', error);
       toast.error('Lỗi khi ghi nhận vi phạm');
+    }
+  };
+
+  const handleDeleteViolation = async (violationId: string, reason: string) => {
+    if (!currentAdmin) return;
+    const loadingToast = toast.loading('Đang xóa vi phạm...');
+    try {
+      const violationRef = doc(db, 'Violations', violationId);
+      const violationSnap = await getDoc(violationRef);
+      
+      if (violationSnap.exists()) {
+        const vData = violationSnap.data();
+        const emp = nhanViens.find(nv => nv.id === vData.empId || nv.empId === vData.empId);
+        
+        await deleteDoc(violationRef);
+        
+        if (emp) {
+          // Notify employee about the deletion and reason
+          await addDoc(collection(db, 'Notifications'), {
+            recipientId: emp.id,
+            locationId: emp.locationId || 'all',
+            title: 'Hủy bỏ vi phạm',
+            message: `Vi phạm ngày ${safeFormat(vData.date, 'dd/MM')} của bạn đã được xóa. Lý do: ${reason}`,
+            type: 'info',
+            priority: 'medium',
+            isRead: false,
+            createdAt: serverTimestamp(),
+            senderId: currentAdmin.id
+          });
+          
+          logAction('Xóa vi phạm', emp.fullName, `Lý do: ${reason} (Lỗi gốc: ${vData.type})`);
+        }
+      }
+      
+      toast.success('Đã xóa vi phạm thành công', { id: loadingToast });
+      fetchInitialData(filterMonth, true);
+    } catch (error) {
+      console.error('Error deleting violation:', error);
+      toast.error('Lỗi khi xóa vi phạm', { id: loadingToast });
     }
   };
 
@@ -1250,30 +1321,34 @@ export function useAdminLogic(globalData: any, fetchInitialData: any, isLoading:
     );
   };
 
-  const SidebarItem = ({ icon: Icon, label, active, onClick, badge }: any) => (
-    <button
-      onClick={() => {
-        onClick();
-        setIsMobileSidebarOpen(false);
-      }}
-      className={`w-full flex items-center gap-3 px-4 py-3 rounded-2xl font-bold transition-all relative ${
-        active 
-          ? `${adminTheme.accent} text-white shadow-lg ${adminTheme.shadow}` 
-          : 'text-slate-400 hover:bg-white/5 hover:text-white'
-      } ${isSidebarCollapsed ? 'justify-center px-0' : ''}`}
-    >
-      <Icon strokeWidth={1.5} className="w-5 h-5 flex-shrink-0" />
-      {(!isSidebarCollapsed || isMobileSidebarOpen) && <span className="text-sm whitespace-nowrap">{label}</span>}
-      {(!isSidebarCollapsed || isMobileSidebarOpen) && badge > 0 && (
-        <span className={`ml-auto ${filterBranch === 'Phố Xanh' ? 'bg-[#D4AF37]' : 'bg-red-500'} text-white py-0.5 px-2 rounded-full text-[10px] font-black`}>
-          {badge}
-        </span>
-      )}
-      {(isSidebarCollapsed && !isMobileSidebarOpen) && badge > 0 && (
-        <div className={`absolute top-2 right-2 w-2.5 h-2.5 ${filterBranch === 'Phố Xanh' ? 'bg-[#D4AF37]' : 'bg-red-500'} rounded-full border-2 border-[#0f172a]`} />
-      )}
-    </button>
-  );
+  const SidebarItem = ({ icon: Icon, label, active, onClick, badge, variant }: any) => {
+    const isRed = variant === 'danger';
+    
+    return (
+      <button
+        onClick={() => {
+          onClick();
+          setIsMobileSidebarOpen(false);
+        }}
+        className={`w-full flex items-center gap-3 px-4 py-3 rounded-2xl font-bold transition-all relative ${
+          active 
+            ? (isRed ? 'bg-red-600 text-white shadow-lg shadow-red-900/20' : `${adminTheme.accent} text-white shadow-lg ${adminTheme.shadow}`) 
+            : (isRed ? 'text-red-400 hover:bg-red-500/10 hover:text-red-300' : 'text-slate-400 hover:bg-white/5 hover:text-white')
+        } ${isSidebarCollapsed ? 'justify-center px-0' : ''}`}
+      >
+        <Icon strokeWidth={1.5} className="w-5 h-5 flex-shrink-0" />
+        {(!isSidebarCollapsed || isMobileSidebarOpen) && <span className="text-sm whitespace-nowrap">{label}</span>}
+        {(!isSidebarCollapsed || isMobileSidebarOpen) && badge > 0 && (
+          <span className={`ml-auto ${isRed ? 'bg-white text-red-600' : (filterBranch === 'Phố Xanh' ? 'bg-[#D4AF37]' : 'bg-red-500')} text-white py-0.5 px-2 rounded-full text-[10px] font-black`}>
+            {badge}
+          </span>
+        )}
+        {(isSidebarCollapsed && !isMobileSidebarOpen) && badge > 0 && (
+          <div className={`absolute top-2 right-2 w-2.5 h-2.5 ${isRed ? 'bg-white' : (filterBranch === 'Phố Xanh' ? 'bg-[#D4AF37]' : 'bg-red-500')} rounded-full border-2 border-[#0f172a]`} />
+        )}
+      </button>
+    );
+  };
 
   const handleSavePayroll = async (specificEmpId?: string, specificAdj?: any) => {
     setIsSavingPayroll(true);
@@ -2346,8 +2421,12 @@ export function useAdminLogic(globalData: any, fetchInitialData: any, isLoading:
     handleUpdateAttendance,
     handleApproveAttendance,
     handleDeleteAttendance,
+    handleDeleteViolation,
     toggleNotifications,
     setNotificationFilter,
+    localGoals,
+    setLocalGoals,
+    handleUpdatePlanningGoal,
     headerTapTimeoutRef,
     currentAdminRef,
     filterBranchRef,
