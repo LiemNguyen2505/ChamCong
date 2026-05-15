@@ -137,7 +137,7 @@ export default function EmployeeView({
 
   const [selectedMonth, setSelectedMonth] = useState(format(new Date(), 'yyyy-MM'));
 
-  const { monthlyStats } = useEmployeeSalary(loggedInEmployee, monthTimesheets, payrollAdjustments, holidays, selectedMonth);
+  const { monthlyStats } = useEmployeeSalary(loggedInEmployee, monthTimesheets, payrollAdjustments, holidays, selectedMonth, globalData.violations);
 
   const {
     showWeeklySchedule, setShowWeeklySchedule,
@@ -391,6 +391,7 @@ export default function EmployeeView({
                     (v.empId === loggedInEmployee?.id || v.empId === loggedInEmployee?.empId) && 
                     v.monthYear === format(new Date(), 'yyyy-MM')
                   )}
+                  monthlyStats={monthlyStats}
                   onRefresh={() => fetchInitialData(format(new Date(), 'yyyy-MM'))}
                 />
               </div>
