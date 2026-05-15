@@ -176,6 +176,7 @@ export interface AppNotification {
   type: 'violation' | 'salary' | 'shift' | 'system' | 'support' | 'approval' | 'penalty';
   priority?: 'low' | 'medium' | 'high';
   isRead: boolean;
+  readBy?: string[];
   createdAt: any;
   senderId?: string;
   relatedId?: string;
