@@ -241,6 +241,7 @@ export default function AdminView({
     handleUndoPayroll,
     violations,
     handleAddViolation,
+    handleDeleteViolation,
     handleLogin,
     handleGoogleLogin,
     handleChangeAdminPin,
@@ -539,23 +540,26 @@ export default function AdminView({
             />
           )}
 
-          {activeTab === 'nhanvien' && (
-            <EmployeeManagement
-              currentAdmin={currentAdmin}
-              adminTheme={adminTheme}
-              activeTab={activeTab}
-              setActiveTab={setActiveTab}
-              nhanViens={nhanViens}
-              filterBranch={filterBranch}
-              planningGoals={planningGoals}
-              salaryReviewNotifications={salaryReviewNotifications}
-              openConfirmModal={openConfirmModal}
-              fetchInitialData={fetchInitialData}
-              BranchTabs={CommonBranchTabs}
-              logAction={logAction}
-              filterMonth={filterMonth}
-            />
-          )}
+            {activeTab === 'nhanvien' && (
+              <EmployeeManagement
+                currentAdmin={currentAdmin}
+                adminTheme={adminTheme}
+                activeTab={activeTab}
+                setActiveTab={setActiveTab}
+                nhanViens={nhanViens}
+                filterBranch={filterBranch}
+                planningGoals={planningGoals}
+                salaryReviewNotifications={salaryReviewNotifications}
+                openConfirmModal={openConfirmModal}
+                fetchInitialData={fetchInitialData}
+                BranchTabs={CommonBranchTabs}
+                logAction={logAction}
+                filterMonth={filterMonth}
+                localGoals={logic.localGoals}
+                setLocalGoals={logic.setLocalGoals}
+                handleUpdatePlanningGoal={logic.handleUpdatePlanningGoal}
+              />
+            )}
 
           {/* Tab: Vi phạm */}
           <ViolationManagement
@@ -563,6 +567,7 @@ export default function AdminView({
             nhanViens={nhanViens}
             violations={violations}
             handleAddViolation={handleAddViolation}
+            handleDeleteViolation={handleDeleteViolation}
             adminTheme={adminTheme}
             filterMonth={filterMonth}
             BranchTabs={CommonBranchTabs}
