@@ -226,8 +226,11 @@ export interface Violation {
   note?: string;
   adminId: string;
   timestamp: any;
+  locationId?: string;
   isConfirmed?: boolean;
   confirmedAt?: any;
+  isRejected?: boolean;
+  rejectedAt?: any;
 }
 
 declare global {
