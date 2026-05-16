@@ -66,7 +66,7 @@ export const EmployeeViolationTracker: React.FC<EmployeeViolationTrackerProps> =
 
       // Send notification to Admin and Super Admin
       await addDoc(collection(db, 'Notifications'), {
-        recipientId: 'admin',
+        recipientId: 'all_admins',
         locationId: violation.locationId || employeeInfo?.locationId || 'all',
         title: 'Nhân viên từ chối nhận lỗi',
         message: `Nhân viên ${employeeInfo?.fullName || 'Ẩn danh'} TỪ CHỐI NHẬN lỗi: ${violation.type} ngày ${safeFormat(violation.date, 'dd/MM')}. Vui lòng kiểm tra lại.`,
