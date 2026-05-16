@@ -316,6 +316,7 @@ export default function EmployeeView({
                 format={format}
                 selectedMonth={selectedMonth}
                 globalData={globalData}
+                onRefresh={() => fetchInitialData(undefined, true)}
               />
             )
           ) : (
@@ -387,6 +388,7 @@ export default function EmployeeView({
               <div className="overflow-y-auto p-4 custom-scrollbar">
                 <EmployeeViolationTracker 
                   theme={theme}
+                  employeeInfo={loggedInEmployee}
                   violations={(globalData.violations || []).filter((v: any) => 
                     (v.empId === loggedInEmployee?.id || v.empId === loggedInEmployee?.empId) && 
                     v.monthYear === format(new Date(), 'yyyy-MM')
