@@ -567,7 +567,7 @@ export const AttendanceTab: React.FC<AttendanceTabProps> = ({
             return (
               <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden relative max-w-[1200px] mx-auto attendance-interactive">
                 {/* Desktop Table View */}
-                <div className="hidden md:block overflow-x-auto custom-scrollbar overflow-y-auto max-h-[75vh]">
+                <div className="hidden md:block overflow-x-auto custom-scrollbar overflow-y-visible">
                   <table 
                     className="w-full text-left border-collapse table-fixed" 
                     style={{ width: `${TABLE_COL_WIDTHS.NAME + (TABLE_COL_WIDTHS.GIO * 2) + (isAdminOrSuperAdmin ? TABLE_COL_WIDTHS.PHOTO : 0) + TABLE_COL_WIDTHS.SD_DT + TABLE_COL_WIDTHS.PHAT_DT + TABLE_COL_WIDTHS.DI_TRE + TABLE_COL_WIDTHS.PHAT_TRE + TABLE_COL_WIDTHS.GIO_CONG + TABLE_COL_WIDTHS.ACTIONS}px` }}
@@ -804,6 +804,15 @@ export const AttendanceTab: React.FC<AttendanceTabProps> = ({
               const pendingHrs = dayLogs.filter(log => log.status === 'pending_approval').reduce((sum, log) => sum + (log.totalHours || 0), 0);
               const lateMins = dayLogs.reduce((sum, log) => sum + (log.lateMinutes || 0), 0);
               const phoneViolations = dayLogs.reduce((sum, log) => sum + (log.SoLanRoiApp || 0), 0);
+              const lateLogsCount = dayLogs.filter(log => (log.lateMinutes || 0) > 0).length;
+              const totalPhonePenalty = dayLogs.reduce((sum, log) => sum + (log.phonePenalty || 0), 0);
+              const totalLatePenalty = dayLogs.reduce((sum, log) => {
+                const employee = nhanViens.find(nv => nv.empId === log.empId);
+                const hourlyRate = employee?.hourlyRate || 0;
+                const penalty = log.latePenaltyMinutes && log.latePenaltyMinutes > 0 && !log.isLateExcused ? 
+                  roundToUnit(log.latePenaltyMinutes * (hourlyRate / 60)) : 0;
+                return sum + penalty;
+              }, 0);
 
               const getShiftType = (timeStr: string | null) => {
                 if (!timeStr) return 'Ca Khác';
@@ -825,27 +834,30 @@ export const AttendanceTab: React.FC<AttendanceTabProps> = ({
               );
               return (
                 <>
-                  {/* Summary Card */}
-                  <div className="grid grid-cols-2 gap-3 mb-6">
-                    <div className="bg-emerald-50 p-4 rounded-3xl border border-emerald-100 shadow-sm flex flex-col items-center">
-                      <span className="text-[10px] font-black text-emerald-600 uppercase tracking-widest mb-1">Tổng giờ công</span>
-                      <div className="flex items-baseline gap-1">
-                        <span className="text-2xl font-black text-emerald-700">{approvedHrs.toFixed(1)}h</span>
-                        {pendingHrs > 0 && <span className="text-[10px] font-bold text-amber-500">(+{pendingHrs.toFixed(1)}?)</span>}
-                      </div>
+                  {/* Summary Row - Compact & Right-Aligned Total per Request 9 */}
+                  <div className="bg-slate-100/90 px-2.5 py-1.5 rounded-xl border border-slate-200 mx-1 mb-3 flex flex-col gap-1 text-[9px] font-black shadow-sm animate-in fade-in slide-in-from-top-1">
+                    <div className="flex flex-wrap gap-x-3 gap-y-0.5 min-w-0">
+                       <div className="flex items-center gap-0.5">
+                          <span className="text-slate-400 uppercase tracking-tighter">Trễ:</span>
+                          <span className="text-rose-600 tabular-nums">{lateLogsCount} lần</span>
+                       </div>
+                       <div className="flex items-center gap-0.5">
+                          <span className="text-slate-400 uppercase tracking-tighter">Phạt trễ:</span>
+                          <span className="text-rose-600 tabular-nums">{formatCurrency(totalLatePenalty)}</span>
+                       </div>
+                       <div className="flex items-center gap-0.5">
+                          <span className="text-slate-400 uppercase tracking-tighter">ĐT:</span>
+                          <span className="text-blue-600 tabular-nums">{phoneViolations}</span>
+                       </div>
+                       <div className="flex items-center gap-0.5">
+                          <span className="text-slate-400 uppercase tracking-tighter">Phạt ĐT:</span>
+                          <span className="text-blue-600 tabular-nums">{formatCurrency(totalPhonePenalty)}</span>
+                       </div>
                     </div>
-                    <div className="bg-rose-50 p-4 rounded-3xl border border-rose-100 shadow-sm flex flex-col items-center">
-                      <span className="text-[10px] font-black text-rose-600 uppercase tracking-widest mb-1">Vi phạm (Ngày)</span>
-                      <div className="flex gap-4">
-                        <div className="text-center">
-                          <p className="text-lg font-black text-rose-700 leading-none">{formatMinutes(lateMins)}</p>
-                          <p className="text-[8px] font-bold text-rose-400 uppercase mt-1">Trễ</p>
-                        </div>
-                        <div className="text-center">
-                          <p className="text-lg font-black text-rose-700 leading-none">{phoneViolations}</p>
-                          <p className="text-[8px] font-bold text-rose-400 uppercase mt-1">ĐT</p>
-                        </div>
-                      </div>
+                    <div className="flex justify-end items-center gap-1 pt-1 border-t border-slate-200/50">
+                       <span className="text-slate-500 uppercase tracking-tighter">Tổng giờ công:</span>
+                       <span className="text-[12px] text-slate-800 tabular-nums">{approvedHrs.toFixed(1)}h</span>
+                       {pendingHrs > 0 && <span className="text-amber-500 text-[10px] font-bold">(+{pendingHrs.toFixed(1)})</span>}
                     </div>
                   </div>
 
@@ -866,9 +878,9 @@ export const AttendanceTab: React.FC<AttendanceTabProps> = ({
                           }).map((log, logIdx) => {
                             const employee = nhanViens.find(nv => nv.empId === log.empId);
                             return (
-                              <div key={log.id} className="attendance-card bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden animate-in fade-in slide-in-from-right-4" style={{ animationDelay: `${logIdx * 50}ms` }}>
-                                <div className="p-4">
-                                  <div className="flex justify-between items-center mb-3">
+                              <div key={log.id} className="attendance-card bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden animate-in fade-in slide-in-from-right-4" style={{ animationDelay: `${logIdx * 50}ms` }}>
+                                <div className="p-2.5">
+                                  <div className="flex justify-between items-center mb-2">
                                     <div onClick={() => {
                                       if (employee) {
                                         setHistoryEmployee(employee);
@@ -973,6 +985,7 @@ export const AttendanceTab: React.FC<AttendanceTabProps> = ({
             const totalPhone = logs.reduce((sum, l) => sum + (l.SoLanRoiApp || 0), 0);
             const totalPhonePenalty = logs.reduce((sum, l) => sum + (l.phonePenalty || 0), 0);
             const totalLate = logs.reduce((sum, l) => sum + (l.lateMinutes || 0), 0);
+            const totalLateLogs = logs.filter(l => (l.lateMinutes || 0) > 0).length;
             const totalPenalty = logs.reduce((sum, l) => {
               const penalty = l.latePenaltyMinutes && l.latePenaltyMinutes > 0 && !l.isLateExcused ? 
                 roundToUnit(l.latePenaltyMinutes * ((historyEmployee.hourlyRate || 0) / 60)) : 0;
@@ -981,7 +994,7 @@ export const AttendanceTab: React.FC<AttendanceTabProps> = ({
 
             return (
               <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden relative max-w-[1200px] mx-auto attendance-interactive">
-                <div className="hidden md:block overflow-x-auto custom-scrollbar overflow-y-auto max-h-[75vh]">
+                <div className="hidden md:block overflow-x-auto custom-scrollbar overflow-y-visible">
                   <table 
                     className="w-full text-left border-collapse border border-[#e0e0e0] table-fixed"
                     style={{ width: `${TABLE_COL_WIDTHS.NGAY + (TABLE_COL_WIDTHS.GIO * 2) + (isAdminOrSuperAdmin ? TABLE_COL_WIDTHS.PHOTO : 0) + TABLE_COL_WIDTHS.SD_DT + TABLE_COL_WIDTHS.PHAT_DT + TABLE_COL_WIDTHS.DI_TRE + TABLE_COL_WIDTHS.PHAT_TRE + TABLE_COL_WIDTHS.GIO_CONG}px` }}
@@ -1154,27 +1167,30 @@ export const AttendanceTab: React.FC<AttendanceTabProps> = ({
 
                     return (
                       <>
-                        {/* Summary Card */}
-                        <div className="grid grid-cols-2 gap-3 mb-4 mx-1">
-                          <div className="bg-emerald-50 p-4 rounded-3xl border border-emerald-100 shadow-sm flex flex-col items-center">
-                            <span className="text-[10px] font-black text-emerald-600 uppercase tracking-widest mb-1">Tổng giờ công</span>
-                            <div className="flex items-baseline gap-1">
-                              <span className="text-2xl font-black text-emerald-700">{totalHours.toFixed(1)}h</span>
-                              {pendingHours > 0 && <span className="text-[10px] font-bold text-amber-500">(+{pendingHours.toFixed(1)}?)</span>}
-                            </div>
+                        {/* Summary Row - Compact & Right-Aligned Total per Request 9 */}
+                        <div className="bg-slate-100/90 px-2.5 py-1.5 rounded-xl border border-slate-200 mx-1 mb-3 flex flex-col gap-1 text-[9px] font-black shadow-sm animate-in fade-in slide-in-from-top-1">
+                          <div className="flex flex-wrap gap-x-3 gap-y-0.5 min-w-0">
+                             <div className="flex items-center gap-0.5">
+                                <span className="text-slate-400 uppercase tracking-tighter">Trễ:</span>
+                                <span className="text-rose-600 tabular-nums">{totalLateLogs} lần</span>
+                             </div>
+                             <div className="flex items-center gap-0.5">
+                                <span className="text-slate-400 uppercase tracking-tighter">Phạt trễ:</span>
+                                <span className="text-rose-600 tabular-nums">{formatCurrency(totalPenalty)}</span>
+                             </div>
+                             <div className="flex items-center gap-0.5">
+                                <span className="text-slate-400 uppercase tracking-tighter">ĐT:</span>
+                                <span className="text-blue-600 tabular-nums">{totalPhone}</span>
+                             </div>
+                             <div className="flex items-center gap-0.5">
+                                <span className="text-slate-400 uppercase tracking-tighter">Phạt ĐT:</span>
+                                <span className="text-blue-600 tabular-nums">{formatCurrency(totalPhonePenalty)}</span>
+                             </div>
                           </div>
-                          <div className="bg-rose-50 p-4 rounded-3xl border border-rose-100 shadow-sm flex flex-col items-center">
-                            <span className="text-[10px] font-black text-rose-600 uppercase tracking-widest mb-1">Vi phạm (Tháng)</span>
-                            <div className="flex gap-4">
-                              <div className="text-center">
-                                <p className="text-lg font-black text-rose-700 leading-none">{formatMinutes(totalLate)}</p>
-                                <p className="text-[8px] font-bold text-rose-400 uppercase mt-1">Trễ</p>
-                              </div>
-                              <div className="text-center">
-                                <p className="text-lg font-black text-rose-700 leading-none">{totalPhone}</p>
-                                <p className="text-[8px] font-bold text-rose-400 uppercase mt-1">ĐT</p>
-                              </div>
-                            </div>
+                          <div className="flex justify-end items-center gap-1 pt-1 border-t border-slate-200/50">
+                             <span className="text-slate-500 uppercase tracking-tighter">Tổng giờ công:</span>
+                             <span className="text-[12px] text-slate-800 tabular-nums">{totalHours.toFixed(1)}h</span>
+                             {pendingHours > 0 && <span className="text-amber-500 text-[10px] font-bold">(+{pendingHours.toFixed(1)})</span>}
                           </div>
                         </div>
 
@@ -1193,15 +1209,15 @@ export const AttendanceTab: React.FC<AttendanceTabProps> = ({
                             const shortDate = format(dateObj, 'dd/MM');
 
                             return (
-                              <div key={dateValue} className="mx-1 attendance-card bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden animate-in fade-in slide-in-from-bottom-2">
-                                <div className="px-3 py-2 bg-slate-50/80 flex justify-between items-center border-b border-slate-100">
-                                  <span className="text-[10px] font-black text-slate-900 uppercase">{dayLabel}, {shortDate}</span>
-                                  <span className={`text-[11px] font-black ${adminTheme.text}`}>{dayTotalHours.toFixed(2)}h</span>
+                              <div key={dateValue} className="mx-1 attendance-card bg-white rounded-xl border border-slate-100 shadow-sm overflow-hidden animate-in fade-in slide-in-from-bottom-2">
+                                <div className="px-2 py-1.5 bg-slate-50/80 flex justify-between items-center border-b border-slate-100">
+                                  <span className="text-[9px] font-black text-slate-900 uppercase">{dayLabel}, {shortDate}</span>
+                                  <span className={`text-[10px] font-black ${adminTheme.text}`}>{dayTotalHours.toFixed(2)}h</span>
                                 </div>
                                 <div className="divide-y divide-slate-50">
                                   {logsInDay.map((log) => (
-                                    <div key={log.id} className="p-2 space-y-1.5 border-b border-slate-50 last:border-0 hover:bg-slate-50/50 transition-colors">
-                                    <div className="flex items-center justify-between gap-1 p-1 bg-slate-50/50 rounded-xl border border-slate-100">
+                                    <div key={log.id} className="p-1.5 space-y-1 border-b border-slate-50 last:border-0 hover:bg-slate-50/50 transition-colors">
+                                    <div className="flex items-center justify-between gap-1 p-1 bg-slate-50/50 rounded-lg border border-slate-100">
                                       <div className="flex items-center gap-3 flex-1 overflow-hidden">
                                         <div className="flex items-center gap-1.5 border-r border-slate-200 pr-2 min-w-0">
                                           <span className="text-[9px] text-slate-400 font-black uppercase">Vào</span>
