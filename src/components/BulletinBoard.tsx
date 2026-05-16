@@ -67,6 +67,7 @@ interface BulletinBoardProps {
   isAdmin?: boolean;
   theme?: any;
   employees?: any[];
+  onRefresh?: () => void;
 }
 
 const NOTE_COLORS = [
@@ -113,7 +114,7 @@ let bulletinCache: {
 
 let isFetchingNotes = false;
 
-export default function BulletinBoard({ currentEmployee, locationId, isAdmin, theme, employees: employeesProp, globalData }: BulletinBoardProps & { globalData?: any }) {
+export default function BulletinBoard({ currentEmployee, locationId, isAdmin, theme, employees: employeesProp, globalData, onRefresh }: BulletinBoardProps & { globalData?: any }) {
   if (!currentEmployee) return null;
   const isSuperAdmin = currentEmployee?.empId?.toUpperCase() === 'ADMIN';
   const [notes, setNotes] = useState<BulletinNote[]>([]);
@@ -254,15 +255,17 @@ export default function BulletinBoard({ currentEmployee, locationId, isAdmin, th
     setShowMentions(false);
   };
 
-  const handleAddNote = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleAddNote = async (e?: React.FormEvent | React.MouseEvent) => {
+    if (e && (e as any).preventDefault) (e as any).preventDefault();
     if (!newNoteContent.trim()) return;
 
     setIsSubmitting(true);
+    console.log('📝 Attempting to save note...', { isEditing: !!editingNote });
+    
     try {
       const now = new Date();
-      let expiresAt: any = null;
-
+      let expiresAt: Date | null = null;
+      
       if (endDate) {
         // If end date is set, expire at the end of that day
         const end = new Date(endDate);
@@ -273,15 +276,17 @@ export default function BulletinBoard({ currentEmployee, locationId, isAdmin, th
         expiresAt = new Date(now.getTime() + 24 * 60 * 60 * 1000);
       }
 
+      const locId = targetLocations.length === 2 ? 'all' : (targetLocations[0] || locationId || 'all');
+
       const noteData = {
         content: newNoteContent,
         color: selectedColor,
         emoji: selectedEmoji,
-        locationId: targetLocations.length === 2 ? 'all' : targetLocations[0],
+        locationId: locId,
         repeatType,
         startDate: startDate || null,
         endDate: endDate || null,
-        expiresAt: expiresAt ? expiresAt : null
+        expiresAt: expiresAt || null
       };
 
       if (editingNote) {
@@ -293,22 +298,18 @@ export default function BulletinBoard({ currentEmployee, locationId, isAdmin, th
       } else {
         await addDoc(collection(db, 'BulletinBoard'), {
           ...noteData,
-          authorId: currentEmployee.empId,
-          authorName: currentEmployee.fullName,
+          authorId: currentEmployee.empId || 'unknown',
+          authorName: currentEmployee.fullName || 'Unknown',
           authorAvatar: currentEmployee.avatar || '',
           authorRole: isAdmin ? 'Quản lý' : (currentEmployee.defaultRole || 'Nhân viên'),
           createdAt: serverTimestamp(),
-          readBy: [currentEmployee.empId],
+          readBy: [currentEmployee.empId || 'unknown'],
           isPinned: false
         });
         toast.success('Đã đăng ghi chú mới!');
       }
 
-      // Instead of manual full re-fetch, we can trigger a parent refresh 
-      // or just wait for the next stabilizer sync if it's frequent.
-      // But for better UX, let's just clear the form.
-      // If parent has a refresh function, it should be called here.
-
+      // Cleanup
       setNewNoteContent('');
       setSelectedEmoji(EMOJIS[0]);
       setSelectedColor(NOTE_COLORS[0]);
@@ -319,8 +320,13 @@ export default function BulletinBoard({ currentEmployee, locationId, isAdmin, th
       setIsAddingInline(false);
       setShowEmojiPicker(false);
       setShowColorPicker(false);
+
+      if (onRefresh) {
+        console.log('🔄 Calling onRefresh after save');
+        onRefresh();
+      }
     } catch (error) {
-      console.error('Error adding/editing note:', error);
+      console.error('❌ Error adding/editing note:', error);
       toast.error('Lỗi khi lưu ghi chú');
     } finally {
       setIsSubmitting(false);
@@ -388,6 +394,7 @@ export default function BulletinBoard({ currentEmployee, locationId, isAdmin, th
       });
       setInlineEditingId(null);
 
+      if (onRefresh) onRefresh();
       // Simple local state update to avoid full re-fetch for inline edits
       setNotes(prev => prev.map(n => n.id === noteId ? { ...n, content: inlineContent, updatedAt: new Date() } : n));
     } catch (error) {
@@ -414,6 +421,8 @@ export default function BulletinBoard({ currentEmployee, locationId, isAdmin, th
         isPinned: !currentPinned
       });
 
+      if (onRefresh) onRefresh();
+
       // Local update
       setNotes(prev => prev.map(n => n.id === noteId ? { ...n, isPinned: !currentPinned } : n));
     } catch (error) {
@@ -431,6 +440,7 @@ export default function BulletinBoard({ currentEmployee, locationId, isAdmin, th
     try {
       await deleteDoc(doc(db, 'BulletinBoard', noteId));
       setDeletingNoteId(null);
+      if (onRefresh) onRefresh();
       // Local update
       setNotes(prev => prev.filter(n => n.id !== noteId));
     } catch (error) {
@@ -677,9 +687,10 @@ export default function BulletinBoard({ currentEmployee, locationId, isAdmin, th
                   </div>
 
                   <button
-                    onClick={handleAddNote}
+                    type="button"
+                    onClick={() => handleAddNote()}
                     disabled={!newNoteContent.trim() || isSubmitting}
-                    className={`text-sm font-black uppercase tracking-widest transition-all px-4 py-2 rounded-xl ${newNoteContent.trim() ? 'text-blue-600 bg-blue-50' : 'text-slate-300 bg-slate-50'}`}
+                    className={`text-sm font-black uppercase tracking-widest transition-all px-4 py-2 rounded-xl h-10 ${newNoteContent.trim() ? 'text-blue-600 bg-blue-50 hover:bg-blue-100' : 'text-slate-300 bg-slate-50'}`}
                   >
                     {isSubmitting ? '...' : (editingNote ? 'Xong' : 'Đăng')}
                   </button>
@@ -694,7 +705,6 @@ export default function BulletinBoard({ currentEmployee, locationId, isAdmin, th
       <div className="px-2 space-y-1">
         <AnimatePresence mode="popLayout">
           {mainDisplayNotes.map((note) => {
-            const displayIcon = note.emoji || ROLE_ICONS[note.authorRole] || '📝';
             const isUnread = !note.readBy?.includes(currentEmployee.empId);
 
             return (
@@ -721,9 +731,6 @@ export default function BulletinBoard({ currentEmployee, locationId, isAdmin, th
                     <Pin className="w-2.5 h-2.5 fill-current" />
                   </div>
                 )}
-                <div className={`w-10 h-10 rounded-2xl flex items-center justify-center text-xl shadow-inner flex-shrink-0 ${note.color || 'bg-white'}`}>
-                  {displayIcon}
-                </div>
                 <div className="flex-1 min-w-0">
                   {inlineEditingId === note.id ? (
                     <div className="flex flex-col gap-2" onClick={(e) => e.stopPropagation()}>
