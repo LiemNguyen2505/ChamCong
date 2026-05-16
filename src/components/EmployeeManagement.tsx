@@ -686,7 +686,7 @@ export const EmployeeManagement: React.FC<EmployeeManagementProps> = ({
                   <div className="grid grid-cols-2 gap-3">
                     <div>
                       <label className="block text-[11px] font-black text-slate-500 uppercase mb-1 ml-1">Vị trí</label>
-                      <select value={(newEmployee.defaultRole || 'PV')} onChange={e => setNewEmployee({ ...newEmployee, defaultRole: e.target.value as 'QUẦY' | 'PV' })} className="w-full px-2 py-1.5 border border-slate-200 rounded-xl font-bold bg-white text-sm">
+                      <select value={(newEmployee.defaultRole || 'PV')} onChange={e => setNewEmployee({ ...newEmployee, defaultRole: e.target.value as 'QUẦY' | 'PV' })} className="w-full px-2 py-1.5 border border-slate-200 rounded-xl font-bold bg-white text-[13px]">
                         <option value="QUẦY">QUẦY</option>
                         <option value="PV">PHỤC VỤ</option>
                       </select>
@@ -785,7 +785,7 @@ export const EmployeeManagement: React.FC<EmployeeManagementProps> = ({
                   <div className="grid grid-cols-2 gap-3">
                     <div>
                       <label className="block text-[11px] font-black text-slate-500 uppercase mb-1 ml-1">Vị trí</label>
-                      <select value={(editingEmployee.defaultRole || 'PV')} onChange={e => setEditingEmployee({ ...editingEmployee, defaultRole: e.target.value as 'QUẦY' | 'PV' })} className="w-full px-2 py-1.5 border border-slate-200 rounded-xl font-bold bg-white text-sm">
+                      <select value={(editingEmployee.defaultRole || 'PV')} onChange={e => setEditingEmployee({ ...editingEmployee, defaultRole: e.target.value as 'QUẦY' | 'PV' })} className="w-full px-2 py-1.5 border border-slate-200 rounded-xl font-bold bg-white text-[13px]">
                         <option value="QUẦY">QUẦY</option>
                         <option value="PV">PHỤC VỤ</option>
                       </select>
