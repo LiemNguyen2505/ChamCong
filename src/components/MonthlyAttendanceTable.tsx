@@ -64,6 +64,38 @@ export const MonthlyAttendanceTable: React.FC<MonthlyAttendanceTableProps> = ({
         </div>
       )}
 
+      {/* Grand Total Summary for the Month - per Request 8 */}
+      {!isLoading && filteredEmployees.length > 0 && (
+        <div className="flex items-center gap-4 px-4 py-2 bg-slate-50 border-b border-slate-200">
+           <div className="flex items-center gap-2">
+              <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Tổng NV:</span>
+              <span className="text-sm font-black text-slate-700">{filteredEmployees.length}</span>
+           </div>
+           <div className="w-px h-4 bg-slate-200" />
+           <div className="flex items-center gap-2">
+              <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Tổng giờ Công Branch:</span>
+              <div className="flex items-baseline gap-1">
+                 <span className="text-sm font-black text-emerald-600">
+                    {attendanceData
+                      .filter(cc => filteredEmployees.some(emp => emp.id === cc.empId || emp.empId === cc.empId))
+                      .reduce((sum, cc) => sum + (cc.status !== 'pending_approval' ? (cc.totalHours || 0) : 0), 0)
+                      .toFixed(1)}h
+                 </span>
+                 {attendanceData
+                    .filter(cc => filteredEmployees.some(emp => emp.id === cc.empId || emp.empId === cc.empId) && cc.status === 'pending_approval')
+                    .reduce((sum, cc) => sum + (cc.totalHours || 0), 0) > 0 && (
+                    <span className="text-[10px] font-bold text-amber-500">
+                      (+{attendanceData
+                          .filter(cc => filteredEmployees.some(emp => emp.id === cc.empId || emp.empId === cc.empId) && cc.status === 'pending_approval')
+                          .reduce((sum, cc) => sum + (cc.totalHours || 0), 0)
+                          .toFixed(1)}h pnd)
+                    </span>
+                 )}
+              </div>
+           </div>
+        </div>
+      )}
+
       <div className="overflow-x-auto custom-scrollbar">
         <table className="w-full border-collapse border border-[#e0e0e0]">
           <thead>
