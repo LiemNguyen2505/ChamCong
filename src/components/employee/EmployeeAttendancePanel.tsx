@@ -29,6 +29,7 @@ interface EmployeeAttendancePanelProps {
   format: (date: Date, str: string) => string;
   selectedMonth: string;
   globalData?: any;
+  onRefresh?: () => void;
 }
 
 export const EmployeeAttendancePanel: React.FC<EmployeeAttendancePanelProps> = ({
@@ -57,7 +58,8 @@ export const EmployeeAttendancePanel: React.FC<EmployeeAttendancePanelProps> = (
   setRequestDate,
   format,
   selectedMonth,
-  globalData
+  globalData,
+  onRefresh
 }) => {
   return (
     <div className="space-y-2">
@@ -69,6 +71,7 @@ export const EmployeeAttendancePanel: React.FC<EmployeeAttendancePanelProps> = (
         theme={theme}
         employees={employees}
         globalData={globalData}
+        onRefresh={onRefresh}
       />
 
       {/* New Menu Buttons - Side by Side */}
