@@ -637,15 +637,15 @@ export const EmployeeManagement: React.FC<EmployeeManagementProps> = ({
                 <X className="w-5 h-5 text-white" />
               </button>
             </div>
-            <form onSubmit={handleAddEmployee} className="p-3 md:p-4 overflow-y-auto space-y-2">
-              <div className="bg-slate-50 p-2.5 rounded-xl border border-slate-200">
-                <h3 className="text-[11px] font-black text-slate-400 uppercase tracking-widest mb-2">Thông tin cơ bản</h3>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+            <form onSubmit={handleAddEmployee} className="p-3 md:p-4 overflow-y-auto space-y-4">
+              <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 shadow-sm">
+                <h3 className="text-[11px] font-black text-slate-400 uppercase tracking-widest mb-3">Thông tin cơ bản</h3>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div className="col-span-1 sm:col-span-2">
                     <label className="block text-[11px] font-black text-slate-500 uppercase mb-1 ml-1">Họ Tên <span className="text-red-500">*</span></label>
                     <input type="text" required value={newEmployee.fullName} onChange={e => setNewEmployee({ ...newEmployee, fullName: e.target.value })} className="w-full px-2.5 py-1.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none font-bold text-sm" placeholder="Nhập họ và tên" />
                   </div>
-                  <div className="grid grid-cols-2 gap-2 col-span-1 sm:col-span-2">
+                  <div className="grid grid-cols-2 gap-3 col-span-1 sm:col-span-2">
                     <div>
                       <label className="block text-[11px] font-black text-slate-500 uppercase mb-1 ml-1">Số Điện Thoại <span className="text-red-500">*</span></label>
                       <input type="tel" required value={newEmployee.phone || ''} onChange={e => setNewEmployee({ ...newEmployee, phone: e.target.value.replace(/\D/g, '') })} className="w-full px-2.5 py-1.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none font-bold text-sm" placeholder="Nhập SĐT" />
@@ -655,7 +655,7 @@ export const EmployeeManagement: React.FC<EmployeeManagementProps> = ({
                       <input type="text" value={newEmployee.cccd || ''} onChange={e => setNewEmployee({ ...newEmployee, cccd: e.target.value.replace(/\D/g, '') })} className="w-full px-2.5 py-1.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none font-bold text-sm" placeholder="Nhập số CCCD" />
                     </div>
                   </div>
-                  <div className="grid grid-cols-2 gap-2">
+                  <div className="grid grid-cols-2 gap-3">
                     <div>
                       <label className="block text-[11px] font-black text-slate-500 uppercase mb-1 ml-1">Chi nhánh <span className="text-red-500">*</span></label>
                       <select value={newEmployee.locationId} onChange={e => setNewEmployee({ ...newEmployee, locationId: e.target.value })} className="w-full px-2.5 py-1.5 border border-slate-200 rounded-xl font-bold bg-white text-sm">
@@ -670,10 +670,10 @@ export const EmployeeManagement: React.FC<EmployeeManagementProps> = ({
                 </div>
               </div>
 
-              <div className="bg-slate-50 p-2.5 rounded-xl border border-slate-200">
-                <h3 className="text-[11px] font-black text-slate-400 uppercase tracking-widest mb-2">Thông tin bổ sung & Ghi chú</h3>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                  <div className="grid grid-cols-2 gap-2">
+              <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 shadow-sm">
+                <h3 className="text-[11px] font-black text-slate-400 uppercase tracking-widest mb-3">Thông tin bổ sung & Ghi chú</h3>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div className="grid grid-cols-2 gap-3">
                     <div>
                       <label className="block text-[11px] font-black text-slate-500 uppercase mb-1 ml-1">Số Ca/Tuần</label>
                       <input type="number" value={newEmployee.shiftsPerWeek || ''} onChange={e => { let val = parseInt(e.target.value); if (isNaN(val)) val = 0; if (val > 21) val = 21; setNewEmployee({ ...newEmployee, shiftsPerWeek: val }); }} className="w-full px-2 py-1.5 border border-slate-200 rounded-xl font-bold text-sm text-center" placeholder="Số ca" />
@@ -683,7 +683,7 @@ export const EmployeeManagement: React.FC<EmployeeManagementProps> = ({
                       <input type="date" value={newEmployee.joinDate || ''} onChange={e => setNewEmployee({ ...newEmployee, joinDate: e.target.value })} className="w-full px-2 py-1.5 border border-slate-200 rounded-xl font-bold text-sm" />
                     </div>
                   </div>
-                  <div className="grid grid-cols-2 gap-2">
+                  <div className="grid grid-cols-2 gap-3">
                     <div>
                       <label className="block text-[11px] font-black text-slate-500 uppercase mb-1 ml-1">Vị trí</label>
                       <select value={(newEmployee.defaultRole || 'PV')} onChange={e => setNewEmployee({ ...newEmployee, defaultRole: e.target.value as 'QUẦY' | 'PV' })} className="w-full px-2 py-1.5 border border-slate-200 rounded-xl font-bold bg-white text-sm">
@@ -704,19 +704,20 @@ export const EmployeeManagement: React.FC<EmployeeManagementProps> = ({
                     <textarea 
                       value={newEmployee.notes || ''} 
                       onChange={e => setNewEmployee({ ...newEmployee, notes: e.target.value })} 
-                      className="w-full px-2.5 py-1.5 border border-slate-200 rounded-xl font-medium text-sm focus:ring-2 focus:ring-blue-500 outline-none min-h-[60px] resize-none bg-white" 
+                      className="w-full px-2.5 py-1.5 border border-slate-200 rounded-xl font-medium text-sm focus:ring-2 focus:ring-blue-500 outline-none min-h-[80px] resize-none bg-white" 
                       placeholder="Ghi chú thêm..." 
                     />
                   </div>
                 </div>
               </div>
 
-              <div className="flex justify-end gap-2 pt-2 border-t border-slate-100">
-                <button type="button" onClick={() => setShowAddEmployeeModal(false)} className="px-4 py-1.5 bg-slate-100 text-slate-600 rounded-xl font-black text-[11px] uppercase tracking-widest">Hủy</button>
-                <button type="submit" disabled={isSubmitting} className={`px-4 py-1.5 ${adminTheme.button} text-white rounded-xl font-black text-[11px] uppercase tracking-widest shadow-lg ${adminTheme.shadow}`}>
+              <div className="flex justify-end gap-3 pt-3 border-t border-slate-100">
+                <button type="button" onClick={() => setShowAddEmployeeModal(false)} className="px-5 py-2 bg-slate-100 text-slate-600 rounded-xl font-black text-[11px] uppercase tracking-widest">Hủy</button>
+                <button type="submit" disabled={isSubmitting} className={`px-5 py-2 ${adminTheme.button} text-white rounded-xl font-black text-[11px] uppercase tracking-widest shadow-lg ${adminTheme.shadow}`}>
                   {isSubmitting ? 'ĐANG XỬ LÝ...' : 'THÊM NHÂN VIÊN'}
                 </button>
               </div>
+
             </form>
           </div>
         </div>
@@ -735,15 +736,15 @@ export const EmployeeManagement: React.FC<EmployeeManagementProps> = ({
                 <X className="w-5 h-5 text-white" />
               </button>
             </div>
-            <form onSubmit={handleUpdateEmployee} className="p-3 md:p-4 overflow-y-auto space-y-2">
-              <div className="bg-slate-50 p-2.5 rounded-xl border border-slate-200">
-                <h3 className="text-[11px] font-black text-slate-400 uppercase tracking-widest mb-2">Thông tin cơ bản</h3>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+            <form onSubmit={handleUpdateEmployee} className="p-3 md:p-4 overflow-y-auto space-y-4">
+              <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 shadow-sm">
+                <h3 className="text-[11px] font-black text-slate-400 uppercase tracking-widest mb-3">Thông tin cơ bản</h3>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div className="col-span-1 sm:col-span-2">
                     <label className="block text-[11px] font-black text-slate-500 uppercase mb-1 ml-1">Họ Tên <span className="text-red-500">*</span></label>
                     <input type="text" required value={editingEmployee.fullName} onChange={e => setEditingEmployee({ ...editingEmployee, fullName: e.target.value })} className="w-full px-2.5 py-1.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none font-bold text-sm" placeholder="Nhập họ và tên" />
                   </div>
-                  <div className="grid grid-cols-2 gap-2 col-span-1 sm:col-span-2">
+                  <div className="grid grid-cols-2 gap-3 col-span-1 sm:col-span-2">
                     <div>
                       <label className="block text-[11px] font-black text-slate-500 uppercase mb-1 ml-1">Số Điện Thoại <span className="text-red-500">*</span></label>
                       <input type="tel" required value={editingEmployee.phone || ''} onChange={e => setEditingEmployee({ ...editingEmployee, phone: e.target.value.replace(/\D/g, '') })} className="w-full px-2.5 py-1.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none font-bold text-sm" placeholder="Nhập SĐT" />
@@ -753,7 +754,7 @@ export const EmployeeManagement: React.FC<EmployeeManagementProps> = ({
                       <input type="text" value={editingEmployee.cccd || ''} onChange={e => setEditingEmployee({ ...editingEmployee, cccd: e.target.value.replace(/\D/g, '') })} className="w-full px-2.5 py-1.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none font-bold text-sm" placeholder="Nhập số CCCD" />
                     </div>
                   </div>
-                  <div className="grid grid-cols-2 gap-2">
+                  <div className="grid grid-cols-2 gap-3">
                     <div>
                       <label className="block text-[11px] font-black text-slate-500 uppercase mb-1 ml-1">Chi nhánh <span className="text-red-500">*</span></label>
                       <select value={editingEmployee.locationId} onChange={e => setEditingEmployee({ ...editingEmployee, locationId: e.target.value })} className="w-full px-2.5 py-1.5 border border-slate-200 rounded-xl font-bold bg-white text-sm">
@@ -768,10 +769,10 @@ export const EmployeeManagement: React.FC<EmployeeManagementProps> = ({
                 </div>
               </div>
 
-              <div className="bg-slate-50 p-2.5 rounded-xl border border-slate-200">
-                <h3 className="text-[11px] font-black text-slate-400 uppercase tracking-widest mb-2">Thông tin bổ sung & Ghi chú</h3>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                  <div className="grid grid-cols-2 gap-2">
+              <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 shadow-sm">
+                <h3 className="text-[11px] font-black text-slate-400 uppercase tracking-widest mb-3">Thông tin bổ sung & Ghi chú</h3>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div className="grid grid-cols-2 gap-3">
                     <div>
                       <label className="block text-[11px] font-black text-slate-500 uppercase mb-1 ml-1">Số Ca/Tuần</label>
                       <input type="number" value={editingEmployee.shiftsPerWeek || ''} onChange={e => { let val = parseInt(e.target.value); if (isNaN(val)) val = 0; if (val > 21) val = 21; setEditingEmployee({ ...editingEmployee, shiftsPerWeek: val }); }} className="w-full px-2 py-1.5 border border-slate-200 rounded-xl font-bold text-sm text-center" placeholder="Số ca" />
@@ -781,7 +782,7 @@ export const EmployeeManagement: React.FC<EmployeeManagementProps> = ({
                       <input type="date" value={editingEmployee.joinDate || ''} onChange={e => setEditingEmployee({ ...editingEmployee, joinDate: e.target.value })} className="w-full px-2 py-1.5 border border-slate-200 rounded-xl font-bold text-sm" />
                     </div>
                   </div>
-                  <div className="grid grid-cols-2 gap-2">
+                  <div className="grid grid-cols-2 gap-3">
                     <div>
                       <label className="block text-[11px] font-black text-slate-500 uppercase mb-1 ml-1">Vị trí</label>
                       <select value={(editingEmployee.defaultRole || 'PV')} onChange={e => setEditingEmployee({ ...editingEmployee, defaultRole: e.target.value as 'QUẦY' | 'PV' })} className="w-full px-2 py-1.5 border border-slate-200 rounded-xl font-bold bg-white text-sm">
@@ -802,16 +803,16 @@ export const EmployeeManagement: React.FC<EmployeeManagementProps> = ({
                     <textarea 
                       value={editingEmployee.notes || ''} 
                       onChange={e => setEditingEmployee({ ...editingEmployee, notes: e.target.value })} 
-                      className="w-full px-2.5 py-1.5 border border-slate-200 rounded-xl font-medium text-sm focus:ring-2 focus:ring-blue-500 outline-none min-h-[60px] resize-none bg-white" 
+                      className="w-full px-2.5 py-1.5 border border-slate-200 rounded-xl font-medium text-sm focus:ring-2 focus:ring-blue-500 outline-none min-h-[80px] resize-none bg-white" 
                       placeholder="Ghi chú thêm..." 
                     />
                   </div>
                 </div>
               </div>
 
-              <div className="flex justify-end gap-2 pt-2 border-t border-slate-100">
-                <button type="button" onClick={() => setShowEditEmployeeModal(false)} className="px-4 py-1.5 bg-slate-100 text-slate-600 rounded-xl font-black text-[11px] uppercase tracking-widest">Hủy</button>
-                <button type="submit" disabled={isSubmitting} className={`px-4 py-1.5 ${adminTheme.button} text-white rounded-xl font-black text-[11px] uppercase tracking-widest shadow-lg ${adminTheme.shadow}`}>
+              <div className="flex justify-end gap-3 pt-3 border-t border-slate-100">
+                <button type="button" onClick={() => setShowEditEmployeeModal(false)} className="px-5 py-2 bg-slate-100 text-slate-600 rounded-xl font-black text-[11px] uppercase tracking-widest">Hủy</button>
+                <button type="submit" disabled={isSubmitting} className={`px-5 py-2 ${adminTheme.button} text-white rounded-xl font-black text-[11px] uppercase tracking-widest shadow-lg ${adminTheme.shadow}`}>
                   {isSubmitting ? 'ĐANG LƯU...' : 'LƯU THAY ĐỔI'}
                 </button>
               </div>
