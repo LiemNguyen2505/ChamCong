@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { format, startOfWeek, addDays, isSameDay, parseISO, addWeeks, subWeeks, subDays } from 'date-fns';
 import { vi } from 'date-fns/locale';
-import { Plus, AlertTriangle, ChevronLeft, ChevronRight, X, Copy, CopyPlus, UserPlus, Info, MessageSquare, Trash2, XCircle, Circle, FileSpreadsheet, Download } from 'lucide-react';
+import { Plus, AlertTriangle, ChevronLeft, ChevronRight, ChevronUp, ChevronDown, X, Copy, CopyPlus, UserPlus, Info, MessageSquare, Trash2, XCircle, Circle, FileSpreadsheet, Download } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 
 interface Employee {
@@ -73,7 +73,37 @@ export const SmartScheduleBuilder: React.FC<SmartScheduleBuilderProps> = ({
   planningGoals = []
 }) => {
   const activeBranch = currentBranchFilter;
-  const [supportEmployeeIds, setSupportEmployeeIds] = useState<string[]>([]);
+  const [employeeOrder, setEmployeeOrder] = useState<string[]>(() => {
+    try {
+      const saved = localStorage.getItem('smart_schedule_emp_order');
+      if (saved) return JSON.parse(saved);
+    } catch {}
+    return employees.map(e => e.id);
+  });
+
+  useEffect(() => {
+    localStorage.setItem('smart_schedule_emp_order', JSON.stringify(employeeOrder));
+  }, [employeeOrder]);
+
+  const moveEmployee = (empId: string, direction: 'up' | 'down') => {
+    setEmployeeOrder(prev => {
+      let current = [...prev];
+      if (!current.includes(empId)) current.push(empId);
+      const idx = current.indexOf(empId);
+      if (direction === 'up' && idx > 0) {
+        let temp = current[idx - 1];
+        current[idx - 1] = current[idx];
+        current[idx] = temp;
+      } else if (direction === 'down' && idx < current.length - 1) {
+        let temp = current[idx + 1];
+        current[idx + 1] = current[idx];
+        current[idx] = temp;
+      }
+      return current;
+    });
+  };
+
+  const [supportEmployees, setSupportEmployees] = useState<{empId: string, role: string}[]>([]);
   const [showSupportModal, setShowSupportModal] = useState(false);
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedCell, setSelectedCell] = useState<{ empId: string; date: string } | null>(null);
@@ -149,6 +179,78 @@ export const SmartScheduleBuilder: React.FC<SmartScheduleBuilderProps> = ({
   const [selectedQuickShift, setSelectedQuickShift] = useState<'Sáng' | 'Trưa' | 'Tối' | 'OFF' | null>(null);
   const [mobileSelectedDate, setMobileSelectedDate] = useState(format(new Date(), 'yyyy-MM-dd'));
 
+  // Local state for batch saving
+  const [localSchedules, setLocalSchedules] = useState<WorkSchedule[]>(schedules);
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+
+  useEffect(() => {
+    // Only update local if not dirty, or if explicitly needed
+    if (!hasUnsavedChanges) {
+      setLocalSchedules(schedules);
+    }
+  }, [schedules]); // intentional to not include hasUnsavedChanges
+
+  const handleApplyChanges = async () => {
+    if (isSaving) return;
+    setIsSaving(true);
+    const loadingToast = toast.loading('Đang lưu thay đổi...');
+    try {
+      if (onBatchSaveShifts) {
+        const currentWeekStart = weekStart;
+        const currentWeekEnd = addDays(currentWeekStart, 6);
+        
+        const localShiftsInWeek = localSchedules.filter(s => {
+          const d = parseISO(s.date);
+          return d >= currentWeekStart && d <= currentWeekEnd;
+        });
+
+        const originalShiftsInWeek = schedules.filter(s => {
+          const d = parseISO(s.date);
+          return d >= currentWeekStart && d <= currentWeekEnd;
+        });
+
+        if (onBatchSaveShifts) {
+           const idsToDelete = originalShiftsInWeek.map(s => s.id);
+           if (onBatchDeleteShifts && idsToDelete.length > 0) {
+             await onBatchDeleteShifts(idsToDelete);
+           }
+           
+           await onBatchSaveShifts(localShiftsInWeek);
+        }
+      }
+      setHasUnsavedChanges(false);
+      toast.success('Lưu lịch thành công!', { id: loadingToast });
+    } catch (error) {
+      console.error('Error batch saving:', error);
+      toast.error('Lỗi khi lưu lịch', { id: loadingToast });
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleLocalToggleShift = (empId: string, date: string, preset: typeof SHIFT_PRESETS[0]) => {
+    const shiftId = getShiftDeterministicId(empId, date, preset.id);
+    const existing = localSchedules.find(s => s.id === shiftId);
+
+    if (existing) {
+      setLocalSchedules(prev => prev.filter(s => s.id !== shiftId));
+    } else {
+      setLocalSchedules(prev => [
+        ...prev,
+        {
+          id: shiftId,
+          empId,
+          date,
+          startTime: preset.startTime,
+          endTime: preset.endTime,
+          locationId: activeBranch === 'All' ? employees.find(e => e.id === empId)?.locationId || 'Góc Phố' : activeBranch,
+          isOff: false
+        }
+      ]);
+    }
+    setHasUnsavedChanges(true);
+  };
+
   // Form state
   const [startTime, setStartTime] = useState('06:00');
   const [endTime, setEndTime] = useState('11:00');
@@ -169,7 +271,6 @@ export const SmartScheduleBuilder: React.FC<SmartScheduleBuilderProps> = ({
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
         setShowModal(false);
-        setShowSupportModal(false);
         setActivePopupCell(null);
         setSelectedCells([]);
         setFocusedSubCell(null);
@@ -199,39 +300,50 @@ export const SmartScheduleBuilder: React.FC<SmartScheduleBuilderProps> = ({
     
     if (!copiedShift || !copiedIndicator || targets.length === 0) return;
 
-    if (onBatchSaveShifts) {
-      const shiftsToAdd: any[] = [];
-      let skippedCount = 0;
+    const shiftsToAdd: any[] = [];
+    let skippedCount = 0;
 
-      targets.forEach(cell => {
-        if (cell.slotIndex !== copiedIndicator.slotIndex) {
-          skippedCount++;
-          return;
-        }
-
-        const deterministicId = getShiftDeterministicId(cell.empId, cell.date, cell.slotIndex);
-        
-        shiftsToAdd.push({
-          ...copiedShift,
-          id: deterministicId,
-          empId: cell.empId,
-          date: cell.date,
-          startTime: copiedShift.startTime,
-          endTime: copiedShift.endTime,
-          locationId: copiedShift.locationId || (activeBranch === 'All' ? employees.find(e => e.id === cell.empId)?.locationId || 'Góc Phố' : activeBranch),
-        });
-      });
-
-      if (shiftsToAdd.length > 0) {
-        await onBatchSaveShifts(shiftsToAdd);
-      } else if (skippedCount > 0) {
-        toast.error('Chỉ được dán vào cùng loại ca (Sáng vào Sáng, Trưa vào Trưa...)');
+    targets.forEach(cell => {
+      if (cell.slotIndex !== copiedIndicator.slotIndex) {
+        skippedCount++;
+        return;
       }
 
-      setSelectedCells([]); // clear selection after paste
-      setFocusedSubCell(null);
+      const deterministicId = getShiftDeterministicId(cell.empId, cell.date, cell.slotIndex);
+      
+      shiftsToAdd.push({
+        ...copiedShift,
+        id: deterministicId,
+        empId: cell.empId,
+        date: cell.date,
+        startTime: copiedShift.startTime,
+        endTime: copiedShift.endTime,
+        locationId: copiedShift.locationId || (activeBranch === 'All' ? employees.find(e => e.id === cell.empId)?.locationId || 'Góc Phố' : activeBranch),
+        isOff: copiedShift.isOff || false
+      });
+    });
+
+    if (shiftsToAdd.length > 0) {
+      setLocalSchedules(prev => {
+        let next = [...prev];
+        shiftsToAdd.forEach(shift => {
+          const idx = next.findIndex(s => s.id === shift.id);
+          if (idx >= 0) {
+            next[idx] = shift;
+          } else {
+            next.push(shift);
+          }
+        });
+        return next;
+      });
+      setHasUnsavedChanges(true);
+    } else if (skippedCount > 0) {
+      toast.error('Chỉ được dán vào cùng loại ca (Sáng vào Sáng, Trưa vào Trưa...)');
     }
-  }, [copiedShift, copiedIndicator, selectedCells, focusedSubCell, activeBranch, employees, onBatchSaveShifts]);
+
+    setSelectedCells([]); // clear selection after paste
+    setFocusedSubCell(null);
+  }, [copiedShift, copiedIndicator, selectedCells, focusedSubCell, activeBranch, employees]);
 
   const handleExcelDelete = React.useCallback(async () => {
     const targets = selectedCells.length > 0 ? selectedCells : (focusedSubCell ? [{ empId: focusedSubCell.empId, date: focusedSubCell.date, slotIndex: focusedSubCell.presetId }] : []);
@@ -239,14 +351,12 @@ export const SmartScheduleBuilder: React.FC<SmartScheduleBuilderProps> = ({
     
     const idsToDelete = targets.map(cell => getShiftDeterministicId(cell.empId, cell.date, cell.slotIndex));
     
-    if (onBatchDeleteShifts) {
-      await onBatchDeleteShifts(idsToDelete);
-    } else {
-      await Promise.all(idsToDelete.map(id => onDeleteShift(id)));
-    }
+    setLocalSchedules(prev => prev.filter(s => !idsToDelete.includes(s.id)));
+    setHasUnsavedChanges(true);
+
     setSelectedCells([]);
     setFocusedSubCell(null);
-  }, [selectedCells, focusedSubCell, onBatchDeleteShifts, onDeleteShift]);
+  }, [selectedCells, focusedSubCell]);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -260,14 +370,13 @@ export const SmartScheduleBuilder: React.FC<SmartScheduleBuilderProps> = ({
           e.preventDefault();
           const targetCell = focusedSubCell || selectedCells[selectedCells.length - 1];
           const detId = getShiftDeterministicId(targetCell.empId, targetCell.date, targetCell.presetId || (targetCell as any).slotIndex);
-          const shiftData = schedules.find(s => s.id === detId);
+          const shiftData = localSchedules.find(s => s.id === detId);
           
           if (shiftData) {
             const { id, empId, date, empName, shiftName, status, createdAt, updatedAt, ...rest } = shiftData as any;
             setCopiedShift(rest);
             setCopiedIndicator({ empId: targetCell.empId, date: targetCell.date, slotIndex: targetCell.presetId || (targetCell as any).slotIndex });
-            
-            // clear indicator after a brief moment or leave until paste? The marching ants will persist until paste or escape.
+            toast.success(`Đã copy ca ngày ${format(parseISO(targetCell.date), 'dd/MM')}`);
           }
         }
       }
@@ -298,25 +407,49 @@ export const SmartScheduleBuilder: React.FC<SmartScheduleBuilderProps> = ({
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [selectedCells, copiedShift, focusedSubCell, schedules, handleExcelPaste, handleExcelDelete, editingShift]);
+  }, [selectedCells, copiedShift, focusedSubCell, localSchedules, handleExcelPaste, handleExcelDelete, editingShift]);
 
   useEffect(() => {
     setLocationId(activeBranch === 'All' ? (managedBranches[0] || 'Góc Phố') : activeBranch);
   }, [activeBranch, managedBranches]);
 
   const weekStart = useMemo(() => startOfWeek(currentDate, { weekStartsOn: 1 }), [currentDate]);
-  const weekDays = Array.from({ length: 7 }).map((_, i) => addDays(weekStart, i));
+  const weekDays = useMemo(() => Array.from({ length: 7 }).map((_, i) => addDays(weekStart, i)), [weekStart]);
+
+  const [pendingNavigation, setPendingNavigation] = useState<'prev' | 'next' | null>(null);
 
   const handlePrevWeek = () => {
+    if (hasUnsavedChanges) {
+      setPendingNavigation('prev');
+      return;
+    }
     const newDate = subWeeks(currentDate, 1);
     setCurrentDate(newDate);
     setMobileSelectedDate(format(newDate, 'yyyy-MM-dd'));
   };
   
   const handleNextWeek = () => {
+    if (hasUnsavedChanges) {
+      setPendingNavigation('next');
+      return;
+    }
     const newDate = addWeeks(currentDate, 1);
     setCurrentDate(newDate);
     setMobileSelectedDate(format(newDate, 'yyyy-MM-dd'));
+  };
+
+  const confirmNavigation = () => {
+    setHasUnsavedChanges(false);
+    if (pendingNavigation === 'prev') {
+      const newDate = subWeeks(currentDate, 1);
+      setCurrentDate(newDate);
+      setMobileSelectedDate(format(newDate, 'yyyy-MM-dd'));
+    } else if (pendingNavigation === 'next') {
+      const newDate = addWeeks(currentDate, 1);
+      setCurrentDate(newDate);
+      setMobileSelectedDate(format(newDate, 'yyyy-MM-dd'));
+    }
+    setPendingNavigation(null);
   };
 
   const handlePrevDay = () => {
@@ -337,8 +470,8 @@ export const SmartScheduleBuilder: React.FC<SmartScheduleBuilderProps> = ({
     const defaultEmployees = employees.filter(e => activeBranch === 'All' || e.locationId === activeBranch);
     
     // 2. Get support employees added to this view
-    const supportEmployees = employees.filter(e => supportEmployeeIds.includes(e.id));
-    
+    const manuallyAddedSupportEmployees = employees.filter(e => supportEmployees.find(se => se.empId === e.id));
+
     // 3. Get employees who have a shift at this branch in the current week
     const weekStart = startOfWeek(currentDate, { weekStartsOn: 1 });
     const weekEnd = addDays(weekStart, 6);
@@ -346,7 +479,7 @@ export const SmartScheduleBuilder: React.FC<SmartScheduleBuilderProps> = ({
     const weekEndStr = format(weekEnd, 'yyyy-MM-dd');
     
     const scheduledEmployees = employees.filter(e => {
-      return schedules.some(s => 
+      return localSchedules.some(s => 
         s.empId === e.id && 
         (activeBranch === 'All' || s.locationId === activeBranch) && 
         s.date >= weekStartStr && 
@@ -355,12 +488,63 @@ export const SmartScheduleBuilder: React.FC<SmartScheduleBuilderProps> = ({
     });
 
     // Combine and remove duplicates
-    const allVisibleEmployees = Array.from(new Map([...defaultEmployees, ...supportEmployees, ...scheduledEmployees].map(e => [e.id, e])).values());
+    const allVisibleEmployees = Array.from(new Map([...defaultEmployees, ...manuallyAddedSupportEmployees, ...scheduledEmployees].map(e => [e.id, e])).values());
 
-    const quay = allVisibleEmployees.filter(e => e.defaultRole === 'QUẦY');
-    const pv = allVisibleEmployees.filter(e => e.defaultRole !== 'QUẦY');
-    return { QUẦY: quay, PV: pv };
-  }, [employees, activeBranch, supportEmployeeIds, schedules, currentDate]);
+    const quay = allVisibleEmployees.filter(e => {
+      // First check if manually supported with a role
+      if (activeBranch !== 'All') {
+        const manualSupport = supportEmployees.find(se => se.empId === e.id);
+        if (manualSupport) return manualSupport.role === 'QUẦY' || manualSupport.role === 'BOTH';
+        
+        // Next, check their shifts in this branch this week to see if there's a role override
+        const activeBranchShifts = localSchedules.filter(s => 
+          s.empId === e.id && 
+          s.locationId === activeBranch &&
+          s.date >= weekStartStr && 
+          s.date <= weekEndStr
+        );
+        if (activeBranchShifts.length > 0) {
+           const hasQuayShift = activeBranchShifts.some(s => s.roleInShift === 'QUẦY' || s.roleInShift === 'BOTH');
+           const hasPvShift = activeBranchShifts.some(s => s.roleInShift === 'PV');
+           if (hasQuayShift && !hasPvShift) return true;
+           if (!hasQuayShift && hasPvShift) return false;
+        }
+      }
+      return e.defaultRole === 'QUẦY';
+    });
+    
+    const pv = allVisibleEmployees.filter(e => {
+      if (activeBranch !== 'All') {
+        const manualSupport = supportEmployees.find(se => se.empId === e.id);
+        if (manualSupport) return manualSupport.role === 'PV' || manualSupport.role === 'BOTH';
+        
+        const activeBranchShifts = localSchedules.filter(s => 
+          s.empId === e.id && 
+          s.locationId === activeBranch &&
+          s.date >= weekStartStr && 
+          s.date <= weekEndStr
+        );
+        if (activeBranchShifts.length > 0) {
+           const hasQuayShift = activeBranchShifts.some(s => s.roleInShift === 'QUẦY' || s.roleInShift === 'BOTH');
+           const hasPvShift = activeBranchShifts.some(s => s.roleInShift === 'PV');
+           if (!hasQuayShift && hasPvShift) return true;
+           if (hasQuayShift && !hasPvShift) return false;
+        }
+      }
+      return e.defaultRole !== 'QUẦY';
+    });
+    
+    const sortFn = (a: Employee, b: Employee) => {
+        const indexA = employeeOrder.indexOf(a.id);
+        const indexB = employeeOrder.indexOf(b.id);
+        if (indexA !== -1 && indexB !== -1) return indexA - indexB;
+        if (indexA !== -1) return -1;
+        if (indexB !== -1) return 1;
+        return 0;
+    };
+
+    return { QUẦY: quay.sort(sortFn), PV: pv.sort(sortFn) };
+  }, [employees, activeBranch, supportEmployees, localSchedules, currentDate, employeeOrder]);
 
   const handleCellClick = (empId: string, date: string, existingShift?: WorkSchedule, e?: React.MouseEvent) => {
     if (isQuickEditMode && selectedQuickShift) {
@@ -475,152 +659,110 @@ export const SmartScheduleBuilder: React.FC<SmartScheduleBuilderProps> = ({
     if (!empId || !date) return;
 
     if (!isOff && duration >= 7) {
-      // Auto-split logic for 7+ hours
       const confirmSplit = window.confirm(`Ca làm việc kéo dài ${duration.toFixed(1)}h (>= 7h). Hệ thống sẽ tự động tách thành 2 ca (Sáng/Trưa/Tối) theo quy định. Tiếp tục?`);
       if (!confirmSplit) return;
 
-      setIsSaving(true);
-      try {
-        // Split logic: 12h-19h -> 12h-17h (Trưa) and 17h-19h (Tối)
-        // We find which slots these times fall into
-        const startSlotId = getSlotIdFromTime(finalStartTime);
-        const endSlotId = getSlotIdFromTime(finalEndTime);
-        
-        // For simplicity, we split at the boundary of the slots
-        // Sáng-Trưa boundary: 12:00
-        // Trưa-Tối boundary: 17:00
-
-        if (startSlotId === 'trua' && finalEndTime > '17:00') {
-           // Split Trưa and Tối
-           await onAddShift({
-             id: getShiftDeterministicId(empId, date, 'trua'),
-             empId, date, startTime: finalStartTime, endTime: '17:00',
-             locationId: activeBranch === 'All' ? employees.find(e => e.id === empId)?.locationId || 'Góc Phố' : activeBranch,
-             isOff: false,
-             ...(roleInShift ? { roleInShift } : {})
-           } as any);
-           await onAddShift({
-             id: getShiftDeterministicId(empId, date, 'toi'),
-             empId, date, startTime: '17:00', endTime: finalEndTime,
-             locationId: activeBranch === 'All' ? employees.find(e => e.id === empId)?.locationId || 'Góc Phố' : activeBranch,
-             isOff: false,
-             ...(roleInShift ? { roleInShift } : {})
-           } as any);
-        } else if (startSlotId === 'sang' && finalEndTime > '12:00') {
-           // Split Sáng and Trưa
-           await onAddShift({
-             id: getShiftDeterministicId(empId, date, 'sang'),
-             empId, date, startTime: finalStartTime, endTime: '12:00',
-             locationId: activeBranch === 'All' ? employees.find(e => e.id === empId)?.locationId || 'Góc Phố' : activeBranch,
-             isOff: false,
-             ...(roleInShift ? { roleInShift } : {})
-           } as any);
-           await onAddShift({
-             id: getShiftDeterministicId(empId, date, 'trua'),
-             empId, date, startTime: '12:00', endTime: finalEndTime,
-             locationId: activeBranch === 'All' ? employees.find(e => e.id === empId)?.locationId || 'Góc Phố' : activeBranch,
-             isOff: false,
-             ...(roleInShift ? { roleInShift } : {})
-           } as any);
-        } else {
-          // General split or just save as is if it's within one slot (unlikely for 7h but possible if custom slots)
-          await onAddShift({
-            id: getShiftDeterministicId(empId, date, startSlotId),
-            empId, date, startTime: finalStartTime, endTime: finalEndTime,
-            locationId: activeBranch === 'All' ? employees.find(e => e.id === empId)?.locationId || 'Góc Phố' : activeBranch,
-            isOff: !!isOff,
-            ...(roleInShift ? { roleInShift } : {})
-          } as any);
-        }
-        
-        // If we were editing a specific shift that might have a different ID, delete it
-        if (editingShift) {
-           const currentSlotId = getSlotIdFromTime(editingShift.startTime);
-           const currentDetId = getShiftDeterministicId(empId, date, currentSlotId);
-           if (editingShift.id !== currentDetId) {
-             await onDeleteShift(editingShift.id);
-           }
-        }
-
-        setShowModal(false);
-        setEditingShift(null);
-        return;
-      } catch (error) {
-        console.error("Error splitting shift:", error);
-      } finally {
-        setIsSaving(false);
+      const startSlotId = getSlotIdFromTime(finalStartTime);
+      
+      const newShifts: WorkSchedule[] = [];
+      if (startSlotId === 'trua' && finalEndTime > '17:00') {
+        newShifts.push({
+          id: getShiftDeterministicId(empId, date, 'trua'),
+          empId, date, startTime: finalStartTime, endTime: '17:00',
+          locationId: activeBranch === 'All' ? employees.find(e => e.id === empId)?.locationId || 'Góc Phố' : activeBranch,
+          isOff: false,
+          ...(roleInShift ? { roleInShift } : {})
+        } as any);
+        newShifts.push({
+          id: getShiftDeterministicId(empId, date, 'toi'),
+          empId, date, startTime: '17:00', endTime: finalEndTime,
+          locationId: activeBranch === 'All' ? employees.find(e => e.id === empId)?.locationId || 'Góc Phố' : activeBranch,
+          isOff: false,
+          ...(roleInShift ? { roleInShift } : {})
+        } as any);
+      } else if (startSlotId === 'sang' && finalEndTime > '12:00') {
+        newShifts.push({
+          id: getShiftDeterministicId(empId, date, 'sang'),
+          empId, date, startTime: finalStartTime, endTime: '12:00',
+          locationId: activeBranch === 'All' ? employees.find(e => e.id === empId)?.locationId || 'Góc Phố' : activeBranch,
+          isOff: false,
+          ...(roleInShift ? { roleInShift } : {})
+        } as any);
+        newShifts.push({
+          id: getShiftDeterministicId(empId, date, 'trua'),
+          empId, date, startTime: '12:00', endTime: finalEndTime,
+          locationId: activeBranch === 'All' ? employees.find(e => e.id === empId)?.locationId || 'Góc Phố' : activeBranch,
+          isOff: false,
+          ...(roleInShift ? { roleInShift } : {})
+        } as any);
+      } else {
+        newShifts.push({
+          id: getShiftDeterministicId(empId, date, startSlotId),
+          empId, date, startTime: finalStartTime, endTime: finalEndTime,
+          locationId: activeBranch === 'All' ? employees.find(e => e.id === empId)?.locationId || 'Góc Phố' : activeBranch,
+          isOff: !!isOff,
+          ...(roleInShift ? { roleInShift } : {})
+        } as any);
       }
+
+      setLocalSchedules(prev => {
+        let next = [...prev];
+        if (editingShift) {
+          next = next.filter(s => s.id !== editingShift.id);
+        }
+        const newIds = newShifts.map(s => s.id);
+        next = next.filter(s => !newIds.includes(s.id));
+        return [...next, ...newShifts];
+      });
+      setHasUnsavedChanges(true);
+      setShowModal(false);
+      setEditingShift(null);
       return;
     }
 
-    setIsSaving(true);
-    try {
-      const slotId = getSlotIdFromTime(finalStartTime);
-      const deterministicId = getShiftDeterministicId(empId, date, slotId);
+    const slotId = getSlotIdFromTime(finalStartTime);
+    const deterministicId = getShiftDeterministicId(empId, date, slotId);
 
-      const baseShiftData: any = {
-        id: deterministicId,
-        startTime: finalStartTime,
-        endTime: finalEndTime,
-        taskNote: taskNote || '',
-        isOff: !!isOff,
-        notes: notes || '',
-        colorLabel: colorLabel || '',
-        tasks: tasks || [],
-      };
+    const baseShiftData: any = {
+      id: deterministicId,
+      startTime: finalStartTime,
+      endTime: finalEndTime,
+      taskNote: taskNote || '',
+      isOff: !!isOff,
+      notes: notes || '',
+      colorLabel: colorLabel || '',
+      tasks: tasks || [],
+    };
 
-      if (roleInShift) {
-        baseShiftData.roleInShift = roleInShift;
-      }
-
-      const finalLocationId = (locationId === 'All' || !locationId) 
-        ? (employees.find(e => e.id === empId)?.locationId || 'Góc Phố')
-        : locationId;
-
-      // If we are editing and the ID changed (due to slot changes), delete the old one
-      if (editingShift && editingShift.id !== deterministicId) {
-        await onDeleteShift(editingShift.id);
-      }
-
-      // Overwrite the deterministic slot
-      await onAddShift({
-        ...baseShiftData,
-        empId,
-        date,
-        locationId: finalLocationId,
-      } as any);
-      
-      setEditingShift(null);
-      setSelectedCell(null);
-      setShowModal(false);
-    } catch (error) {
-      console.error("Error saving shift:", error);
-    } finally {
-      setIsSaving(false);
+    if (roleInShift) {
+      baseShiftData.roleInShift = roleInShift;
     }
+
+    const finalLocationId = (locationId === 'All' || !locationId) 
+      ? (employees.find(e => e.id === empId)?.locationId || 'Góc Phố')
+      : locationId;
+
+    setLocalSchedules(prev => {
+      let next = [...prev];
+      if (editingShift && editingShift.id !== deterministicId) {
+        next = next.filter(s => s.id !== editingShift.id);
+      }
+      next = next.filter(s => s.id !== deterministicId);
+      return [...next, { ...baseShiftData, empId, date, locationId: finalLocationId }];
+    });
+    
+    setHasUnsavedChanges(true);
+    setEditingShift(null);
+    setSelectedCell(null);
+    setShowModal(false);
   };
 
   const handleDeleteShift = async () => {
     if (editingShift) {
-      if (isSaving) return;
-      setIsSaving(true);
-      try {
-        const slotId = getSlotIdFromTime(editingShift.startTime);
-        const deterministicId = getShiftDeterministicId(editingShift.empId, editingShift.date, slotId);
-        
-        // Just delete the deterministic document (and the actual id if differing, though it shouldn't)
-        await onDeleteShift(deterministicId);
-        if (editingShift.id !== deterministicId) {
-          await onDeleteShift(editingShift.id);
-        }
-
-        setEditingShift(null);
-        setShowModal(false);
-      } catch (error) {
-        console.error("Error deleting shift:", error);
-      } finally {
-        setIsSaving(false);
-      }
+      setLocalSchedules(prev => prev.filter(s => s.id !== editingShift.id));
+      setHasUnsavedChanges(true);
+      setEditingShift(null);
+      setShowModal(false);
     }
   };
 
@@ -629,14 +771,13 @@ export const SmartScheduleBuilder: React.FC<SmartScheduleBuilderProps> = ({
   useEffect(() => {
     const handleEsc = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
-        if (showSupportModal) setShowSupportModal(false);
-        else if (showModal) setShowModal(false);
+        if (showModal) setShowModal(false);
         else if (showCloneConfirm) setShowCloneConfirm(false);
       }
     };
     window.addEventListener('keydown', handleEsc);
     return () => window.removeEventListener('keydown', handleEsc);
-  }, [showSupportModal, showModal, showCloneConfirm]);
+  }, [showModal, showCloneConfirm]);
 
   const handleDọnRácTứcThì = async () => {
     const confirmed = window.confirm("HỆ THỐNG SẼ XOÁ TOÀN BỘ CÁC CA LỖI/CA TRÙNG TRONG TUẦN NÀY ĐỂ TRẢ LẠI TRẠNG THÁI TRỐNG. TIẾP TỤC?");
@@ -646,7 +787,7 @@ export const SmartScheduleBuilder: React.FC<SmartScheduleBuilderProps> = ({
     toast.loading("Đang thực hiện thanh trừng dữ liệu lỗi...", { id: 'purge' });
     
     try {
-      const currentWeekShifts = schedules.filter(s => {
+      const currentWeekShifts = localSchedules.filter(s => {
         const d = parseISO(s.date);
         return d >= weekStart && d <= addDays(weekStart, 6);
       });
@@ -697,7 +838,7 @@ export const SmartScheduleBuilder: React.FC<SmartScheduleBuilderProps> = ({
       const currentWeekStart = weekStart;
       const currentWeekEnd = addDays(currentWeekStart, 6);
       
-      const currentWeekShifts = schedules.filter(s => {
+      const currentWeekShifts = localSchedules.filter(s => {
         const d = parseISO(s.date);
         return d >= currentWeekStart && d <= currentWeekEnd && (activeBranch === 'All' || s.locationId === activeBranch);
       });
@@ -737,7 +878,22 @@ export const SmartScheduleBuilder: React.FC<SmartScheduleBuilderProps> = ({
   };
 
   const renderCell = (emp: Employee, dateStr: string) => {
-    const dayShifts = schedules.filter(s => s.empId === emp.id && s.date === dateStr);
+    const dayShifts = localSchedules.filter(s => s.empId === emp.id && s.date === dateStr);
+
+    const handleSubCellDoubleClick = async (presetId: string, e: React.MouseEvent) => {
+      e.stopPropagation();
+      if (isQuickEditMode) return;
+
+      const shiftId = getShiftDeterministicId(emp.id, dateStr, presetId);
+      const shift = localSchedules.find(s => s.id === shiftId);
+      
+      if (shift) {
+        handleDoubleClick(shift);
+      } else {
+        const preset = SHIFT_PRESETS.find(p => p.id === presetId)!;
+        handleLocalToggleShift(emp.id, dateStr, preset);
+      }
+    };
 
     const onSubCellPressStart = (presetId: string, e: React.MouseEvent | React.TouchEvent) => {
       const clientX = 'touches' in e ? e.touches[0].clientX : (e as React.MouseEvent).clientX;
@@ -758,8 +914,50 @@ export const SmartScheduleBuilder: React.FC<SmartScheduleBuilderProps> = ({
       }
     };
 
-    const handleSubCellClick = (presetId: string, e: React.MouseEvent) => {
+  const handleSubCellClick = async (presetId: string, e: React.MouseEvent) => {
       e.stopPropagation();
+
+      if (isQuickEditMode && selectedQuickShift) {
+        const presets: any = {
+           'Sáng': { isOff: false, startTime: '06:00', endTime: '11:00', presetId: 'sang' },
+           'Trưa': { isOff: false, startTime: '12:00', endTime: '17:00', presetId: 'trua' },
+           'Tối': { isOff: false, startTime: '17:00', endTime: '22:00', presetId: 'toi' },
+           'OFF': { isOff: true, startTime: '00:00', endTime: '00:00', presetId: 'off' }
+        };
+        const p = presets[selectedQuickShift];
+        
+        const targetPresetId = selectedQuickShift === 'OFF' ? presetId : p.presetId;
+        const shiftId = getShiftDeterministicId(emp.id, dateStr, targetPresetId);
+        const existing = localSchedules.find(s => s.id === shiftId);
+
+        setLocalSchedules(prev => {
+           let next = [...prev];
+           if (existing) {
+              const currentType = existing.isOff ? 'OFF' : 
+                             existing.startTime < '12:00' ? 'Sáng' :
+                             existing.startTime < '17:00' ? 'Trưa' : 'Tối';
+              if (currentType === selectedQuickShift) {
+                next = next.filter(s => s.id !== existing.id);
+              } else {
+                next = next.map(s => s.id === existing.id ? { ...s, isOff: p.isOff, startTime: p.startTime, endTime: p.endTime } : s);
+              }
+           } else {
+              next.push({
+                id: shiftId,
+                empId: emp.id,
+                date: dateStr,
+                locationId: activeBranch === 'All' ? (emp.locationId || 'Góc Phố') : activeBranch,
+                startTime: p.startTime,
+                endTime: p.endTime,
+                isOff: p.isOff
+              });
+           }
+           return next;
+        });
+        setHasUnsavedChanges(true);
+        return;
+      }
+
       const isCtrl = e.ctrlKey || e.metaKey;
       const isShift = e.shiftKey;
 
@@ -831,18 +1029,28 @@ export const SmartScheduleBuilder: React.FC<SmartScheduleBuilderProps> = ({
       }
     };
 
-    const getPositionLabel = (role?: string) => {
-      if (role === 'QUẦY') return 'Q';
-      if (role === 'PV') return 'PV';
-      if (role === 'BOTH') return 'PV & Q';
-      return '';
+    const getPositionLabel = (shiftLocId: string | undefined, empLocId: string | undefined, role?: string) => {
+      let roleLabel = '';
+      if (role === 'QUẦY') roleLabel = 'Q';
+      if (role === 'PV') roleLabel = 'PV';
+      if (role === 'BOTH') roleLabel = 'PV & Q';
+
+      let locLabel = '';
+      if (shiftLocId && empLocId && shiftLocId !== empLocId && shiftLocId !== 'All') {
+         // Create abbr: "Phố Xanh" -> "PX"
+         locLabel = shiftLocId.split(' ').map(w => w[0]).join('').toUpperCase();
+      }
+
+      if (locLabel && roleLabel) return `${locLabel}-${roleLabel}`;
+      if (locLabel) return locLabel;
+      return roleLabel;
     };
 
     return (
       <div className="h-full w-full flex items-center p-0.5 gap-0.5 bg-white group select-none relative">
         {SHIFT_PRESETS.map((preset) => {
           const shiftId = getShiftDeterministicId(emp.id, dateStr, preset.id);
-          const shift = schedules.find(s => s.id === shiftId);
+          const shift = localSchedules.find(s => s.id === shiftId);
           
           const isActive = !!shift;
           const isOffSlot = shift?.isOff;
@@ -864,15 +1072,7 @@ export const SmartScheduleBuilder: React.FC<SmartScheduleBuilderProps> = ({
               onTouchStart={(e) => onSubCellPressStart(preset.id, e)}
               onTouchEnd={onSubCellPressEnd}
               onClick={(e) => handleSubCellClick(preset.id, e)}
-              onDoubleClick={async (e) => {
-                e.stopPropagation();
-                onSubCellPressEnd(); // Clear timer on double click
-                if (shift) {
-                  handleDoubleClick(shift);
-                } else {
-                  await handleToggleShift(emp.id, dateStr, preset);
-                }
-              }}
+              onDoubleClick={(e) => handleSubCellDoubleClick(preset.id, e)}
               style={{ 
                 backgroundColor: isOffSlot ? '#fee2e2' : (isActive ? (shift.colorLabel ? '' : preset.color) : 'transparent'),
               }}
@@ -893,16 +1093,16 @@ export const SmartScheduleBuilder: React.FC<SmartScheduleBuilderProps> = ({
               {isActive && !isOffSlot && (
                 <div className="flex flex-col items-center justify-center leading-none gap-0.5">
                   <span 
-                    className="text-[9px] font-black tracking-tighter" 
+                    className="text-[11px] font-black tracking-tight" 
                     style={{ color: shift.colorLabel ? '#fff' : preset.textColor }}
                   >
                     {formatTimeLabel(shift.startTime)}-{formatTimeLabel(shift.endTime)}
                   </span>
                   <span 
-                    className="text-[8px] font-black opacity-90 scale-90" 
+                    className="text-[10px] font-black opacity-90 scale-90" 
                     style={{ color: shift.colorLabel ? '#fff' : preset.textColor }}
                   >
-                    {getPositionLabel(shift.roleInShift)}
+                    {getPositionLabel(shift.locationId, emp.locationId, shift.roleInShift)}
                   </span>
                 </div>
               )}
@@ -923,7 +1123,7 @@ export const SmartScheduleBuilder: React.FC<SmartScheduleBuilderProps> = ({
     allVisibleEmployees.forEach(emp => {
       SHIFT_PRESETS.forEach(preset => {
         const shiftId = getShiftDeterministicId(emp.id, dateStr, preset.id);
-        const shift = schedules.find(s => s.id === shiftId);
+        const shift = localSchedules.find(s => s.id === shiftId);
         
         if (shift && !shift.isOff) {
           if (activeBranch === 'All' || shift.locationId === activeBranch) {
@@ -962,11 +1162,11 @@ export const SmartScheduleBuilder: React.FC<SmartScheduleBuilderProps> = ({
       {/* Header & Quick Edit Toolbar */}
       <div className="pt-0.5 px-2 pb-1 border-b border-slate-200 bg-white flex-shrink-0">
         <div className="flex justify-between items-center gap-1 mb-0.5">
-          <h2 className="text-base font-black text-slate-900 uppercase tracking-tight whitespace-nowrap">
-            LỊCH LÀM VIỆC
-          </h2>
-          
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-3">
+            <h2 className="text-base font-black text-slate-900 uppercase tracking-tight whitespace-nowrap">
+              LỊCH LÀM VIỆC
+            </h2>
+            
             <div className="flex items-center gap-1 bg-slate-100 p-0.5 rounded-lg scale-90 md:scale-100 transform-gpu">
               <button onClick={handlePrevWeek} className="p-1.5 rounded hover:bg-white hover:shadow-sm text-slate-600 transition-all">
                 <ChevronLeft className="w-4 h-4" />
@@ -978,6 +1178,7 @@ export const SmartScheduleBuilder: React.FC<SmartScheduleBuilderProps> = ({
                 <ChevronRight className="w-4 h-4" />
               </button>
             </div>
+
             <button 
               onClick={() => setShowCloneConfirm(true)} 
               disabled={isCloning}
@@ -985,6 +1186,24 @@ export const SmartScheduleBuilder: React.FC<SmartScheduleBuilderProps> = ({
               className="flex items-center justify-center p-2 text-amber-900 bg-white hover:bg-amber-50 rounded-md border border-amber-200 transition-all active:scale-95 disabled:opacity-50"
             >
               <CopyPlus className="w-4 h-4" />
+            </button>
+            <button 
+              onClick={() => setShowSupportModal(true)} 
+              title="Thêm nhân viên hỗ trợ từ chi nhánh khác"
+              className="flex items-center justify-center p-2 text-sky-700 bg-white hover:bg-sky-50 rounded-md border border-sky-200 transition-all active:scale-95 flex-shrink-0 gap-1 lg:px-3"
+            >
+              <UserPlus className="w-4 h-4" />
+              <span className="hidden lg:inline text-xs font-bold">Thêm NV hỗ trợ</span>
+            </button>
+          </div>
+          
+          <div className="flex items-center gap-2">
+            <button 
+              onClick={handleApplyChanges}
+              disabled={isSaving}
+              className="flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-xl font-black text-xs shadow-lg shadow-emerald-200 active:scale-95 disabled:opacity-50 transition-all font-sans"
+            >
+              LƯU
             </button>
             <button 
               onClick={exportToCSV} 
@@ -996,14 +1215,41 @@ export const SmartScheduleBuilder: React.FC<SmartScheduleBuilderProps> = ({
           </div>
         </div>
 
-        <div className="flex items-center gap-4 mt-2">
+        <div className="flex flex-col md:flex-row md:items-center gap-3 mt-1.5 bg-slate-50/50 p-2 rounded-xl border border-dashed border-slate-200">
+          <div className="flex items-center gap-2">
+            <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest bg-white px-2 py-1 rounded-md border border-slate-100">CÔNG CỤ NHẬP NHANH:</span>
+            <div className="flex items-center gap-1 bg-white p-1 rounded-xl shadow-sm border border-slate-100">
+              {(['Sáng', 'Trưa', 'Tối', 'OFF'] as const).map(s => (
+                <button 
+                  key={s}
+                  onClick={() => {
+                    if (selectedQuickShift === s) {
+                      setIsQuickEditMode(false);
+                      setSelectedQuickShift(null);
+                    } else {
+                      setIsQuickEditMode(true);
+                      setSelectedQuickShift(s);
+                    }
+                  }}
+                  className={`px-3 py-1.5 rounded-lg text-[10px] font-black uppercase transition-all flex items-center gap-1.5 ${selectedQuickShift === s ? 'bg-sky-600 text-white shadow-lg shadow-sky-200 scale-105' : 'text-slate-500 hover:bg-slate-50'}`}
+                >
+                  <div className={`w-1.5 h-1.5 rounded-full ${s === 'OFF' ? 'bg-rose-400' : (selectedQuickShift === s ? 'bg-white' : 'bg-slate-300')}`} />
+                  {s}
+                </button>
+              ))}
+            </div>
+          </div>
+
           <div className="flex-1 flex items-center gap-2">
-            <span className="text-[12px] font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap">Ghi chú:</span>
-            <input 
-              type="text" 
-              placeholder="VD: Chà sàn khu B..."
-              className="px-3 py-1.5 text-xs border border-slate-200 rounded-lg focus:ring-2 focus:ring-sky-500 w-full md:max-w-md"
-            />
+            <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest hidden lg:inline">GHI CHÚ:</span>
+            <div className="relative flex-1">
+              <MessageSquare className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
+              <input 
+                type="text" 
+                placeholder="VD: Dọn kho, kiểm kê cuối tháng..."
+                className="w-full pl-9 pr-3 py-1.5 text-xs bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-sky-500 outline-none transition-all"
+              />
+            </div>
           </div>
         </div>
       </div>
@@ -1060,7 +1306,13 @@ export const SmartScheduleBuilder: React.FC<SmartScheduleBuilderProps> = ({
               <tr key={emp.id} className="group border-b border-slate-100 hover:bg-slate-50 transition-colors">
                 <td className="p-3 border-b border-slate-200 border-r-2 border-r-slate-300 font-medium text-[13px] text-slate-800 sticky left-0 bg-white z-20 group-hover:bg-slate-50 transition-colors shadow-[2px_0_5px_rgba(0,0,0,0.05)]">
                   <div className="flex flex-col">
-                    <span className="truncate tracking-tight">{emp.fullName}</span>
+                    <div className="flex items-center gap-1 group/emp" tabIndex={0}>
+                      <span className="truncate tracking-tight flex-1" title={emp.fullName}>{emp.fullName}</span>
+                      <div className="flex flex-col gap-0.5 opacity-0 group-hover/emp:opacity-100 group-focus/emp:opacity-100 focus-within:opacity-100 transition-opacity pointer-events-none group-hover/emp:pointer-events-auto group-focus/emp:pointer-events-auto focus-within:pointer-events-auto">
+                        <button onClick={(e) => { e.stopPropagation(); moveEmployee(emp.id, 'up'); }} className="p-0 hover:bg-slate-200 rounded text-slate-400 hover:text-slate-600 leading-none outline-none"><ChevronUp size={12} strokeWidth={3} /></button>
+                        <button onClick={(e) => { e.stopPropagation(); moveEmployee(emp.id, 'down'); }} className="p-0 hover:bg-slate-200 rounded text-slate-400 hover:text-slate-600 leading-none outline-none"><ChevronDown size={12} strokeWidth={3} /></button>
+                      </div>
+                    </div>
                     {activeBranch !== 'All' && emp.locationId !== activeBranch && (
                       <span className="text-[8px] text-rose-500 font-black italic tracking-tighter mt-0.5">❂ Hỗ trợ từ {emp.locationId}</span>
                     )}
@@ -1085,7 +1337,13 @@ export const SmartScheduleBuilder: React.FC<SmartScheduleBuilderProps> = ({
               <tr key={emp.id} className="group border-b border-slate-100 hover:bg-slate-50 transition-colors">
                 <td className="p-3 border-b border-slate-200 border-r-2 border-r-slate-300 font-medium text-[13px] text-slate-800 sticky left-0 bg-white z-20 group-hover:bg-slate-50 transition-colors shadow-[2px_0_5px_rgba(0,0,0,0.05)]">
                   <div className="flex flex-col">
-                    <span className="truncate tracking-tight">{emp.fullName}</span>
+                    <div className="flex items-center gap-1 group/emp" tabIndex={0}>
+                      <span className="truncate tracking-tight flex-1" title={emp.fullName}>{emp.fullName}</span>
+                      <div className="flex flex-col gap-0.5 opacity-0 group-hover/emp:opacity-100 group-focus/emp:opacity-100 focus-within:opacity-100 transition-opacity pointer-events-none group-hover/emp:pointer-events-auto group-focus/emp:pointer-events-auto focus-within:pointer-events-auto">
+                        <button onClick={(e) => { e.stopPropagation(); moveEmployee(emp.id, 'up'); }} className="p-0 hover:bg-slate-200 rounded text-slate-400 hover:text-slate-600 leading-none outline-none"><ChevronUp size={12} strokeWidth={3} /></button>
+                        <button onClick={(e) => { e.stopPropagation(); moveEmployee(emp.id, 'down'); }} className="p-0 hover:bg-slate-200 rounded text-slate-400 hover:text-slate-600 leading-none outline-none"><ChevronDown size={12} strokeWidth={3} /></button>
+                      </div>
+                    </div>
                     {activeBranch !== 'All' && emp.locationId !== activeBranch && (
                       <span className="text-[8px] text-rose-500 font-black italic tracking-tighter mt-0.5">❂ Hỗ trợ từ {emp.locationId}</span>
                     )}
@@ -1166,9 +1424,16 @@ export const SmartScheduleBuilder: React.FC<SmartScheduleBuilderProps> = ({
                       <div className="h-1.5 bg-slate-200 w-full shadow-inner border-y border-slate-100"></div>
                     )}
                     {list.map(emp => (
-                      <div key={emp.id} className="px-2 py-1 flex items-center justify-between gap-3 bg-white hover:bg-slate-50 transition-all border-b border-slate-200 shadow-sm relative active:bg-sky-50 active:scale-[0.98]">
-                        <div className="flex-1 min-w-0">
+                      <div key={emp.id} tabIndex={0} className="group/mob px-2 py-1 flex items-center justify-between gap-1 bg-white hover:bg-slate-50 transition-all border-b border-slate-200 shadow-sm relative active:bg-sky-50 focus:bg-slate-50 outline-none">
+                        <div className="flex flex-col gap-1 -ml-1 opacity-0 group-hover/mob:opacity-100 group-focus/mob:opacity-100 focus-within:opacity-100 transition-opacity pointer-events-none group-hover/mob:pointer-events-auto group-focus/mob:pointer-events-auto focus-within:pointer-events-auto">
+                          <button onClick={(e) => { e.stopPropagation(); moveEmployee(emp.id, 'up'); }} className="p-1 text-slate-400 hover:text-slate-700 bg-slate-50 hover:bg-slate-100 rounded outline-none"><ChevronUp size={14} strokeWidth={2.5} /></button>
+                          <button onClick={(e) => { e.stopPropagation(); moveEmployee(emp.id, 'down'); }} className="p-1 text-slate-400 hover:text-slate-700 bg-slate-50 hover:bg-slate-100 rounded outline-none"><ChevronDown size={14} strokeWidth={2.5} /></button>
+                        </div>
+                        <div className="flex-1 min-w-0 pl-1">
                           <p className="text-[14px] font-medium text-slate-800 truncate leading-tight tracking-tight">{emp.fullName}</p>
+                          {activeBranch !== 'All' && emp.locationId !== activeBranch && (
+                            <p className="text-[10px] text-rose-500 font-bold italic truncate tracking-tight">❂ Hỗ trợ từ {emp.locationId}</p>
+                          )}
                         </div>
                         <div className="w-[180px] flex-shrink-0">
                           {renderCell(emp, mobileSelectedDate)}
@@ -1358,51 +1623,71 @@ export const SmartScheduleBuilder: React.FC<SmartScheduleBuilderProps> = ({
                   )}
                 </div>
 
-                {/* Group 2: Role Selection */}
+                {/* Group 2: Branch & Role Selection */}
                 {!isOff && (
                   <div className="bg-slate-50 p-3 rounded-xl border border-slate-200 space-y-3 shadow-sm">
                     <div className="flex items-center gap-2 mb-1">
                       <div className="w-1 h-4 bg-slate-600 rounded-full"></div>
-                      <span className="text-xs font-black text-slate-800 uppercase tracking-wider">Vị trí</span>
+                      <span className="text-xs font-black text-slate-800 uppercase tracking-wider">Chi nhánh & Vị trí</span>
                     </div>
 
-                    <div className="flex gap-6">
-                      <label className="flex items-center gap-3 cursor-pointer group">
-                        <input 
-                          type="checkbox" 
-                          checked={roleInShift === 'QUẦY' || roleInShift === 'BOTH'} 
-                          onChange={e => {
-                            const isChecked = e.target.checked;
-                            if (isChecked) {
-                              setRoleInShift(roleInShift === 'PV' ? 'BOTH' : 'QUẦY');
-                            } else {
-                              setRoleInShift(roleInShift === 'BOTH' ? 'PV' : undefined);
-                            }
-                          }}
-                          className="w-5 h-5 text-sky-600 rounded border-slate-300 focus:ring-sky-500"
-                        />
-                        <span className={`text-sm transition-colors ${roleInShift === 'QUẦY' || roleInShift === 'BOTH' ? 'text-sky-700 font-bold' : 'text-slate-600 group-hover:text-slate-900'}`}>
-                          QUẦY
-                        </span>
-                      </label>
-                      <label className="flex items-center gap-3 cursor-pointer group">
-                        <input 
-                          type="checkbox" 
-                          checked={roleInShift === 'PV' || roleInShift === 'BOTH'} 
-                          onChange={e => {
-                            const isChecked = e.target.checked;
-                            if (isChecked) {
-                              setRoleInShift(roleInShift === 'QUẦY' ? 'BOTH' : 'PV');
-                            } else {
-                              setRoleInShift(roleInShift === 'BOTH' ? 'QUẦY' : undefined);
-                            }
-                          }}
-                          className="w-5 h-5 text-sky-600 rounded border-slate-300 focus:ring-sky-500"
-                        />
-                        <span className={`text-sm transition-colors ${roleInShift === 'PV' || roleInShift === 'BOTH' ? 'text-sky-700 font-bold' : 'text-slate-600 group-hover:text-slate-900'}`}>
-                          PHỤC VỤ (PV)
-                        </span>
-                      </label>
+                    <div className="space-y-4">
+                      <div>
+                        <label className="block text-[10px] font-bold text-slate-500 uppercase mb-2 ml-1">Làm việc tại chi nhánh</label>
+                        <div className="flex flex-wrap gap-2">
+                          {managedBranches.map(branch => (
+                            <button
+                              key={branch}
+                              onClick={() => setLocationId(branch)}
+                              className={`px-3 py-1.5 rounded-lg border text-xs font-bold transition-all ${locationId === branch ? 'border-sky-500 bg-sky-50 text-sky-700 ring-1 ring-sky-500' : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'}`}
+                            >
+                              {branch}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="block text-[10px] font-bold text-slate-500 uppercase mb-2 ml-1">Vai trò trong ca</label>
+                        <div className="flex gap-6">
+                          <label className="flex items-center gap-3 cursor-pointer group">
+                            <input 
+                              type="checkbox" 
+                              checked={roleInShift === 'QUẦY' || roleInShift === 'BOTH'} 
+                              onChange={e => {
+                                const isChecked = e.target.checked;
+                                if (isChecked) {
+                                  setRoleInShift(roleInShift === 'PV' ? 'BOTH' : 'QUẦY');
+                                } else {
+                                  setRoleInShift(roleInShift === 'BOTH' ? 'PV' : undefined);
+                                }
+                              }}
+                              className="w-5 h-5 text-sky-600 rounded border-slate-300 focus:ring-sky-500"
+                            />
+                            <span className={`text-sm transition-colors ${roleInShift === 'QUẦY' || roleInShift === 'BOTH' ? 'text-sky-700 font-bold' : 'text-slate-600 group-hover:text-slate-900'}`}>
+                              QUẦY
+                            </span>
+                          </label>
+                          <label className="flex items-center gap-3 cursor-pointer group">
+                            <input 
+                              type="checkbox" 
+                              checked={roleInShift === 'PV' || roleInShift === 'BOTH'} 
+                              onChange={e => {
+                                const isChecked = e.target.checked;
+                                if (isChecked) {
+                                  setRoleInShift(roleInShift === 'QUẦY' ? 'BOTH' : 'PV');
+                                } else {
+                                  setRoleInShift(roleInShift === 'BOTH' ? 'QUẦY' : undefined);
+                                }
+                              }}
+                              className="w-5 h-5 text-sky-600 rounded border-slate-300 focus:ring-sky-500"
+                            />
+                            <span className={`text-sm transition-colors ${roleInShift === 'PV' || roleInShift === 'BOTH' ? 'text-sky-700 font-bold' : 'text-slate-600 group-hover:text-slate-900'}`}>
+                              PHỤC VỤ (PV)
+                            </span>
+                          </label>
+                        </div>
+                      </div>
                     </div>
                   </div>
                 )}
@@ -1508,12 +1793,29 @@ export const SmartScheduleBuilder: React.FC<SmartScheduleBuilderProps> = ({
         </div>
       )}
 
+      {pendingNavigation && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4" onMouseDown={(e) => { if (e.target === e.currentTarget) setPendingNavigation(null); }}>
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden transform transition-all scale-100 p-6">
+            <h3 className="font-bold text-lg text-slate-900 mb-2">Chưa lưu thay đổi</h3>
+            <p className="text-sm text-slate-600 mb-6">Bạn có thay đổi chưa lưu. Rời khỏi tuần này sẽ mất các thay đổi. Tiếp tục?</p>
+            <div className="flex justify-end gap-3">
+              <button onClick={() => setPendingNavigation(null)} className="px-4 py-2 font-bold text-slate-500 bg-slate-100 rounded-xl hover:bg-slate-200">
+                Hủy
+              </button>
+              <button onClick={confirmNavigation} className="px-4 py-2 font-bold text-white bg-red-500 rounded-xl hover:bg-red-600">
+                Chuyển tuần
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Support Employee Selection Modal */}
       {showSupportModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[60] p-4" onMouseDown={(e) => { if (e.target === e.currentTarget) setShowSupportModal(false); }}>
           <div className="bg-white rounded-xl shadow-xl w-full max-w-md overflow-hidden">
             <div className={`p-4 border-b border-white/10 flex justify-between items-center ${theme?.header || 'bg-slate-800'}`}>
-              <h3 className="font-bold text-lg text-white">Chọn nhân viên hỗ trợ</h3>
+              <h3 className="font-bold text-lg text-white">Thêm NV hỗ trợ</h3>
               <button 
                 onClick={() => setShowSupportModal(false)}
                 className="p-1 hover:bg-white/10 rounded-full text-white/70"
@@ -1522,28 +1824,43 @@ export const SmartScheduleBuilder: React.FC<SmartScheduleBuilderProps> = ({
               </button>
             </div>
             <div className="p-4 max-h-[400px] overflow-y-auto">
-              <p className="text-sm text-slate-500 mb-4">Danh sách nhân viên từ chi nhánh khác có thể mượn sang {activeBranch}:</p>
+              <p className="text-sm text-slate-500 mb-4">Chọn NV từ nhánh khác hỗ trợ {activeBranch}:</p>
               <div className="space-y-2">
                 {employees
-                  .filter(e => e.locationId !== activeBranch && !supportEmployeeIds.includes(e.id))
+                  .filter(e => e.locationId !== activeBranch && !supportEmployees.find(se => se.empId === e.id))
                   .map(emp => (
                     <div 
                       key={emp.id}
-                      className="flex items-center justify-between p-3 border border-slate-200 rounded-lg hover:bg-sky-50 cursor-pointer transition-colors"
-                      onClick={() => {
-                        setSupportEmployeeIds(prev => [...prev, emp.id]);
-                        setShowSupportModal(false);
-                      }}
+                      className="flex items-center justify-between p-3 border border-slate-200 rounded-lg hover:border-sky-300 transition-colors"
                     >
                       <div>
                         <div className="font-bold text-slate-800">{emp.fullName}</div>
-                        <div className="text-xs text-slate-500">{emp.locationId} - {emp.defaultRole}</div>
+                        <div className="text-xs text-slate-500">{emp.locationId}</div>
                       </div>
-                      <Plus className="w-5 h-5 text-sky-600" />
+                      <div className="flex gap-2">
+                        <button 
+                          title="Hỗ trợ QUẦY"
+                          onClick={() => {
+                            setSupportEmployees(prev => [...prev, { empId: emp.id, role: 'QUẦY' }]);
+                          }}
+                          className="px-2 py-1 text-[10px] font-bold text-sky-700 bg-sky-50 hover:bg-sky-100 rounded-md transition-colors border border-sky-200"
+                        >
+                          + QUẦY
+                        </button>
+                        <button 
+                          title="Hỗ trợ PHỤC VỤ (PV)"
+                          onClick={() => {
+                            setSupportEmployees(prev => [...prev, { empId: emp.id, role: 'PV' }]);
+                          }}
+                          className="px-2 py-1 text-[10px] font-bold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 rounded-md transition-colors border border-emerald-200"
+                        >
+                          + PV
+                        </button>
+                      </div>
                     </div>
                   ))}
-                {employees.filter(e => e.locationId !== activeBranch && !supportEmployeeIds.includes(e.id)).length === 0 && (
-                  <div className="text-center py-8 text-slate-400 italic">Không còn nhân viên nào khác để thêm.</div>
+                {employees.filter(e => e.locationId !== activeBranch && !supportEmployees.find(se => se.empId === e.id)).length === 0 && (
+                  <div className="text-center py-8 text-slate-400 italic">Không còn người nào khác.</div>
                 )}
               </div>
             </div>
@@ -1558,6 +1875,8 @@ export const SmartScheduleBuilder: React.FC<SmartScheduleBuilderProps> = ({
           </div>
         </div>
       )}
+
+
     </div>
   );
 };
