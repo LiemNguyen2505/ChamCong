@@ -62,8 +62,10 @@ export const EmployeeLoginForm: React.FC<EmployeeLoginFormProps> = ({
                 required
                 placeholder=""
                 value={empIdInput}
-                onChange={(e) => setEmpIdInput(e.target.value)}
+                onChange={(e) => setEmpIdInput(e.target.value.replace(/\D/g, ''))}
                 className={`w-full px-4 h-[52px] pl-12 rounded-2xl bg-slate-50 border border-slate-200 focus:ring-2 ${theme.ring.replace('focus:ring-', 'focus:ring-').replace(']', ']/20')} focus:${theme.accent.replace('bg-', 'border-')} text-base font-bold ${theme.text} transition-all outline-none`}
+                inputMode="numeric"
+                pattern="[0-9]*"
               />
             </div>
           </div>
@@ -81,9 +83,11 @@ export const EmployeeLoginForm: React.FC<EmployeeLoginFormProps> = ({
                 required
                 placeholder=""
                 value={pinInput}
-                onChange={(e) => setPinInput(e.target.value)}
+                onChange={(e) => setPinInput(e.target.value.replace(/\D/g, ''))}
                 className={`w-full px-4 h-[52px] pl-12 rounded-xl bg-slate-50 border border-slate-200 focus:ring-2 ${theme.ring.replace('focus:ring-', 'focus:ring-').replace(']', ']/20')} focus:${theme.accent.replace('bg-', 'border-')} text-left text-lg ${theme.text} transition-all font-black outline-none`}
                 maxLength={6}
+                inputMode="numeric"
+                pattern="[0-9]*"
               />
               <button
                 type="button"
@@ -124,8 +128,8 @@ export const EmployeeLoginForm: React.FC<EmployeeLoginFormProps> = ({
 
           {(!localStorage.getItem('hasLoggedInBefore')) ? (
             <div className="text-center mt-4">
-              <p className="text-[10px] text-stone-400 font-bold uppercase tracking-widest">
-                <span className={`${theme.text} opacity-70`}>Lần đầu đăng nhập:</span> mã PIN là 4 số cuối SĐT
+              <p className="text-[11px] text-stone-500 font-bold tracking-wide">
+                <span className={`${theme.text}`}>Lần đầu đăng nhập:</span> Mã PIN là 4 số cuối số điện thoại
               </p>
             </div>
           ) : (
