@@ -1225,7 +1225,7 @@ export const SmartScheduleBuilder: React.FC<SmartScheduleBuilderProps> = ({
             <button 
               onClick={exportToCSV} 
               title="Xuất Báo Cáo CSV"
-              className="flex items-center justify-center p-2 text-white bg-emerald-600 hover:bg-emerald-700 rounded-md border border-emerald-500 transition-all active:scale-95"
+              className="hidden md:flex items-center justify-center p-2 text-white bg-emerald-600 hover:bg-emerald-700 rounded-md border border-emerald-500 transition-all active:scale-95"
             >
               <Download className="w-4 h-4" />
             </button>
@@ -1440,7 +1440,7 @@ export const SmartScheduleBuilder: React.FC<SmartScheduleBuilderProps> = ({
                 </div>
 
                 {/* Daily Total Summary for Mobile - Aligned with shift columns */}
-                <div className="w-[180px] flex-shrink-0 h-8 border-l border-slate-100 pl-1">
+                <div className="w-[220px] flex-shrink-0 h-8 border-l border-slate-100 pl-1">
                    {renderDailySummary(mobileSelectedDate, 'mobile')}
                 </div>
             </div>
@@ -1463,7 +1463,7 @@ export const SmartScheduleBuilder: React.FC<SmartScheduleBuilderProps> = ({
                             <p className="text-[9px] text-rose-500 font-bold italic truncate tracking-tight uppercase mt-0.5">❂ TỪ {emp.locationId}</p>
                           )}
                         </div>
-                        <div className="w-[180px] flex-shrink-0 h-[40px]">
+                        <div className="w-[220px] flex-shrink-0 h-[40px]">
                           {renderCell(emp, mobileSelectedDate)}
                         </div>
                       </div>
