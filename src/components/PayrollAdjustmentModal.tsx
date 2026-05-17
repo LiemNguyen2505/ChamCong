@@ -38,15 +38,27 @@ export const PayrollAdjustmentModal: React.FC<PayrollAdjustmentModalProps> = ({
   const [note, setNote] = useState(adjustment?.note || '');
   const [loading, setLoading] = useState(false);
 
+  const [isDirty, setIsDirty] = useState(false);
+
+  const handleClose = () => {
+    if (isDirty) {
+      if (window.confirm('Bạn có thay đổi chưa lưu. Bạn có chắc muốn đóng?')) {
+        onClose();
+      }
+    } else {
+      onClose();
+    }
+  };
+
   useEffect(() => {
     const handleEsc = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
-        onClose();
+        handleClose();
       }
     };
     window.addEventListener('keydown', handleEsc);
     return () => window.removeEventListener('keydown', handleEsc);
-  }, [onClose]);
+  }, [isDirty, onClose]);
 
   const handleSave = async () => {
     setLoading(true);
@@ -85,11 +97,11 @@ export const PayrollAdjustmentModal: React.FC<PayrollAdjustmentModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4" onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}>
-      <div className="bg-white rounded-3xl w-full max-w-md overflow-hidden shadow-2xl">
+    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4" onMouseDown={(e) => { if (e.target === e.currentTarget) handleClose(); }}>
+      <div className="bg-white rounded-3xl w-full max-w-md overflow-hidden shadow-2xl" onChange={() => setIsDirty(true)}>
         <div className={`p-6 ${adminTheme.header} text-white flex justify-between items-center`}>
           <h3 className="font-bold text-xl">Điều chỉnh lương - {empName}</h3>
-          <button onClick={onClose} className="p-2 bg-white/20 hover:bg-white/30 rounded-full transition-colors">
+          <button onClick={handleClose} className="p-2 bg-white/20 hover:bg-white/30 rounded-full transition-colors">
             <X className="w-5 h-5 text-white" />
           </button>
         </div>
