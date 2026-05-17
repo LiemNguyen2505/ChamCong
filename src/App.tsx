@@ -77,9 +77,22 @@ export default function App() {
     try {
       console.log(`🚀 [App] Fetching data for: ${targetMonth}`);
       const [year, month] = targetMonth.split('-').map(Number);
-      const startDate = `${targetMonth}-01`;
-      const lastDay = new Date(year, month, 0).getDate();
-      const endDate = `${targetMonth}-${String(lastDay).padStart(2, '0')}`;
+      
+      const rawStart = new Date(year, month - 1, 1);
+      const rawEnd = new Date(year, month, 0);
+      
+      const bufferStart = new Date(rawStart); bufferStart.setDate(bufferStart.getDate() - 7);
+      const bufferEnd = new Date(rawEnd); bufferEnd.setDate(bufferEnd.getDate() + 7);
+      
+      const formatLocal = (d: Date) => {
+        const y = d.getFullYear();
+        const m = String(d.getMonth() + 1).padStart(2, '0');
+        const day = String(d.getDate()).padStart(2, '0');
+        return `${y}-${m}-${day}`;
+      };
+      
+      const startDate = formatLocal(bufferStart);
+      const endDate = formatLocal(bufferEnd);
 
       const config: { key: string; query: any; type: 'static' | 'dynamic' }[] = [
         { key: 'nhanViens', query: query(collection(db, 'employees'), limit(500)), type: 'dynamic' },
@@ -94,7 +107,10 @@ export default function App() {
         { key: 'violations', query: query(collection(db, 'Violations'), where('monthYear', '==', targetMonth)), type: 'dynamic' },
         { key: 'chamCongs', query: query(collection(db, 'timesheets'), where('date', '>=', startDate), where('date', '<=', endDate), limit(3000)), type: 'dynamic' },
         { key: 'lichLamViecs', query: query(collection(db, 'LichLamViec'), where('date', '>=', startDate), where('date', '<=', endDate), limit(3000)), type: 'dynamic' },
-        { key: 'bulletinNotes', query: query(collection(db, 'BulletinBoard'), orderBy('isPinned', 'desc'), orderBy('createdAt', 'desc'), limit(100)), type: 'dynamic' }
+        { key: 'bulletinNotes', query: query(collection(db, 'BulletinBoard'), orderBy('isPinned', 'desc'), orderBy('createdAt', 'desc'), limit(100)), type: 'dynamic' },
+        { key: 'planningGoals', query: query(collection(db, 'PlanningGoals'), limit(100)), type: 'static' },
+        { key: 'xinNghiPheps', query: query(collection(db, 'XinNghiPhep'), limit(1000)), type: 'static' },
+        { key: 'salaryHistories', query: query(collection(db, 'SalaryHistories'), limit(500)), type: 'static' }
       ];
 
       const activeQueries = config.filter(c => !(!force && c.type === 'static' && hasInitialLoadedRef.current));
