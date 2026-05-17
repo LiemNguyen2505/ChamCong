@@ -549,7 +549,6 @@ export default function AdminView({
                 nhanViens={nhanViens}
                 filterBranch={filterBranch}
                 planningGoals={planningGoals}
-                salaryReviewNotifications={salaryReviewNotifications}
                 openConfirmModal={openConfirmModal}
                 fetchInitialData={fetchInitialData}
                 BranchTabs={CommonBranchTabs}
