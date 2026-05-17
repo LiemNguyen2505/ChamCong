@@ -59,6 +59,20 @@ export const ViolationManagement: React.FC<ViolationManagementProps> = ({
     })
     .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
+  const handleCloseAdd = () => {
+    if (selectedEmpId || selectedViolationType || customViolation || customNote) {
+      if (window.confirm('Bạn có thay đổi chưa lưu. Bạn có chắc muốn đóng?')) {
+        setShowAddModal(false);
+        setSelectedEmpId('');
+        setSelectedViolationType('');
+        setCustomViolation('');
+        setCustomNote('');
+      }
+    } else {
+      setShowAddModal(false);
+    }
+  };
+
   const handleSubmit = async () => {
     if (!selectedEmpId || !selectedViolationType) return;
     
@@ -263,7 +277,7 @@ export const ViolationManagement: React.FC<ViolationManagementProps> = ({
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              onClick={() => setShowAddModal(false)}
+              onClick={handleCloseAdd}
               className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm"
             />
             <motion.div
@@ -277,7 +291,7 @@ export const ViolationManagement: React.FC<ViolationManagementProps> = ({
                   <h3 className="text-xl md:text-2xl font-black text-white uppercase tracking-tight">THÊM VI PHẠM</h3>
                   <div className="h-1 w-10 bg-white rounded-full shadow-sm" />
                 </div>
-                <button onClick={() => setShowAddModal(false)} className="p-2 bg-white/20 hover:bg-white/30 rounded-full text-white transition-all">
+                <button onClick={handleCloseAdd} className="p-2 bg-white/20 hover:bg-white/30 rounded-full text-white transition-all">
                   <X className="w-5 h-5 md:w-6 md:h-6" />
                 </button>
               </div>
@@ -365,7 +379,7 @@ export const ViolationManagement: React.FC<ViolationManagementProps> = ({
 
               <div className="p-4 md:p-8 bg-slate-50 flex gap-3 shrink-0">
                 <button
-                  onClick={() => setShowAddModal(false)}
+                  onClick={handleCloseAdd}
                   className="flex-1 py-3.5 bg-white border border-slate-200 text-slate-500 font-black rounded-2xl hover:bg-slate-50 transition-all uppercase tracking-widest text-[10px]"
                 >
                   Hủy
