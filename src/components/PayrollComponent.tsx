@@ -560,9 +560,12 @@ export const PayrollComponent: React.FC<any> = ({
                                       onClick={() => {
                                         if (onEmployeeClick) onEmployeeClick(emp);
                                       }}
-                                      className="text-left hover:text-sky-600 transition-colors font-bold text-slate-700 text-base whitespace-nowrap"
+                                      className="text-left hover:text-sky-600 transition-colors font-bold text-slate-700 text-base whitespace-nowrap flex items-center gap-2"
                                     >
                                       {emp.fullName}
+                                      {checkEmployeeReview && checkEmployeeReview(emp).needsReview && (
+                                        <span className="inline-block px-1.5 py-0.5 bg-red-100 text-red-600 text-[9px] font-bold rounded animate-pulse uppercase border border-red-200 shadow-sm leading-none shrink-0" title={`${checkEmployeeReview(emp).daysSince} ngày từ lần review cuối`}>Review lương</span>
+                                      )}
                                     </button>
                                   </div>
                                 </td>
@@ -846,11 +849,11 @@ export const PayrollComponent: React.FC<any> = ({
                                       e.stopPropagation();
                                       if (onEmployeeClick) onEmployeeClick(emp);
                                     }}
-                                    className="text-base font-bold text-slate-900 text-left truncate tracking-tight focus:outline-none hover:underline relative"
+                                    className="text-base font-bold text-slate-900 text-left truncate tracking-tight focus:outline-none hover:underline flex items-center gap-2"
                                   >
                                     {emp.fullName}
                                     {checkEmployeeReview && checkEmployeeReview(emp).needsReview && (
-                                      <span className="absolute -top-1 -right-3 w-2 h-2 bg-[#ea580c] rounded-full ring-2 ring-white" />
+                                      <span className="inline-block px-1.5 py-0.5 bg-red-100 text-red-600 text-[9px] font-bold rounded animate-pulse uppercase border border-red-200 shadow-sm leading-none shrink-0" title={`${checkEmployeeReview(emp).daysSince} ngày từ lần review cuối`}>Review lương</span>
                                     )}
                                   </button>
                                 </div>
