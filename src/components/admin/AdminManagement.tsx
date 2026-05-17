@@ -54,7 +54,7 @@ export const AdminManagement: React.FC<AdminManagementProps> = ({
       toast.success('Thêm Admin thành công', { id: loadingToast });
       setShowAddAdminModal(false);
       setNewAdmin({ email: '', pin: '', role: 'BranchAdmin', locationIds: ['Góc Phố'] });
-      await fetchInitialData();
+      await fetchInitialData(undefined, true);
     } catch (error) {
       toast.error('Lỗi khi thêm Admin', { id: loadingToast });
     }
@@ -72,7 +72,7 @@ export const AdminManagement: React.FC<AdminManagementProps> = ({
       toast.success('Cập nhật Admin thành công', { id: loadingToast });
       setShowEditAdminModal(false);
       setEditingAdmin(null);
-      await fetchInitialData();
+      await fetchInitialData(undefined, true);
     } catch (error) {
       toast.error('Lỗi khi cập nhật Admin', { id: loadingToast });
     }
@@ -93,7 +93,7 @@ export const AdminManagement: React.FC<AdminManagementProps> = ({
           await deleteDoc(doc(db, 'Admins', id));
           await logAction('Xóa', 'Admin', `Xóa Admin ID: ${id}`);
           toast.success('Xóa Admin thành công', { id: loadingToast });
-          await fetchInitialData();
+          await fetchInitialData(undefined, true);
         } catch (error) {
           toast.error('Lỗi khi xóa Admin', { id: loadingToast });
         }
