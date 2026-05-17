@@ -64,6 +64,20 @@ export const EmployeeManagement: React.FC<EmployeeManagementProps> = ({
   const [luongTheoGioStr, setLuongTheoGioStr] = React.useState('');
   const [thuongTrachNhiemStr, setThuongTrachNhiemStr] = React.useState('');
   const [isSubmitting, setIsSubmitting] = React.useState(false);
+  const [isAddFormDirty, setIsAddFormDirty] = React.useState(false);
+  const [isEditFormDirty, setIsEditFormDirty] = React.useState(false);
+
+  const checkLeave = (isDirty: boolean, closeAction: () => void) => {
+    if (isDirty) {
+      if (window.confirm('Bạn có thay đổi chưa lưu. Bạn có chắc muốn đóng form?')) {
+        closeAction();
+        setIsAddFormDirty(false);
+        setIsEditFormDirty(false);
+      }
+    } else {
+      closeAction();
+    }
+  };
 
   const getAllowedBranches = () => {
     if (currentAdmin?.role === 'SuperAdmin') return ['Góc Phố', 'Phố Xanh'];
@@ -631,13 +645,13 @@ export const EmployeeManagement: React.FC<EmployeeManagementProps> = ({
             <div className={`flex items-center justify-between p-3 border-b border-white/10 ${adminTheme.header}`}>
               <h2 className="text-base font-bold text-white uppercase tracking-tight">Thêm nhân viên mới</h2>
               <button 
-                onClick={() => setShowAddEmployeeModal(false)}
+                onClick={() => checkLeave(isAddFormDirty, () => setShowAddEmployeeModal(false))}
                 className="p-1 hover:bg-white/10 rounded-full text-white/70 transition-colors"
               >
                 <X className="w-5 h-5 text-white" />
               </button>
             </div>
-            <form onSubmit={handleAddEmployee} className="p-3 md:p-4 overflow-y-auto space-y-4">
+            <form onSubmit={handleAddEmployee} className="p-3 md:p-4 overflow-y-auto space-y-4" onChange={() => setIsAddFormDirty(true)}>
               <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 shadow-sm">
                 <h3 className="text-[11px] font-black text-slate-400 uppercase tracking-widest mb-3">Thông tin cơ bản</h3>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -686,7 +700,7 @@ export const EmployeeManagement: React.FC<EmployeeManagementProps> = ({
                   <div className="grid grid-cols-2 gap-3">
                     <div>
                       <label className="block text-[11px] font-black text-slate-500 uppercase mb-1 ml-1">Vị trí</label>
-                      <select value={(newEmployee.defaultRole || 'PV')} onChange={e => setNewEmployee({ ...newEmployee, defaultRole: e.target.value as 'QUẦY' | 'PV' })} className="w-full px-2 py-1.5 border border-slate-200 rounded-xl font-bold bg-white text-[13px]">
+                      <select value={(newEmployee.defaultRole || 'PV')} onChange={e => setNewEmployee({ ...newEmployee, defaultRole: e.target.value as 'QUẦY' | 'PV' })} className="w-full px-2 py-1.5 border border-slate-200 rounded-xl font-bold bg-white text-sm">
                         <option value="QUẦY">Quầy</option>
                         <option value="PV">Phục vụ</option>
                       </select>
@@ -712,7 +726,7 @@ export const EmployeeManagement: React.FC<EmployeeManagementProps> = ({
               </div>
 
               <div className="flex justify-end gap-3 pt-3 border-t border-slate-100">
-                <button type="button" onClick={() => setShowAddEmployeeModal(false)} className="px-5 py-2 bg-slate-100 text-slate-600 rounded-xl font-black text-[11px] uppercase tracking-widest">Hủy</button>
+                <button type="button" onClick={() => checkLeave(isAddFormDirty, () => setShowAddEmployeeModal(false))} className="px-5 py-2 bg-slate-100 text-slate-600 rounded-xl font-black text-[11px] uppercase tracking-widest">Hủy</button>
                 <button type="submit" disabled={isSubmitting} className={`px-5 py-2 ${adminTheme.button} text-white rounded-xl font-black text-[11px] uppercase tracking-widest shadow-lg ${adminTheme.shadow}`}>
                   {isSubmitting ? 'ĐANG XỬ LÝ...' : 'THÊM NHÂN VIÊN'}
                 </button>
@@ -730,13 +744,13 @@ export const EmployeeManagement: React.FC<EmployeeManagementProps> = ({
             <div className={`flex items-center justify-between p-3 border-b border-white/10 ${adminTheme.header}`}>
               <h2 className="text-base font-bold text-white uppercase tracking-tight">Sửa thông tin nhân viên</h2>
               <button 
-                onClick={() => setShowEditEmployeeModal(false)}
+                onClick={() => checkLeave(isEditFormDirty, () => setShowEditEmployeeModal(false))}
                 className="p-1 hover:bg-white/10 rounded-full text-white/70 transition-colors"
               >
                 <X className="w-5 h-5 text-white" />
               </button>
             </div>
-            <form onSubmit={handleUpdateEmployee} className="p-3 md:p-4 overflow-y-auto space-y-4">
+            <form onSubmit={handleUpdateEmployee} className="p-3 md:p-4 overflow-y-auto space-y-4" onChange={() => setIsEditFormDirty(true)}>
               <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 shadow-sm">
                 <h3 className="text-[11px] font-black text-slate-400 uppercase tracking-widest mb-3">Thông tin cơ bản</h3>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -785,7 +799,7 @@ export const EmployeeManagement: React.FC<EmployeeManagementProps> = ({
                   <div className="grid grid-cols-2 gap-3">
                     <div>
                       <label className="block text-[11px] font-black text-slate-500 uppercase mb-1 ml-1">Vị trí</label>
-                      <select value={(editingEmployee.defaultRole || 'PV')} onChange={e => setEditingEmployee({ ...editingEmployee, defaultRole: e.target.value as 'QUẦY' | 'PV' })} className="w-full px-2 py-1.5 border border-slate-200 rounded-xl font-bold bg-white text-[13px]">
+                      <select value={(editingEmployee.defaultRole || 'PV')} onChange={e => setEditingEmployee({ ...editingEmployee, defaultRole: e.target.value as 'QUẦY' | 'PV' })} className="w-full px-2 py-1.5 border border-slate-200 rounded-xl font-bold bg-white text-sm">
                         <option value="QUẦY">Quầy</option>
                         <option value="PV">Phục vụ</option>
                       </select>
@@ -811,7 +825,7 @@ export const EmployeeManagement: React.FC<EmployeeManagementProps> = ({
               </div>
 
               <div className="flex justify-end gap-3 pt-3 border-t border-slate-100">
-                <button type="button" onClick={() => setShowEditEmployeeModal(false)} className="px-5 py-2 bg-slate-100 text-slate-600 rounded-xl font-black text-[11px] uppercase tracking-widest">Hủy</button>
+                <button type="button" onClick={() => checkLeave(isEditFormDirty, () => setShowEditEmployeeModal(false))} className="px-5 py-2 bg-slate-100 text-slate-600 rounded-xl font-black text-[11px] uppercase tracking-widest">Hủy</button>
                 <button type="submit" disabled={isSubmitting} className={`px-5 py-2 ${adminTheme.button} text-white rounded-xl font-black text-[11px] uppercase tracking-widest shadow-lg ${adminTheme.shadow}`}>
                   {isSubmitting ? 'ĐANG LƯU...' : 'LƯU THAY ĐỔI'}
                 </button>
