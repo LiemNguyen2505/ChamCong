@@ -333,6 +333,21 @@ export default function BulletinBoard({ currentEmployee, locationId, isAdmin, th
     }
   };
 
+  const handleCloseAdd = () => {
+    if (newNoteContent.trim() || startDate || endDate) {
+      if (window.confirm('Bạn có thay đổi chưa lưu. Bạn có chắc muốn đóng?')) {
+        setNewNoteContent('');
+        setStartDate('');
+        setEndDate('');
+        setIsAddingInline(false);
+        setEditingNote(null);
+      }
+    } else {
+      setIsAddingInline(false);
+      setEditingNote(null);
+    }
+  };
+
   const canEdit = (note: BulletinNote) => {
     if (note.authorId !== currentEmployee.empId) return false;
     
@@ -491,7 +506,13 @@ export default function BulletinBoard({ currentEmployee, locationId, isAdmin, th
         </div>
         {isAdmin && (
           <button
-            onClick={() => setIsAddingInline(!isAddingInline)}
+            onClick={() => {
+              if (isAddingInline) {
+                handleCloseAdd();
+              } else {
+                setIsAddingInline(true);
+              }
+            }}
             className={`p-1.5 rounded-lg transition-all active:scale-95 ${isAddingInline ? 'bg-red-50 text-red-500' : 'bg-white shadow-sm border border-slate-100 text-slate-600 hover:bg-slate-50'}`}
           >
             {isAddingInline ? <X className="w-4 h-4" /> : <Plus className="w-4 h-4" />}
