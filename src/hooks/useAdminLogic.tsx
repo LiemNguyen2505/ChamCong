@@ -253,7 +253,7 @@ export function useAdminLogic(globalData: any, fetchInitialData: any, isLoading:
 
     const loadData = async () => {
       try {
-        await fetchInitialData(filterMonth);
+        await fetchInitialData(filterMonth, true);
       } catch (err) {
         console.error("Failed to load data for month:", filterMonth, err);
       } finally {
@@ -453,7 +453,7 @@ export function useAdminLogic(globalData: any, fetchInitialData: any, isLoading:
     if (headerTapCount >= 3) {
       setHeaderTapCount(0);
       // Already in Admin, maybe refresh data?
-      fetchInitialData(filterMonth);
+      fetchInitialData(filterMonth, true);
       toast.success('Đã cập nhật dữ liệu mới nhất!', { icon: '🔄' });
     }
   }, [headerTapCount]);
@@ -608,7 +608,7 @@ export function useAdminLogic(globalData: any, fetchInitialData: any, isLoading:
       await Promise.all(batchPromises);
 
       toast.success('Đã xử lý khấu hao vật tư thành công!', { id: loadingToast });
-      await fetchInitialData(filterMonth);
+      await fetchInitialData(filterMonth, true);
       setShowMaterialLossModal(false);
       setItemType('');
       setOriginalPrice('');
@@ -1409,6 +1409,43 @@ export function useAdminLogic(globalData: any, fetchInitialData: any, isLoading:
           dataToSave.retainedBranch = payrollActiveBranch;
         }
 
+        const empUpdates: any = {};
+        let syncEmployee = false;
+
+        if (changes.hourlyRate !== undefined && changes.hourlyRate > (emp.hourlyRate || 0)) {
+           const luong = changes.hourlyRate;
+           const diff = luong - (emp.hourlyRate || 0);
+           const diffK = diff >= 1000 ? `${Math.round(diff / 1000)}k` : diff;
+           const noteAddition = `Đã tăng ${diffK}/h từ tháng ${filterMonth}`;
+           
+           empUpdates.hourlyRate = luong;
+           empUpdates.lastSalaryReviewDate = new Date().toISOString();
+           syncEmployee = true;
+
+           const currentAdjNote = dataToSave.note || '';
+           dataToSave.note = currentAdjNote ? currentAdjNote + '\n' + noteAddition : noteAddition;
+        } else if (changes.hourlyRate !== undefined) {
+           empUpdates.hourlyRate = changes.hourlyRate;
+           syncEmployee = true;
+        }
+
+        if (changes.responsibilityBonus !== undefined && changes.responsibilityBonus > (emp.responsibilityBonus || 0)) {
+           const bonus = changes.responsibilityBonus;
+           const diff = bonus - (emp.responsibilityBonus || 0);
+           const diffK = diff >= 1000 ? `${Math.round(diff / 1000)}k` : diff;
+           const noteAddition = `Đã tăng Đơn giá Thưởng TN ${diffK} từ tháng ${filterMonth}`;
+           
+           empUpdates.responsibilityBonus = bonus;
+           empUpdates.lastSalaryReviewDate = new Date().toISOString();
+           syncEmployee = true;
+
+           const currentAdjNote = dataToSave.note || '';
+           dataToSave.note = currentAdjNote ? currentAdjNote + '\n' + noteAddition : noteAddition;
+        } else if (changes.responsibilityBonus !== undefined) {
+           empUpdates.responsibilityBonus = changes.responsibilityBonus;
+           syncEmployee = true;
+        }
+
         batch.set(adjRef, dataToSave, { merge: true });
 
         // Duplicates cleanup - separate from batch because they are separate docs
@@ -1419,16 +1456,18 @@ export function useAdminLogic(globalData: any, fetchInitialData: any, isLoading:
 
         // Sync employee profile
         if (dataToSave.retainedSalary > 0) {
-          batch.update(doc(db, 'employees', emp.id), {
-            retainedSalaryAmount: dataToSave.retainedSalary,
-            retainedSalaryStatus: 'Đã giữ',
-            retainedSalaryBranch: dataToSave.retainedBranch || payrollActiveBranch
-          });
+          empUpdates.retainedSalaryAmount = dataToSave.retainedSalary;
+          empUpdates.retainedSalaryStatus = 'Đã giữ';
+          empUpdates.retainedSalaryBranch = dataToSave.retainedBranch || payrollActiveBranch;
+          syncEmployee = true;
         }
         if (dataToSave.returnRetainedSalary > 0) {
-          batch.update(doc(db, 'employees', emp.id), {
-            retainedSalaryStatus: 'Đã trả'
-          });
+          empUpdates.retainedSalaryStatus = 'Đã trả';
+          syncEmployee = true;
+        }
+
+        if (syncEmployee) {
+          batch.update(doc(db, 'employees', emp.id), empUpdates);
         }
 
         // AUTO-TRIGGER NOTIFICATION FOR PAYROLL UPDATE
