@@ -188,7 +188,7 @@ export const SmartScheduleBuilder: React.FC<SmartScheduleBuilderProps> = ({
     if (!hasUnsavedChanges) {
       setLocalSchedules(schedules);
     }
-  }, [schedules]); // intentional to not include hasUnsavedChanges
+  }, [schedules, hasUnsavedChanges]);
 
   const handleApplyChanges = async () => {
     if (isSaving) return;
@@ -196,17 +196,15 @@ export const SmartScheduleBuilder: React.FC<SmartScheduleBuilderProps> = ({
     const loadingToast = toast.loading('Đang lưu thay đổi...');
     try {
       if (onBatchSaveShifts) {
-        const currentWeekStart = weekStart;
-        const currentWeekEnd = addDays(currentWeekStart, 6);
+        const currentWeekStartStr = format(weekStart, 'yyyy-MM-dd');
+        const currentWeekEndStr = format(addDays(weekStart, 6), 'yyyy-MM-dd');
         
         const localShiftsInWeek = localSchedules.filter(s => {
-          const d = parseISO(s.date);
-          return d >= currentWeekStart && d <= currentWeekEnd;
+          return s.date >= currentWeekStartStr && s.date <= currentWeekEndStr;
         });
 
         const originalShiftsInWeek = schedules.filter(s => {
-          const d = parseISO(s.date);
-          return d >= currentWeekStart && d <= currentWeekEnd;
+          return s.date >= currentWeekStartStr && s.date <= currentWeekEndStr;
         });
 
         if (onBatchSaveShifts) {
@@ -787,9 +785,11 @@ export const SmartScheduleBuilder: React.FC<SmartScheduleBuilderProps> = ({
     toast.loading("Đang thực hiện thanh trừng dữ liệu lỗi...", { id: 'purge' });
     
     try {
+      const currentWeekStartStr = format(weekStart, 'yyyy-MM-dd');
+      const currentWeekEndStr = format(addDays(weekStart, 6), 'yyyy-MM-dd');
+      
       const currentWeekShifts = localSchedules.filter(s => {
-        const d = parseISO(s.date);
-        return d >= weekStart && d <= addDays(weekStart, 6);
+        return s.date >= currentWeekStartStr && s.date <= currentWeekEndStr;
       });
 
       // Clear all non-deterministic shifts in one go
@@ -821,35 +821,39 @@ export const SmartScheduleBuilder: React.FC<SmartScheduleBuilderProps> = ({
     try {
       const nextWeekStart = addWeeks(weekStart, 1);
       const nextWeekEnd = addDays(nextWeekStart, 6);
+      const nextWeekStartStr = format(nextWeekStart, 'yyyy-MM-dd');
+      const nextWeekEndStr = format(nextWeekEnd, 'yyyy-MM-dd');
 
       // 1. Find and clear ALL existing shifts in the TARGET week for the current scope
       const nextWeekShiftsToDelete = schedules.filter(s => {
-        const d = parseISO(s.date);
-        return d >= nextWeekStart && d <= nextWeekEnd && (activeBranch === 'All' || s.locationId === activeBranch);
+        return s.date >= nextWeekStartStr && s.date <= nextWeekEndStr && (activeBranch === 'All' || s.locationId === activeBranch);
       });
 
       if (nextWeekShiftsToDelete.length > 0) {
-        for (const shift of nextWeekShiftsToDelete) {
-          await onDeleteShift(shift.id);
+        if (onBatchDeleteShifts) {
+          await onBatchDeleteShifts(nextWeekShiftsToDelete.map(s => s.id));
+        } else {
+          for (const shift of nextWeekShiftsToDelete) {
+            await onDeleteShift(shift.id);
+          }
         }
       }
 
       // 2. Get shifts from CURRENT week
-      const currentWeekStart = weekStart;
-      const currentWeekEnd = addDays(currentWeekStart, 6);
+      const currentWeekStartStr = format(weekStart, 'yyyy-MM-dd');
+      const currentWeekEndStr = format(addDays(weekStart, 6), 'yyyy-MM-dd');
       
       const currentWeekShifts = localSchedules.filter(s => {
-        const d = parseISO(s.date);
-        return d >= currentWeekStart && d <= currentWeekEnd && (activeBranch === 'All' || s.locationId === activeBranch);
+        return s.date >= currentWeekStartStr && s.date <= currentWeekEndStr && (activeBranch === 'All' || s.locationId === activeBranch);
       });
 
       // 3. Clone them to next week
-      for (const shift of currentWeekShifts) {
+      const clonedShifts = currentWeekShifts.map(shift => {
         const nextWeekDate = format(addWeeks(parseISO(shift.date), 1), 'yyyy-MM-dd');
         const slotId = getSlotIdFromTime(shift.startTime);
         const deterministicId = getShiftDeterministicId(shift.empId, nextWeekDate, slotId);
-
-        await onAddShift({
+        
+        return {
           id: deterministicId,
           empId: shift.empId,
           date: nextWeekDate,
@@ -862,11 +866,24 @@ export const SmartScheduleBuilder: React.FC<SmartScheduleBuilderProps> = ({
           colorLabel: shift.colorLabel || '',
           tasks: shift.tasks || [],
           ...(shift.roleInShift ? { roleInShift: shift.roleInShift } : {})
-        });
+        };
+      });
+
+      if (clonedShifts.length > 0) {
+        if (onBatchSaveShifts) {
+          await onBatchSaveShifts(clonedShifts);
+        } else {
+          for (const shift of clonedShifts) {
+            await onAddShift(shift);
+          }
+        }
       }
       
       // Jump view to next week
-      setCurrentDate(addWeeks(currentDate, 1));
+      setHasUnsavedChanges(false);
+      const newDate = addWeeks(currentDate, 1);
+      setCurrentDate(newDate);
+      setMobileSelectedDate(format(newDate, 'yyyy-MM-dd'));
       toast.success("Đã copy lịch qua tuần mới thành công!", { id: 'clone' });
     } catch (error) {
       console.error('Error cloning schedule:', error);
@@ -1088,18 +1105,18 @@ export const SmartScheduleBuilder: React.FC<SmartScheduleBuilderProps> = ({
                  </div>
                )}
               {isActive && isOffSlot && (
-                <span className="text-[10px] font-black tracking-tighter">OFF</span>
+                <span className="text-[12px] font-bold tracking-tighter">OFF</span>
               )}
               {isActive && !isOffSlot && (
-                <div className="flex flex-col items-center justify-center leading-none gap-0.5">
+                <div className="flex flex-col items-center justify-center leading-none">
                   <span 
-                    className="text-[11px] font-black tracking-tight" 
+                    className="text-[11px] font-bold tracking-tight" 
                     style={{ color: shift.colorLabel ? '#fff' : preset.textColor }}
                   >
                     {formatTimeLabel(shift.startTime)}-{formatTimeLabel(shift.endTime)}
                   </span>
                   <span 
-                    className="text-[10px] font-black opacity-90 scale-90" 
+                    className="text-[10px] font-bold opacity-90 scale-90" 
                     style={{ color: shift.colorLabel ? '#fff' : preset.textColor }}
                   >
                     {getPositionLabel(shift.locationId, emp.locationId, shift.roleInShift)}
@@ -1377,19 +1394,22 @@ export const SmartScheduleBuilder: React.FC<SmartScheduleBuilderProps> = ({
       {/* View Mobile (Daily Management) */}
       <div className="md:hidden flex-1 overflow-y-auto bg-slate-50">
          <div className="bg-white rounded-t-xl shadow-sm border-t border-slate-100 overflow-hidden mb-2">
-            <div className="px-4 py-2 border-b border-slate-50 bg-white flex items-center justify-between sticky top-0 z-10 shadow-sm gap-1.5">
-                <div className="flex-1 min-w-0 flex items-center gap-1.5">
+            <div className="px-2 py-2 border-b border-slate-50 bg-white flex items-center sticky top-0 z-10 shadow-sm gap-2">
+                <div className="w-[110px] flex-shrink-0 flex items-center justify-between">
                   <button 
                     onClick={handlePrevDay} 
-                    className="p-1 px-1.5 bg-slate-50 text-slate-400 rounded-lg active:bg-slate-100 transition-colors h-8 flex items-center justify-center outline-none"
+                    className="p-1 px-[2px] bg-slate-50 text-slate-400 rounded-lg active:bg-slate-100 transition-colors h-8 flex items-center justify-center outline-none"
                   >
                     <ChevronLeft size={20} strokeWidth={1.5} />
                   </button>
                   
-                  <div className="flex flex-none relative min-w-max items-start">
-                    <div className="flex items-center gap-1 w-full text-left">
-                      <span className="text-[14px] font-black text-slate-800 truncate leading-tight uppercase tracking-tight">
-                        {format(parseISO(mobileSelectedDate), 'EEEE, dd/MM', { locale: vi })}
+                  <div className="flex-1 flex justify-center relative min-w-max">
+                    <div className="text-center">
+                      <span className="text-[12px] font-black text-slate-800 tracking-tight uppercase leading-none block">
+                        {format(parseISO(mobileSelectedDate), 'dd/MM', { locale: vi })}
+                      </span>
+                      <span className="text-[9px] font-bold text-slate-400 tracking-wider uppercase block">
+                        {format(parseISO(mobileSelectedDate), 'EEEE', { locale: vi })}
                       </span>
                       <input 
                         type="date"
@@ -1405,14 +1425,14 @@ export const SmartScheduleBuilder: React.FC<SmartScheduleBuilderProps> = ({
 
                   <button 
                     onClick={handleNextDay} 
-                    className="p-1 px-1.5 bg-slate-50 text-slate-400 rounded-lg active:bg-slate-100 transition-colors h-8 flex items-center justify-center outline-none"
+                    className="p-1 px-[2px] bg-slate-50 text-slate-400 rounded-lg active:bg-slate-100 transition-colors h-8 flex items-center justify-center outline-none"
                   >
                     <ChevronRight size={20} strokeWidth={1.5} />
                   </button>
                 </div>
 
                 {/* Daily Total Summary for Mobile - Aligned with shift columns */}
-                <div className="w-[160px] flex-shrink-0 h-8 border-l border-slate-100">
+                <div className="flex-1 min-w-0 h-8 border-l border-slate-100 pl-1">
                    {renderDailySummary(mobileSelectedDate, 'mobile')}
                 </div>
             </div>
@@ -1424,18 +1444,18 @@ export const SmartScheduleBuilder: React.FC<SmartScheduleBuilderProps> = ({
                       <div className="h-1.5 bg-slate-200 w-full shadow-inner border-y border-slate-100"></div>
                     )}
                     {list.map(emp => (
-                      <div key={emp.id} tabIndex={0} className="group/mob px-2 py-1 flex items-center justify-between gap-1 bg-white hover:bg-slate-50 transition-all border-b border-slate-200 shadow-sm relative active:bg-sky-50 focus:bg-slate-50 outline-none">
-                        <div className="flex flex-col gap-1 -ml-1 opacity-0 group-hover/mob:opacity-100 group-focus/mob:opacity-100 focus-within:opacity-100 transition-opacity pointer-events-none group-hover/mob:pointer-events-auto group-focus/mob:pointer-events-auto focus-within:pointer-events-auto">
-                          <button onClick={(e) => { e.stopPropagation(); moveEmployee(emp.id, 'up'); }} className="p-1 text-slate-400 hover:text-slate-700 bg-slate-50 hover:bg-slate-100 rounded outline-none"><ChevronUp size={14} strokeWidth={2.5} /></button>
-                          <button onClick={(e) => { e.stopPropagation(); moveEmployee(emp.id, 'down'); }} className="p-1 text-slate-400 hover:text-slate-700 bg-slate-50 hover:bg-slate-100 rounded outline-none"><ChevronDown size={14} strokeWidth={2.5} /></button>
+                      <div key={emp.id} tabIndex={0} className="group/mob px-1.5 py-1.5 flex items-center gap-1.5 bg-white hover:bg-slate-50 transition-all border-b border-slate-200 shadow-[0_1px_2px_rgba(0,0,0,0.02)] relative active:bg-sky-50 focus:bg-slate-50 outline-none">
+                        <div className="flex flex-col gap-1 -ml-1 opacity-0 group-hover/mob:opacity-100 group-focus/mob:opacity-100 focus-within:opacity-100 transition-opacity pointer-events-none group-hover/mob:pointer-events-auto group-focus/mob:pointer-events-auto focus-within:pointer-events-auto w-5">
+                          <button onClick={(e) => { e.stopPropagation(); moveEmployee(emp.id, 'up'); }} className="p-0.5 text-slate-400 hover:text-slate-700 bg-slate-50 hover:bg-slate-100 rounded outline-none"><ChevronUp size={14} strokeWidth={2.5} /></button>
+                          <button onClick={(e) => { e.stopPropagation(); moveEmployee(emp.id, 'down'); }} className="p-0.5 text-slate-400 hover:text-slate-700 bg-slate-50 hover:bg-slate-100 rounded outline-none"><ChevronDown size={14} strokeWidth={2.5} /></button>
                         </div>
-                        <div className="flex-1 min-w-0 pl-1">
-                          <p className="text-[14px] font-medium text-slate-800 truncate leading-tight tracking-tight">{emp.fullName}</p>
+                        <div className="w-[85px] flex-shrink-0">
+                          <p className="text-[13px] font-bold text-slate-800 truncate leading-tight tracking-tight">{emp.fullName}</p>
                           {activeBranch !== 'All' && emp.locationId !== activeBranch && (
-                            <p className="text-[10px] text-rose-500 font-bold italic truncate tracking-tight">❂ Hỗ trợ từ {emp.locationId}</p>
+                            <p className="text-[9px] text-rose-500 font-bold italic truncate tracking-tight uppercase mt-0.5">❂ TỪ {emp.locationId}</p>
                           )}
                         </div>
-                        <div className="w-[180px] flex-shrink-0">
+                        <div className="flex-1 min-w-0 h-[40px]">
                           {renderCell(emp, mobileSelectedDate)}
                         </div>
                       </div>
