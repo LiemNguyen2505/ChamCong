@@ -16,7 +16,6 @@ interface EmployeeManagementProps {
   nhanViens: Employee[];
   filterBranch: string;
   planningGoals: PlanningGoal[];
-  salaryReviewNotifications: any[];
   openConfirmModal: (title: string, message: string, onConfirm: () => void) => void;
   fetchInitialData: (month?: string, skipLoading?: boolean) => Promise<any>;
   BranchTabs: React.ComponentType<any>;
@@ -35,7 +34,6 @@ export const EmployeeManagement: React.FC<EmployeeManagementProps> = ({
   nhanViens,
   filterBranch,
   planningGoals,
-  salaryReviewNotifications,
   openConfirmModal,
   fetchInitialData,
   BranchTabs,
@@ -540,9 +538,6 @@ export const EmployeeManagement: React.FC<EmployeeManagementProps> = ({
                       </td>
                       <td className="p-2 sticky left-[60px] bg-inherit z-10 border-r border-gray-100 shadow-[2px_0_5px_rgba(0,0,0,0.05)]">
                         <div className="font-bold text-gray-900 group-hover/row:text-blue-600 transition-colors uppercase text-[13px]">{nv.fullName}</div>
-                        {salaryReviewNotifications.some(n => n.empId === nv.empId) && (
-                          <span className="inline-block px-1.5 py-0.5 bg-red-100 text-red-600 text-[9px] font-bold rounded animate-pulse uppercase">Review lương</span>
-                        )}
                       </td>
                       <td className="p-2">
                         <div className="text-gray-600 font-mono text-xs">{nv.phone}</div>
