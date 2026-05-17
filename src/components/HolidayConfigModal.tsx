@@ -8,7 +8,7 @@ import { toast } from 'react-hot-toast';
 interface HolidayConfigModalProps {
   holidays: HolidayConfig[];
   onClose: () => void;
-  fetchInitialData?: () => Promise<any>;
+  fetchInitialData?: (month?: string, force?: boolean) => Promise<any>;
   adminTheme: any;
 }
 
@@ -56,7 +56,7 @@ export const HolidayConfigModal: React.FC<HolidayConfigModalProps> = ({
       };
       await setDoc(doc(db, 'Holidays', newDate), newHoliday);
       setLocalHolidays([...localHolidays, newHoliday]);
-      if (fetchInitialData) await fetchInitialData();
+      if (fetchInitialData) await fetchInitialData(undefined, true);
       setNewDate('');
       setNewName('');
       setNewMultiplier('2');
@@ -74,7 +74,7 @@ export const HolidayConfigModal: React.FC<HolidayConfigModalProps> = ({
     try {
       await deleteDoc(doc(db, 'Holidays', id));
       setLocalHolidays(localHolidays.filter(h => h.id !== id));
-      if (fetchInitialData) await fetchInitialData();
+      if (fetchInitialData) await fetchInitialData(undefined, true);
       toast.success('Đã xóa ngày lễ');
     } catch (error) {
       console.error('Error deleting holiday:', error);
