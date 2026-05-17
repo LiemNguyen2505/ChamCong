@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { X, Save, Plus, Trash2 } from 'lucide-react';
-import { doc, setDoc, deleteDoc, collection } from 'firebase/firestore';
+import { doc, setDoc, deleteDoc } from 'firebase/firestore';
 import { db } from '../firebase';
 import { HolidayConfig } from '../types/admin';
-const toast = { success: (msg?: string) => {}, error: (msg?: string) => {}, loading: (msg?: string) => ({}), dismiss: () => {} };
+import { toast } from 'react-hot-toast';
 
 interface HolidayConfigModalProps {
   holidays: HolidayConfig[];
@@ -18,20 +18,31 @@ export const HolidayConfigModal: React.FC<HolidayConfigModalProps> = ({
   fetchInitialData,
   adminTheme
 }) => {
-  useEffect(() => {
-    const handleEsc = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
-    };
-    window.addEventListener('keydown', handleEsc);
-    return () => window.removeEventListener('keydown', handleEsc);
-  }, [onClose]);
-
   const [localHolidays, setLocalHolidays] = useState<HolidayConfig[]>(holidays);
   const [newDate, setNewDate] = useState('');
   const [newName, setNewName] = useState('');
   const [newMultiplier, setNewMultiplier] = useState('2');
   const [loading, setLoading] = useState(false);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+
+  const handleClose = () => {
+    if (newDate || newName) {
+      if (window.confirm('Bạn có thay đổi chưa lưu. Bạn có chắc muốn đóng?')) {
+        onClose();
+      }
+    } else {
+      onClose();
+    }
+  };
+
+  const handleEsc = (e: KeyboardEvent) => {
+    if (e.key === 'Escape') handleClose();
+  };
+
+  useEffect(() => {
+    window.addEventListener('keydown', handleEsc);
+    return () => window.removeEventListener('keydown', handleEsc);
+  }, [newDate, newName]); // Re-bind when dirty state changes
 
   const handleAdd = async () => {
     if (!newDate || !newName) return;
@@ -75,7 +86,7 @@ export const HolidayConfigModal: React.FC<HolidayConfigModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4" onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}>
+    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4" onMouseDown={(e) => { if (e.target === e.currentTarget) handleClose(); }}>
       <div className="bg-white rounded-3xl w-full max-w-2xl overflow-hidden shadow-2xl relative">
         {confirmDeleteId && (
           <div className="absolute inset-0 bg-black/40 backdrop-blur-sm z-[60] flex items-center justify-center p-4">
@@ -101,7 +112,7 @@ export const HolidayConfigModal: React.FC<HolidayConfigModalProps> = ({
         )}
         <div className={`${adminTheme.header} p-6 border-b border-white/10 flex justify-between items-center`}>
           <h3 className="font-bold text-xl uppercase tracking-widest text-white">Cấu hình ngày lễ</h3>
-          <button onClick={onClose} className="p-2 bg-white/20 hover:bg-white/30 rounded-full transition-colors">
+          <button onClick={handleClose} className="p-2 bg-white/20 hover:bg-white/30 rounded-full transition-colors">
             <X className="w-5 h-5 text-white" />
           </button>
         </div>
