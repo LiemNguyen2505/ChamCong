@@ -490,10 +490,10 @@ export const EmployeeManagement: React.FC<EmployeeManagementProps> = ({
               <th className="p-3 w-[60px] text-center sticky left-0 bg-gray-100 z-30 border-r border-gray-200 shadow-[2px_0_5px_rgba(0,0,0,0.05)]">STT</th>
               <th className="p-3 w-[220px] sticky left-[60px] bg-gray-100 z-30 border-r border-gray-200 shadow-[2px_0_5px_rgba(0,0,0,0.05)]">Họ Tên</th>
               <th className="p-3 w-[120px]">Số Điện Thoại</th>
-              <th className="p-3 w-[100px] text-center">Vị trí</th>
               <th className="p-3 w-[100px] text-center">Số Ca/Tuần</th>
               <th className="p-3 w-[150px]">Ngày vào làm</th>
               <th className="p-3 w-[150px]">TK Ngân hàng</th>
+              <th className="p-3 w-[200px]">Ghi chú</th>
               <th className="p-3 w-[120px] text-right">Thao tác</th>
             </tr>
           </thead>
@@ -548,11 +548,6 @@ export const EmployeeManagement: React.FC<EmployeeManagementProps> = ({
                         <div className="text-gray-600 font-mono text-xs">{nv.phone}</div>
                       </td>
                       <td className="p-2 text-center">
-                        <span className={`px-2 py-1 rounded-md text-[10px] font-black ${pos === 'QUẦY' ? 'bg-orange-100 text-orange-700' : 'bg-blue-100 text-blue-700'}`}>
-                          {pos}
-                        </span>
-                      </td>
-                      <td className="p-2 text-center">
                         <div className="w-16 mx-auto px-2 py-1 border border-transparent rounded text-center font-black">
                           {nv.shiftsPerWeek || 0}
                         </div>
@@ -562,6 +557,9 @@ export const EmployeeManagement: React.FC<EmployeeManagementProps> = ({
                       </td>
                       <td className="p-2 text-gray-600 text-xs truncate max-w-[150px]">
                         {nv.bankAccount || '-'}
+                      </td>
+                      <td className="p-2 text-gray-600 text-xs truncate max-w-[200px]" title={nv.notes}>
+                        {nv.notes || '-'}
                       </td>
                       <td className="p-2">
                         <div className="flex justify-end gap-1 px-1">
