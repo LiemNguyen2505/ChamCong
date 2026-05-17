@@ -37,10 +37,20 @@ export const MaterialLossModal: React.FC<MaterialLossModalProps> = ({
   handleSelectItemType,
   adminTheme,
 }) => {
+  const handleClose = () => {
+    if (itemType || totalLossAmount || originalPrice) {
+      if (window.confirm('Bạn có thay đổi chưa lưu. Bạn có chắc muốn đóng form?')) {
+        onClose();
+      }
+    } else {
+      onClose();
+    }
+  };
+
   if (!show) return null;
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50 overflow-y-auto pt-20 pb-20" onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}>
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50 overflow-y-auto pt-20 pb-20" onMouseDown={(e) => { if (e.target === e.currentTarget) handleClose(); }}>
       <div className="bg-white rounded-3xl w-full max-w-4xl shadow-2xl relative overflow-hidden">
         <div className={`p-6 border-b border-slate-100 flex justify-between items-center ${adminTheme.header}`}>
           <div className="flex items-center gap-3">
@@ -52,7 +62,7 @@ export const MaterialLossModal: React.FC<MaterialLossModalProps> = ({
               <p className="text-sm text-white/70">Phân bổ chi phí hao hụt cho nhân viên dựa trên giờ làm</p>
             </div>
           </div>
-          <button onClick={onClose} className="p-2 hover:bg-white/10 rounded-full transition-colors">
+          <button onClick={handleClose} className="p-2 hover:bg-white/10 rounded-full transition-colors">
             <X className="w-6 h-6 text-white" />
           </button>
         </div>
@@ -186,7 +196,7 @@ export const MaterialLossModal: React.FC<MaterialLossModalProps> = ({
 
         <div className="p-6 border-t border-slate-100 bg-slate-50 rounded-b-3xl flex justify-end gap-3">
           <button
-            onClick={onClose}
+            onClick={handleClose}
             className="px-6 py-3 text-slate-600 font-bold hover:bg-slate-200 rounded-2xl transition-all"
           >
             Hủy bỏ
