@@ -61,8 +61,14 @@ export const useEmployeeAuth = (employees: Employee[], admins: any[], kioskBranc
       }
       
       if (emp.pinCode !== pinInput) {
-        setError('Mã PIN không đúng.');
-        return;
+        // Fallback for existing users who might not have their pinCode updated properly in the DB yet
+        const last4Phone = emp.phone ? emp.phone.slice(-4) : null;
+        if (emp.isFirstLogin && last4Phone && pinInput === last4Phone) {
+           // Allow login, it will immediately prompt them to change PIN anyway
+        } else {
+          setError('Mã PIN không đúng.');
+          return;
+        }
       }
 
       const currentDeviceId = getBrowserDeviceId();
@@ -86,6 +92,9 @@ export const useEmployeeAuth = (employees: Employee[], admins: any[], kioskBranc
 
       localStorage.setItem('hasLoggedInBefore', 'true');
       setLoggedInEmployee(emp);
+      if (emp.isFirstLogin) {
+        setShowChangePinModal(true);
+      }
       setEmpIdInput('');
       setPinInput('');
     } finally {
