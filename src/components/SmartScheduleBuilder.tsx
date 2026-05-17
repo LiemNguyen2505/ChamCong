@@ -1207,7 +1207,7 @@ export const SmartScheduleBuilder: React.FC<SmartScheduleBuilderProps> = ({
             <button 
               onClick={() => setShowSupportModal(true)} 
               title="Thêm nhân viên hỗ trợ từ chi nhánh khác"
-              className="flex items-center justify-center p-2 text-sky-700 bg-white hover:bg-sky-50 rounded-md border border-sky-200 transition-all active:scale-95 flex-shrink-0 gap-1 lg:px-3"
+              className="hidden md:flex items-center justify-center p-2 text-sky-700 bg-white hover:bg-sky-50 rounded-md border border-sky-200 transition-all active:scale-95 flex-shrink-0 gap-1 lg:px-3"
             >
               <UserPlus className="w-4 h-4" />
               <span className="hidden lg:inline text-xs font-bold">Thêm NV hỗ trợ</span>
@@ -1234,7 +1234,7 @@ export const SmartScheduleBuilder: React.FC<SmartScheduleBuilderProps> = ({
 
         <div className="flex flex-col md:flex-row md:items-center gap-3 mt-1.5 bg-slate-50/50 p-2 rounded-xl border border-dashed border-slate-200">
           <div className="flex items-center gap-2">
-            <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest bg-white px-2 py-1 rounded-md border border-slate-100">CÔNG CỤ NHẬP NHANH:</span>
+            <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest bg-white px-2 py-1 rounded-md border border-slate-100">Chọn nhanh:</span>
             <div className="flex items-center gap-1 bg-white p-1 rounded-xl shadow-sm border border-slate-100">
               {(['Sáng', 'Trưa', 'Tối', 'OFF'] as const).map(s => (
                 <button 
@@ -1255,6 +1255,14 @@ export const SmartScheduleBuilder: React.FC<SmartScheduleBuilderProps> = ({
                 </button>
               ))}
             </div>
+
+            <button 
+              onClick={() => setShowSupportModal(true)} 
+              title="Thêm nhân viên hỗ trợ"
+              className="md:hidden flex items-center justify-center p-2 text-sky-700 bg-white hover:bg-sky-50 rounded-xl border border-sky-200 transition-all active:scale-95 flex-shrink-0"
+            >
+              <UserPlus className="w-4 h-4" />
+            </button>
           </div>
 
           <div className="flex-1 flex items-center gap-2">
