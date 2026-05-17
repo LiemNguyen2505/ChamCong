@@ -27,17 +27,27 @@ export const ManualAttendanceModal: React.FC<ManualAttendanceModalProps> = ({
   setManualAttendance,
   adminTheme,
 }) => {
+  const handleClose = () => {
+    if (manualAttendance.empId || manualAttendance.date || manualAttendance.checkInTime) {
+      if (window.confirm('Bạn có thay đổi chưa lưu. Bạn có chắc muốn đóng form?')) {
+        onClose();
+      }
+    } else {
+      onClose();
+    }
+  };
+
   if (!show) return null;
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50" onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}>
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50" onMouseDown={(e) => { if (e.target === e.currentTarget) handleClose(); }}>
       <div className="bg-white rounded-3xl w-full max-w-md shadow-2xl animate-in zoom-in-95 overflow-hidden">
         <div className={`p-6 border-b border-white/10 flex justify-between items-center ${adminTheme.header} mb-6`}>
            <h2 className="text-xl font-black text-white uppercase tracking-tight flex items-center gap-2">
             <Clock className="w-6 h-6 text-white" />
             Chấm công hộ
           </h2>
-          <button onClick={onClose} className="p-2 hover:bg-white/10 rounded-full transition-colors">
+          <button onClick={handleClose} className="p-2 hover:bg-white/10 rounded-full transition-colors">
             <X className="w-6 h-6 text-white" />
           </button>
         </div>
@@ -114,7 +124,7 @@ export const ManualAttendanceModal: React.FC<ManualAttendanceModalProps> = ({
           <div className="flex justify-end gap-3 pt-4">
             <button
               type="button"
-              onClick={onClose}
+              onClick={handleClose}
               className="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-lg font-medium"
             >
               Hủy
@@ -153,17 +163,30 @@ export const EditAttendanceModal: React.FC<EditAttendanceModalProps> = ({
   getAllowedBranches,
   adminTheme,
 }) => {
+  const [isDirty, setIsDirty] = React.useState(false);
+
+  const handleClose = () => {
+    if (isDirty) {
+      if (window.confirm('Bạn có thay đổi chưa lưu. Bạn có chắc muốn đóng form?')) {
+        onClose();
+        setIsDirty(false);
+      }
+    } else {
+      onClose();
+    }
+  };
+
   if (!show || !editingAttendance) return null;
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50" onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}>
-      <div className="bg-white rounded-3xl w-full max-w-md shadow-2xl overflow-hidden">
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50" onMouseDown={(e) => { if (e.target === e.currentTarget) handleClose(); }}>
+      <div className="bg-white rounded-3xl w-full max-w-md shadow-2xl overflow-hidden" onChange={() => setIsDirty(true)}>
         <div className={`p-6 border-b border-white/10 flex justify-between items-center ${adminTheme.header} mb-6`}>
            <h2 className="text-xl font-black text-white uppercase tracking-tight flex items-center gap-2">
             <Clock className="w-6 h-6 text-white" />
             Sửa chấm công
           </h2>
-          <button onClick={onClose} className="p-2 hover:bg-white/10 rounded-full transition-colors">
+          <button onClick={handleClose} className="p-2 hover:bg-white/10 rounded-full transition-colors">
             <X className="w-6 h-6 text-white" />
           </button>
         </div>
@@ -184,7 +207,7 @@ export const EditAttendanceModal: React.FC<EditAttendanceModalProps> = ({
                 type="date"
                 required
                 value={editingAttendance.date}
-                onChange={e => setEditingAttendance({ ...editingAttendance, date: e.target.value })}
+                onChange={e => { setEditingAttendance({ ...editingAttendance, date: e.target.value }); setIsDirty(true); }}
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
               />
             </div>
@@ -192,7 +215,7 @@ export const EditAttendanceModal: React.FC<EditAttendanceModalProps> = ({
               <label className="block text-sm font-medium text-gray-700 mb-1">Chi nhánh</label>
               <select
                 value={editingAttendance.locationId}
-                onChange={e => setEditingAttendance({ ...editingAttendance, locationId: e.target.value })}
+                onChange={e => { setEditingAttendance({ ...editingAttendance, locationId: e.target.value }); setIsDirty(true); }}
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
               >
                 {getAllowedBranches().map(branch => (
@@ -208,7 +231,7 @@ export const EditAttendanceModal: React.FC<EditAttendanceModalProps> = ({
                 type="time"
                 required
                 value={editingAttendance.checkInTime || ''}
-                onChange={e => setEditingAttendance({ ...editingAttendance, checkInTime: e.target.value })}
+                onChange={e => { setEditingAttendance({ ...editingAttendance, checkInTime: e.target.value }); setIsDirty(true); }}
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
               />
             </div>
@@ -217,7 +240,7 @@ export const EditAttendanceModal: React.FC<EditAttendanceModalProps> = ({
               <input
                 type="time"
                 value={editingAttendance.checkOutTime || ''}
-                onChange={e => setEditingAttendance({ ...editingAttendance, checkOutTime: e.target.value })}
+                onChange={e => { setEditingAttendance({ ...editingAttendance, checkOutTime: e.target.value }); setIsDirty(true); }}
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
               />
             </div>
@@ -225,7 +248,7 @@ export const EditAttendanceModal: React.FC<EditAttendanceModalProps> = ({
           <div className="flex justify-end gap-3 pt-4">
             <button
               type="button"
-              onClick={onClose}
+              onClick={handleClose}
               className="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-lg font-medium"
             >
               Hủy
