@@ -1235,7 +1235,7 @@ export const SmartScheduleBuilder: React.FC<SmartScheduleBuilderProps> = ({
         <div className="flex flex-col md:flex-row md:items-center gap-3 mt-1.5 bg-slate-50/50 p-2 rounded-xl border border-dashed border-slate-200">
           <div className="flex items-center gap-2">
             <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest bg-white px-2 py-1 rounded-md border border-slate-100">Chọn nhanh:</span>
-            <div className="flex items-center gap-1 bg-white p-1 rounded-xl shadow-sm border border-slate-100">
+            <div className="flex items-center gap-0.5 bg-white p-1 rounded-xl shadow-sm border border-slate-100">
               {(['Sáng', 'Trưa', 'Tối', 'OFF'] as const).map(s => (
                 <button 
                   key={s}
@@ -1248,7 +1248,7 @@ export const SmartScheduleBuilder: React.FC<SmartScheduleBuilderProps> = ({
                       setSelectedQuickShift(s);
                     }
                   }}
-                  className={`px-3 py-1.5 rounded-lg text-[10px] font-black uppercase transition-all flex items-center gap-1.5 ${selectedQuickShift === s ? 'bg-sky-600 text-white shadow-lg shadow-sky-200 scale-105' : 'text-slate-500 hover:bg-slate-50'}`}
+                  className={`px-2 py-1.5 rounded-lg text-[10px] font-black uppercase transition-all flex items-center gap-1 ${selectedQuickShift === s ? 'bg-sky-600 text-white shadow-lg shadow-sky-200 scale-105' : 'text-slate-500 hover:bg-slate-50'}`}
                 >
                   <div className={`w-1.5 h-1.5 rounded-full ${s === 'OFF' ? 'bg-rose-400' : (selectedQuickShift === s ? 'bg-white' : 'bg-slate-300')}`} />
                   {s}
@@ -1259,7 +1259,7 @@ export const SmartScheduleBuilder: React.FC<SmartScheduleBuilderProps> = ({
             <button 
               onClick={() => setShowSupportModal(true)} 
               title="Thêm nhân viên hỗ trợ"
-              className="md:hidden flex items-center justify-center p-2 text-sky-700 bg-white hover:bg-sky-50 rounded-xl border border-sky-200 transition-all active:scale-95 flex-shrink-0"
+              className="md:hidden flex items-center justify-center px-4 py-2 text-sky-700 bg-white hover:bg-sky-50 rounded-xl border border-sky-200 transition-all active:scale-95 flex-shrink-0"
             >
               <UserPlus className="w-4 h-4" />
             </button>
@@ -1403,7 +1403,7 @@ export const SmartScheduleBuilder: React.FC<SmartScheduleBuilderProps> = ({
       <div className="md:hidden flex-1 overflow-y-auto bg-slate-50">
          <div className="bg-white rounded-t-xl shadow-sm border-t border-slate-100 overflow-hidden mb-2">
             <div className="px-2 py-2 border-b border-slate-50 bg-white flex items-center sticky top-0 z-10 shadow-sm gap-2">
-                <div className="w-[110px] flex-shrink-0 flex items-center justify-between">
+                <div className="flex-1 min-w-0 flex items-center justify-between">
                   <button 
                     onClick={handlePrevDay} 
                     className="p-1 px-[2px] bg-slate-50 text-slate-400 rounded-lg active:bg-slate-100 transition-colors h-8 flex items-center justify-center outline-none"
@@ -1440,7 +1440,7 @@ export const SmartScheduleBuilder: React.FC<SmartScheduleBuilderProps> = ({
                 </div>
 
                 {/* Daily Total Summary for Mobile - Aligned with shift columns */}
-                <div className="flex-1 min-w-0 h-8 border-l border-slate-100 pl-1">
+                <div className="w-[150px] flex-shrink-0 h-8 border-l border-slate-100 pl-1">
                    {renderDailySummary(mobileSelectedDate, 'mobile')}
                 </div>
             </div>
@@ -1457,13 +1457,13 @@ export const SmartScheduleBuilder: React.FC<SmartScheduleBuilderProps> = ({
                           <button onClick={(e) => { e.stopPropagation(); moveEmployee(emp.id, 'up'); }} className="p-0.5 text-slate-400 hover:text-slate-700 bg-slate-50 hover:bg-slate-100 rounded outline-none"><ChevronUp size={14} strokeWidth={2.5} /></button>
                           <button onClick={(e) => { e.stopPropagation(); moveEmployee(emp.id, 'down'); }} className="p-0.5 text-slate-400 hover:text-slate-700 bg-slate-50 hover:bg-slate-100 rounded outline-none"><ChevronDown size={14} strokeWidth={2.5} /></button>
                         </div>
-                        <div className="w-[85px] flex-shrink-0">
+                        <div className="flex-1 min-w-0">
                           <p className="text-[13px] font-bold text-slate-800 truncate leading-tight tracking-tight">{emp.fullName}</p>
                           {activeBranch !== 'All' && emp.locationId !== activeBranch && (
                             <p className="text-[9px] text-rose-500 font-bold italic truncate tracking-tight uppercase mt-0.5">❂ TỪ {emp.locationId}</p>
                           )}
                         </div>
-                        <div className="flex-1 min-w-0 h-[40px]">
+                        <div className="w-[150px] flex-shrink-0 h-[40px]">
                           {renderCell(emp, mobileSelectedDate)}
                         </div>
                       </div>
