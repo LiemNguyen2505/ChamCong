@@ -7,17 +7,18 @@ interface ScheduleViewProps {
     nhanViens: any[];
     lichLamViecs: any[];
     filterBranch: string;
+    filterMonth: string;
     currentAdmin: any;
     planningGoals: any[];
     adminTheme: any;
     setIsScheduleModalOpen: (isOpen: boolean) => void;
-    fetchInitialData: () => Promise<void>;
+    fetchInitialData: (month?: string, force?: boolean) => Promise<any>;
     exportToCSV: () => void;
     BranchTabs: React.ComponentType;
 }
 
 export const ScheduleView: React.FC<ScheduleViewProps> = ({
-    nhanViens, lichLamViecs, filterBranch, currentAdmin, planningGoals, adminTheme,
+    nhanViens, lichLamViecs, filterBranch, filterMonth, currentAdmin, planningGoals, adminTheme,
     setIsScheduleModalOpen, fetchInitialData, exportToCSV, BranchTabs
 }) => {
     return (
@@ -47,7 +48,7 @@ export const ScheduleView: React.FC<ScheduleViewProps> = ({
                             createdAt: serverTimestamp(),
                             updatedAt: serverTimestamp()
                         });
-                        await fetchInitialData();
+                        await fetchInitialData(filterMonth, true);
                     } catch (error) {
                         console.error('Error adding shift:', error);
                     }
@@ -68,7 +69,7 @@ export const ScheduleView: React.FC<ScheduleViewProps> = ({
                             updatedAt: serverTimestamp()
                         }, { merge: false });
                         
-                        await fetchInitialData();
+                        await fetchInitialData(filterMonth, true);
                     } catch (error) {
                         console.error('Error updating shift:', error);
                     }
@@ -76,7 +77,7 @@ export const ScheduleView: React.FC<ScheduleViewProps> = ({
                 onDeleteShift={async (id) => {
                     try {
                         await deleteDoc(doc(db, 'LichLamViec', id));
-                        await fetchInitialData();
+                        await fetchInitialData(filterMonth, true);
                     } catch (error) {
                         console.error('Error deleting shift:', error);
                     }
@@ -88,7 +89,7 @@ export const ScheduleView: React.FC<ScheduleViewProps> = ({
                             batch.delete(doc(db, 'LichLamViec', id));
                         });
                         await batch.commit();
-                        await fetchInitialData();
+                        await fetchInitialData(filterMonth, true);
                     } catch (error) {
                         console.error('Error batch deleting shifts:', error);
                     }
@@ -109,7 +110,7 @@ export const ScheduleView: React.FC<ScheduleViewProps> = ({
                             });
                         });
                         await batch.commit();
-                        await fetchInitialData();
+                        await fetchInitialData(filterMonth, true);
                     } catch (error) {
                         console.error('Error batch saving shifts:', error);
                     }
