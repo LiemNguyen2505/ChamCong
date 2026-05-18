@@ -2139,6 +2139,21 @@ export function useAdminLogic(globalData: any, fetchInitialData: any, isLoading:
       let checkOutISO = null;
       let totalHours = 0;
       let totalPay = 0;
+      let lateMinutes = 0;
+      let latePenaltyMinutes = 0;
+
+      if (editingAttendance.scheduledStartTime && editingAttendance.checkInTime) {
+        const [schH, schM] = editingAttendance.scheduledStartTime.split(':').map(Number);
+        const [selH, selM] = editingAttendance.checkInTime.split(':').map(Number);
+        const selTotal = selH * 60 + selM;
+        const schTotal = schH * 60 + schM;
+        if (selTotal > schTotal) {
+          lateMinutes = selTotal - schTotal;
+          if (lateMinutes >= 10) {
+            latePenaltyMinutes = lateMinutes * 3;
+          }
+        }
+      }
 
       if (editingAttendance.checkOutTime) {
         checkOutISO = new Date(`${editingAttendance.date}T${editingAttendance.checkOutTime}`).toISOString();
@@ -2153,7 +2168,9 @@ export function useAdminLogic(globalData: any, fetchInitialData: any, isLoading:
         checkInTime: checkInISO,
         checkOutTime: checkOutISO,
         totalHours,
-        totalPay
+        totalPay,
+        lateMinutes,
+        latePenaltyMinutes
       });
       await logAction('Sửa', 'Chấm công', `Sửa bản ghi chấm công của ${employee.fullName} (Mã: ${editingAttendance.empId}) ngày ${editingAttendance.date}`);
 
