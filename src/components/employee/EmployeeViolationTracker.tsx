@@ -38,7 +38,7 @@ export const EmployeeViolationTracker: React.FC<EmployeeViolationTrackerProps> =
       id: `late-${i}-${ld.date}`,
       date: ld.date,
       type: ld.isAbandonedShift ? 'BỎ CA' : 'ĐI TRỄ',
-      note: `${ld.shift}: trễ ${ld.minutes}p${ld.penaltyMinutes > 0 ? ` (-${ld.penalty.toLocaleString()}đ)` : ''}`,
+      note: `${ld.shift}: trễ ${ld.minutes < 60 ? `${ld.minutes}p` : `${Math.floor(ld.minutes / 60)}h${ld.minutes % 60 > 0 ? `${ld.minutes % 60}p` : ''}`}${ld.penaltyMinutes > 0 ? ` (-${ld.penalty.toLocaleString()}đ)` : ''}`,
       isConfirmed: true,
       isLate: true
     })),
