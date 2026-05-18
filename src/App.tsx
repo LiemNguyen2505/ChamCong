@@ -25,7 +25,8 @@ export default function App() {
     payrollAdjustments: [],
     planningGoals: [],
     violations: [],
-    bulletinNotes: []
+    bulletinNotes: [],
+    materialLossLogs: []
   });
 
   const [dataCache, setDataCache] = useState<Record<string, any>>({});
@@ -105,6 +106,7 @@ export default function App() {
         { key: 'materialItems', query: query(collection(db, 'MaterialItems'), limit(50)), type: 'static' },
         { key: 'payrollAdjustments', query: query(collection(db, 'PayrollAdjustments'), where('monthYear', '==', targetMonth)), type: 'dynamic' },
         { key: 'violations', query: query(collection(db, 'Violations'), where('monthYear', '==', targetMonth)), type: 'dynamic' },
+        { key: 'materialLossLogs', query: query(collection(db, 'MaterialLossLogs'), where('monthYear', '==', targetMonth), orderBy('processedAt', 'desc'), limit(100)), type: 'dynamic' },
         { key: 'chamCongs', query: query(collection(db, 'timesheets'), where('date', '>=', startDate), where('date', '<=', endDate), limit(3000)), type: 'dynamic' },
         { key: 'lichLamViecs', query: query(collection(db, 'LichLamViec'), where('date', '>=', startDate), where('date', '<=', endDate), limit(3000)), type: 'dynamic' },
         { key: 'bulletinNotes', query: query(collection(db, 'BulletinBoard'), orderBy('isPinned', 'desc'), orderBy('createdAt', 'desc'), limit(100)), type: 'dynamic' },
