@@ -421,7 +421,7 @@ export const PayrollComponent: React.FC<any> = ({
                               latePenalty: 'Phạt đi trễ',
                               phonePenalty: 'Sử dụng ĐT',
                               otherDeductions: 'Khấu trừ khác',
-                              materialLoss: 'Khấu trừ dụng cụ',
+                              materialLoss: 'Khấu trừ dụng cụ (Ly tách)',
                               extraAdditions: 'Thu nhập bổ sung',
                               actual: 'Tiền thực lãnh', note: 'Ghi chú'
                             }).map(([key, label]) => (
