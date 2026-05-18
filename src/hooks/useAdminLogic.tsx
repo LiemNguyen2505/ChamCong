@@ -785,6 +785,7 @@ export function useAdminLogic(globalData: any, fetchInitialData: any, isLoading:
   const adminTheme = getBranchTheme(currentThemeBranch);
   const [showHolidayConfig, setShowHolidayConfig] = useState(false);
   const [showFinancialModal, setShowFinancialModal] = useState(false);
+  const [showOtherDeductionsModal, setShowOtherDeductionsModal] = useState(false);
   const [showMobileUtilities, setShowMobileUtilities] = useState(false);
   const [editingAdjustment, setEditingAdjustment] = useState<PayrollAdjustment | null>(null);
   const [showMaterialLossModal, setShowMaterialLossModal] = useState(false);
@@ -2359,6 +2360,8 @@ export function useAdminLogic(globalData: any, fetchInitialData: any, isLoading:
     setShowHolidayConfig,
     showFinancialModal,
     setShowFinancialModal,
+    showOtherDeductionsModal,
+    setShowOtherDeductionsModal,
     showMobileUtilities,
     setShowMobileUtilities,
     editingAdjustment,
