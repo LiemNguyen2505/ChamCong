@@ -34,6 +34,7 @@ export const ScheduleView: React.FC<ScheduleViewProps> = ({
                 planningGoals={planningGoals}
                 theme={adminTheme}
                 exportToCSV={exportToCSV}
+                filterMonth={filterMonth}
                 onModalToggle={(isOpen) => setIsScheduleModalOpen(isOpen)}
                 onAddShift={async (shift) => {
                     try {
@@ -67,7 +68,7 @@ export const ScheduleView: React.FC<ScheduleViewProps> = ({
                         await setDoc(doc(db, 'LichLamViec', id), {
                             ...updateData,
                             updatedAt: serverTimestamp()
-                        }, { merge: false });
+                        }, { merge: true });
                         
                         await fetchInitialData(filterMonth, true);
                     } catch (error) {
