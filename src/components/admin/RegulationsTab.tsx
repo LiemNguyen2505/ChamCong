@@ -1,5 +1,5 @@
 import React from 'react';
-import { ShieldAlert, Phone, Clock, Info, CheckCircle2, AlertTriangle, MessageSquare } from 'lucide-react';
+import { FileCheck, Phone, Clock, Info, Check, AlertTriangle, MessageSquare } from 'lucide-react';
 import { motion } from 'motion/react';
 
 interface RegulationsTabProps {
@@ -12,31 +12,35 @@ export const RegulationsTab = ({ activeTab, adminTheme }: RegulationsTabProps) =
 
   const regulations = [
     {
-      id: 'phone',
-      title: 'Quy định về sử dụng điện thoại',
+      id: 'lateness_rules',
+      title: 'Quy tắc về Đi trễ (Lateness)',
+      icon: AlertTriangle,
+      color: 'text-rose-600',
+      bgColor: 'bg-rose-50',
+      borderColor: 'border-rose-100',
+      rules: [
+        'Hệ thống tính toán dựa trên số phút trễ và số lần trễ trong tháng:',
+        'Trừ vào Tiền lương: Tiền phạt trễ = Số phút trễ × 3 × (Lương giờ / 60) (khi trễ >= 10p).',
+        'Lưu ý: Chỉ những phút trễ không được quản lý xác nhận mới bị tính phạt.',
+        'Ảnh hưởng đến Thưởng Trách Nhiệm (TTN):',
+        '  . Giảm 50% TTN nếu tổng số lần đi trễ trong tháng từ 5 đến 9 lần.',
+        '  . Mất 100% TTN nếu tổng số lần đi trễ trong tháng từ 10 lần trở lên.',
+        '  . Mất 100% TTN ngay lập tức nếu có hành vi Bỏ ca (trễ > 300p không lý do).'
+      ]
+    },
+    {
+      id: 'phone_rules',
+      title: 'QUY TẮC SỬ DỤNG ĐIỆN THOẠI',
       icon: Phone,
       color: 'text-blue-600',
       bgColor: 'bg-blue-50',
       borderColor: 'border-blue-100',
       rules: [
-        'Không sử dụng điện thoại trong giờ làm việc trừ trường hợp khẩn cấp.',
-        'Điện thoại phải để chế độ rung hoặc im lặng.',
-        'Nếu có việc cần liên lạc gấp, vui lòng báo cáo với quản lý trực tiếp.',
-        'Việc sử dụng điện thoại quá mức sẽ bị nhắc nhở và có thể bị trừ điểm chuyên cần.'
-      ]
-    },
-    {
-      id: 'late',
-      title: 'Quy định về đi trễ & Giờ giấc',
-      icon: Clock,
-      color: 'text-amber-600',
-      bgColor: 'bg-amber-50',
-      borderColor: 'border-amber-100',
-      rules: [
-        'Nhân viên phải có mặt tại nơi làm việc ít nhất 5-10 phút trước giờ vào ca.',
-        'Đi trễ dưới 15 phút: Nhắc nhở và ghi nhận vào hệ thống.',
-        'Đi trễ trên 15 phút: Có thể bị xếp lại ca hoặc trừ lương theo quy định (nếu không có lý do chính đáng).',
-        'Nghỉ phép phải báo trước ít nhất 24h (trừ trường hợp đột xuất có giấy tờ minh chứng).'
+        'Hệ thống ghi nhận việc rời khỏi ứng dụng trong giờ làm việc để tính vào thưởng trách nhiệm và một phần lương',
+        'Ảnh hưởng đến Thưởng Trách Nhiệm (TTN):',
+        '  . Giảm 50% TTN nếu tổng số lần rời app từ 5 đến 7 lần/ngày',
+        '  . Mất 100% TTN nếu tổng số lỗi vi phạm từ 8 lần trở lên.',
+        'Số tiền trừ sẽ được tính dựa trên dữ liệu thực tế mà app ghi nhận được trong từng ca làm việc (được tổng hợp vào mục "Phạt Điện Thoại" trong bảng lương).'
       ]
     },
     {
@@ -64,10 +68,9 @@ export const RegulationsTab = ({ activeTab, adminTheme }: RegulationsTabProps) =
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-stone-100 pb-6">
         <div>
           <h2 className="text-2xl font-black text-slate-800 tracking-tight uppercase flex items-center gap-3">
-            <ShieldAlert className={`w-8 h-8 ${adminTheme.textPrimary}`} />
-            Nội Quy & Quy Định Cửa Hàng
+            <FileCheck className={`w-8 h-8 ${adminTheme.text}`} />
+            Quy Định Quán
           </h2>
-          <p className="text-slate-500 font-medium mt-1">Hệ thống ghi nhớ các quy định vận hành quán</p>
         </div>
       </div>
 
@@ -85,12 +88,16 @@ export const RegulationsTab = ({ activeTab, adminTheme }: RegulationsTabProps) =
             </div>
             <div className="p-6 space-y-4">
               <ul className="space-y-3">
-                {reg.rules.map((rule, idx) => (
-                  <li key={idx} className="flex gap-3 text-slate-600 font-medium leading-relaxed">
-                    <CheckCircle2 className="w-5 h-5 text-emerald-500 flex-shrink-0 mt-0.5" />
-                    <span>{rule}</span>
-                  </li>
-                ))}
+                {reg.rules.map((rule, idx) => {
+                  const isSubRule = rule.startsWith('  ');
+                  return (
+                    <li key={idx} className="flex gap-3 text-slate-600 font-medium leading-relaxed">
+                      {!isSubRule && <Check className="w-5 h-5 text-slate-900 flex-shrink-0 mt-0.5" />}
+                      {isSubRule && <div className="w-5 flex-shrink-0" />}
+                      <span>{rule}</span>
+                    </li>
+                  );
+                })}
               </ul>
             </div>
           </div>
