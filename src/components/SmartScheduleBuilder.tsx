@@ -45,6 +45,7 @@ interface SmartScheduleBuilderProps {
   onDeleteShift: (id: string) => Promise<void>;
   onBatchDeleteShifts?: (ids: string[]) => Promise<void>;
   onBatchSaveShifts?: (shifts: any[]) => Promise<void>;
+  onSyncWeekShifts?: (shiftsToSave: any[], idsToDelete: string[]) => Promise<void>;
   onModalToggle?: (isOpen: boolean) => void;
   exportToCSV?: () => void;
   theme?: any;
@@ -67,6 +68,7 @@ export const SmartScheduleBuilder: React.FC<SmartScheduleBuilderProps> = ({
   onDeleteShift,
   onBatchDeleteShifts,
   onBatchSaveShifts,
+  onSyncWeekShifts,
   onModalToggle,
   exportToCSV,
   theme,
@@ -195,7 +197,7 @@ export const SmartScheduleBuilder: React.FC<SmartScheduleBuilderProps> = ({
     setIsSaving(true);
     const loadingToast = toast.loading('Đang lưu thay đổi...');
     try {
-      if (onBatchSaveShifts) {
+      if (onSyncWeekShifts || onBatchSaveShifts) {
         const currentWeekStartStr = format(weekStart, 'yyyy-MM-dd');
         const currentWeekEndStr = format(addDays(weekStart, 6), 'yyyy-MM-dd');
         
@@ -207,12 +209,14 @@ export const SmartScheduleBuilder: React.FC<SmartScheduleBuilderProps> = ({
           return s.date >= currentWeekStartStr && s.date <= currentWeekEndStr;
         });
 
-        if (onBatchSaveShifts) {
-           const idsToDelete = originalShiftsInWeek.map(s => s.id);
+        const idsToDelete = originalShiftsInWeek.map(s => s.id);
+
+        if (onSyncWeekShifts) {
+           await onSyncWeekShifts(localShiftsInWeek, idsToDelete);
+        } else if (onBatchSaveShifts) {
            if (onBatchDeleteShifts && idsToDelete.length > 0) {
              await onBatchDeleteShifts(idsToDelete);
            }
-           
            await onBatchSaveShifts(localShiftsInWeek);
         }
       }
@@ -226,12 +230,49 @@ export const SmartScheduleBuilder: React.FC<SmartScheduleBuilderProps> = ({
     }
   };
 
+  // For keyboard shortcut Command+S
+  const handleApplyChangesRef = useRef(handleApplyChanges);
+  const hasUnsavedChangesRef = useRef(hasUnsavedChanges);
+  const isSavingRef = useRef(isSaving);
+
+  useEffect(() => {
+    handleApplyChangesRef.current = handleApplyChanges;
+    hasUnsavedChangesRef.current = hasUnsavedChanges;
+    isSavingRef.current = isSaving;
+  });
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === 's') {
+        e.preventDefault();
+        if (hasUnsavedChangesRef.current && !isSavingRef.current) {
+          handleApplyChangesRef.current();
+        } else if (!hasUnsavedChangesRef.current && !isSavingRef.current) {
+          toast('Không có thay đổi nào để lưu', { icon: 'ℹ️', id: 'no-changes-toast' });
+        }
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
+
   const handleLocalToggleShift = (empId: string, date: string, preset: typeof SHIFT_PRESETS[0]) => {
     const shiftId = getShiftDeterministicId(empId, date, preset.id);
     const existing = localSchedules.find(s => s.id === shiftId);
 
     if (existing) {
-      setLocalSchedules(prev => prev.filter(s => s.id !== shiftId));
+      if (activeBranch !== 'All' && existing.locationId !== activeBranch) {
+        // The shift exists but is at another branch (hidden here). 
+        // User clicked an "empty" cell, meaning they want to schedule here instead.
+        // Update its location to the current active branch.
+        setLocalSchedules(prev => prev.map(s => s.id === shiftId ? {
+          ...s,
+          locationId: activeBranch
+        } : s));
+      } else {
+        // Shift is active in this branch, so we just remove it.
+        setLocalSchedules(prev => prev.filter(s => s.id !== shiftId));
+      }
     } else {
       setLocalSchedules(prev => [
         ...prev,
@@ -1069,7 +1110,18 @@ export const SmartScheduleBuilder: React.FC<SmartScheduleBuilderProps> = ({
           const shiftId = getShiftDeterministicId(emp.id, dateStr, preset.id);
           const shift = localSchedules.find(s => s.id === shiftId);
           
-          const isActive = !!shift;
+          let isShiftVisible = !!shift;
+          if (shift && activeBranch !== 'All') {
+            if (emp.locationId !== activeBranch) {
+              // Viewing a support branch: only show shifts assigned to this support branch
+              isShiftVisible = shift.locationId === activeBranch;
+            } else {
+              // Viewing default branch: show all shifts (support shifts will have labels)
+              isShiftVisible = true;
+            }
+          }
+
+          const isActive = isShiftVisible;
           const isOffSlot = shift?.isOff;
           const isHighlighted = focusedSubCell?.empId === emp.id && 
                               focusedSubCell?.date === dateStr && 
