@@ -137,6 +137,15 @@ export default function EmployeeView({
 
   const [selectedMonth, setSelectedMonth] = useState(format(new Date(), 'yyyy-MM'));
 
+  const [outsideScheduleReason, setOutsideScheduleReason] = useState('');
+
+  const employeeTodayShifts = useMemo(() => {
+    if (!loggedInEmployee) return [];
+    return globalData.lichLamViecs
+      .filter((s: any) => s.date === format(new Date(), 'yyyy-MM-dd') && !s.isOff && s.locationId === kioskBranch && s.empId === loggedInEmployee.id)
+      .sort((a: any, b: any) => a.startTime.localeCompare(b.startTime));
+  }, [globalData.lichLamViecs, loggedInEmployee, kioskBranch]);
+
   const { monthlyStats } = useEmployeeSalary(loggedInEmployee, monthTimesheets, payrollAdjustments, holidays, selectedMonth, globalData.violations);
 
   const {
@@ -328,7 +337,7 @@ export default function EmployeeView({
               photoData={photoData}
               cameraRef={cameraRef}
               handlePhotoCapture={handlePhotoCapture}
-              todayShifts={workSchedules}
+              todayShifts={employeeTodayShifts}
               selectedShiftId={selectedShiftId}
               setSelectedShiftId={setSelectedShiftId}
               setScheduledShiftTime={setScheduledShiftTime}
@@ -343,8 +352,49 @@ export default function EmployeeView({
                     cameraRef.current?.capturePhoto();
                     return;
                   }
+                  
+                  if (!selectedShiftId) {
+                    setShowOutsideScheduleModal(true);
+                    return;
+                  }
+
+                  const now = new Date();
+                  const [selH, selM] = selectedShiftTime.split(':').map(Number);
+                  const selTotal = selH * 60 + selM;
+                  const [schH, schM] = (scheduledShiftTime || '00:00').split(':').map(Number);
+                  const schTotal = schH * 60 + schM;
+                  const nowTotal = now.getHours() * 60 + now.getMinutes();
+
+                  if (selTotal < schTotal - 30) {
+                    setCheckinWarningStep(1); // Sớm hơn 30p
+                    return;
+                  } else if (selTotal > schTotal) {
+                    setCheckinWarningStep(2); // Trễ
+                    return;
+                  }
+                  
                   cameraRef.current?.capturePhoto();
                 } else {
+                  if (emergencyManager) {
+                    cameraRef.current?.capturePhoto();
+                    return;
+                  }
+
+                  const [selH, selM] = selectedShiftTime.split(':').map(Number);
+                  const selTotal = selH * 60 + selM;
+                  const [schH, schM] = (scheduledShiftTime || '00:00').split(':').map(Number);
+                  const schTotal = schH * 60 + schM;
+
+                  if (selTotal < schTotal) {
+                    setCheckoutWarningStep(1); // Ra ca sớm
+                    return;
+                  }
+
+                  if (selTotal > schTotal + 30 && note.trim() === '') {
+                    setCheckoutWarningStep(4); // Tăng ca cần ghi chú
+                    return;
+                  }
+                  
                   cameraRef.current?.capturePhoto();
                 }
               }}
@@ -547,6 +597,59 @@ export default function EmployeeView({
         setRequestTime={setRequestTime}
         requestSubTime={requestSubTime}
         setRequestSubTime={setRequestSubTime}
+      />
+
+      <CheckinWarningModal
+        checkinWarningStep={checkinWarningStep}
+        setCheckinWarningStep={setCheckinWarningStep}
+        selectedShiftTime={selectedShiftTime}
+        scheduledShiftTime={scheduledShiftTime}
+        monthlyStats={monthlyStats}
+        theme={theme}
+        onConfirm={() => {
+          setCheckinWarningStep(0);
+          cameraRef.current?.capturePhoto();
+        }}
+      />
+
+      <OutsideScheduleModal
+        showOutsideScheduleModal={showOutsideScheduleModal}
+        setShowOutsideScheduleModal={setShowOutsideScheduleModal}
+        theme={theme}
+        outsideScheduleReason={outsideScheduleReason}
+        setOutsideScheduleReason={setOutsideScheduleReason}
+        onConfirm={() => {
+          setShowOutsideScheduleModal(false);
+          setShowEmergencyCheckInModal(true);
+        }}
+      />
+
+      <EmergencyCheckInModal
+        showEmergencyCheckInModal={showEmergencyCheckInModal}
+        setShowEmergencyCheckInModal={setShowEmergencyCheckInModal}
+        theme={theme}
+        emergencyManager={emergencyManager}
+        setEmergencyManager={setEmergencyManager}
+        outsideScheduleReason={outsideScheduleReason}
+        setOutsideScheduleReason={setOutsideScheduleReason}
+        admins={admins}
+        kioskBranch={kioskBranch}
+        onConfirm={() => {
+          setShowEmergencyCheckInModal(false);
+          cameraRef.current?.capturePhoto();
+        }}
+      />
+
+      <OvertimeReasonModal
+        checkoutWarningStep={checkoutWarningStep}
+        setCheckoutWarningStep={setCheckoutWarningStep}
+        note={note}
+        setNote={setNote}
+        theme={theme}
+        onConfirm={() => {
+          setCheckoutWarningStep(0);
+          cameraRef.current?.capturePhoto();
+        }}
       />
 
       <ExtraSupportModal
