@@ -74,8 +74,8 @@ export const EmployeeAttendanceDetailModal: React.FC<EmployeeAttendanceDetailMod
         const checkIn = ts.checkInTime ? safeFormat(ts.checkInTime, 'HH:mm', '--:--', ts.date) : '--:--';
         const checkOut = ts.checkOutTime ? safeFormat(ts.checkOutTime, 'HH:mm', '--:--', ts.date) : '--:--';
         const hours = ts.totalHours || 0;
-        const lateMins = (!ts.isLateExcused && ts.latePenaltyMinutes) ? ts.latePenaltyMinutes : 0;
-        const phonePenalty = ts.TienPhatSuDungDienThoai || 0;
+        const lateMins = (!ts.isLateExcused && ts.latePenaltyMinutes) ? ts.latePenaltyMinutes / 3 : (ts.lateMinutes || 0);
+        const phonePenalty = ts.phonePenalty || 0;
 
         totalHours += hours;
         totalLateMinutes += lateMins;
@@ -190,7 +190,7 @@ export const EmployeeAttendanceDetailModal: React.FC<EmployeeAttendanceDetailMod
                                 {shift.lateMins > 0 ? (
                                   <span className="inline-flex items-center gap-1 text-xs font-medium text-rose-600 bg-rose-50 px-2 py-1 rounded">
                                     <Clock className="w-3.5 h-3.5" />
-                                    Trễ {shift.lateMins}p
+                                    Trễ {shift.lateMins < 60 ? `${shift.lateMins}p` : `${Math.floor(shift.lateMins / 60)}h${shift.lateMins % 60 > 0 ? `${shift.lateMins % 60}p` : ''}`}
                                   </span>
                                 ) : (
                                   <span className="text-xs text-slate-400 px-2 py-1">Không đi trễ</span>
