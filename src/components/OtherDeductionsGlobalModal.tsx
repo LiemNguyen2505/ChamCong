@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { X, Wallet, Banknote, RefreshCw, Box, Landmark } from 'lucide-react';
-import { MaterialLossModal } from './MaterialLossModal';
+import MaterialLossModal from './MaterialLossModal';
 import { FinancialModal } from './FinancialModal';
 
 interface OtherDeductionsGlobalModalProps {
@@ -91,7 +91,7 @@ export const OtherDeductionsGlobalModal: React.FC<OtherDeductionsGlobalModalProp
             }`}
           >
             <Box className={`w-4 h-4 ${activeTab === 'material' ? 'text-indigo-500' : ''}`} />
-            <span className="text-xs uppercase tracking-wider">Khấu Trừ Dụng Cụ</span>
+            <span className="text-xs uppercase tracking-wider">Khấu Trừ Dụng Cụ (Ly Tách)</span>
           </button>
           <button
             onClick={() => setActiveTab('financial')}
