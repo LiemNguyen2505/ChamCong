@@ -40,6 +40,7 @@ interface SmartScheduleBuilderProps {
   schedules: WorkSchedule[];
   currentBranchFilter: string;
   managedBranches: string[];
+  filterMonth?: string;
   onAddShift: (shift: Omit<WorkSchedule, 'id'>) => Promise<void>;
   onUpdateShift: (id: string, shift: Partial<WorkSchedule>) => Promise<void>;
   onDeleteShift: (id: string) => Promise<void>;
@@ -63,6 +64,7 @@ export const SmartScheduleBuilder: React.FC<SmartScheduleBuilderProps> = ({
   schedules,
   currentBranchFilter,
   managedBranches,
+  filterMonth,
   onAddShift,
   onUpdateShift,
   onDeleteShift,
@@ -107,7 +109,29 @@ export const SmartScheduleBuilder: React.FC<SmartScheduleBuilderProps> = ({
 
   const [supportEmployees, setSupportEmployees] = useState<{empId: string, role: string}[]>([]);
   const [showSupportModal, setShowSupportModal] = useState(false);
-  const [currentDate, setCurrentDate] = useState(new Date());
+  const [currentDate, setCurrentDate] = useState(() => {
+    if (filterMonth) {
+      const [y, m] = filterMonth.split('-').map(Number);
+      const now = new Date();
+      if (y === now.getFullYear() && m === now.getMonth() + 1) {
+        return now;
+      }
+      return new Date(y, m - 1, 1);
+    }
+    return new Date();
+  });
+
+  useEffect(() => {
+    if (filterMonth) {
+      const [y, m] = filterMonth.split('-').map(Number);
+      const now = new Date();
+      if (y === now.getFullYear() && m === now.getMonth() + 1) {
+        setCurrentDate(now);
+      } else {
+        setCurrentDate(new Date(y, m - 1, 1));
+      }
+    }
+  }, [filterMonth]);
   const [selectedCell, setSelectedCell] = useState<{ empId: string; date: string } | null>(null);
   const [editingShift, setEditingShift] = useState<WorkSchedule | null>(null);
   const [showModal, setShowModal] = useState(false);
@@ -198,26 +222,37 @@ export const SmartScheduleBuilder: React.FC<SmartScheduleBuilderProps> = ({
     const loadingToast = toast.loading('Đang lưu thay đổi...');
     try {
       if (onSyncWeekShifts || onBatchSaveShifts) {
-        const currentWeekStartStr = format(weekStart, 'yyyy-MM-dd');
-        const currentWeekEndStr = format(addDays(weekStart, 6), 'yyyy-MM-dd');
         
-        const localShiftsInWeek = localSchedules.filter(s => {
-          return s.date >= currentWeekStartStr && s.date <= currentWeekEndStr;
-        });
+        const originalShiftIds = schedules.map(s => s.id);
+        const localShiftIds = localSchedules.map(s => s.id);
 
-        const originalShiftsInWeek = schedules.filter(s => {
-          return s.date >= currentWeekStartStr && s.date <= currentWeekEndStr;
-        });
+        const idsToDelete = schedules.filter(s => !localShiftIds.includes(s.id)).map(s => s.id);
 
-        const idsToDelete = originalShiftsInWeek.map(s => s.id);
+        const shiftsToSave = localSchedules.filter(s => {
+            const original = schedules.find(orig => orig.id === s.id);
+            if (!original) return true; // new
+            return (
+              original.startTime !== s.startTime ||
+              original.endTime !== s.endTime ||
+              original.locationId !== s.locationId ||
+              original.isOff !== s.isOff ||
+              original.taskNote !== s.taskNote ||
+              original.notes !== s.notes ||
+              original.colorLabel !== s.colorLabel ||
+              original.roleInShift !== s.roleInShift ||
+              JSON.stringify(original.tasks || []) !== JSON.stringify(s.tasks || [])
+            );
+        });
 
         if (onSyncWeekShifts) {
-           await onSyncWeekShifts(localShiftsInWeek, idsToDelete);
+           await onSyncWeekShifts(shiftsToSave, idsToDelete);
         } else if (onBatchSaveShifts) {
            if (onBatchDeleteShifts && idsToDelete.length > 0) {
              await onBatchDeleteShifts(idsToDelete);
            }
-           await onBatchSaveShifts(localShiftsInWeek);
+           if (shiftsToSave.length > 0) {
+             await onBatchSaveShifts(shiftsToSave);
+           }
         }
       }
       setHasUnsavedChanges(false);
@@ -870,16 +905,6 @@ export const SmartScheduleBuilder: React.FC<SmartScheduleBuilderProps> = ({
         return s.date >= nextWeekStartStr && s.date <= nextWeekEndStr && (activeBranch === 'All' || s.locationId === activeBranch);
       });
 
-      if (nextWeekShiftsToDelete.length > 0) {
-        if (onBatchDeleteShifts) {
-          await onBatchDeleteShifts(nextWeekShiftsToDelete.map(s => s.id));
-        } else {
-          for (const shift of nextWeekShiftsToDelete) {
-            await onDeleteShift(shift.id);
-          }
-        }
-      }
-
       // 2. Get shifts from CURRENT week
       const currentWeekStartStr = format(weekStart, 'yyyy-MM-dd');
       const currentWeekEndStr = format(addDays(weekStart, 6), 'yyyy-MM-dd');
@@ -910,12 +935,25 @@ export const SmartScheduleBuilder: React.FC<SmartScheduleBuilderProps> = ({
         };
       });
 
-      if (clonedShifts.length > 0) {
-        if (onBatchSaveShifts) {
-          await onBatchSaveShifts(clonedShifts);
-        } else {
-          for (const shift of clonedShifts) {
-            await onAddShift(shift);
+      if (onSyncWeekShifts) {
+        await onSyncWeekShifts(clonedShifts, nextWeekShiftsToDelete.map(s => s.id));
+      } else {
+        if (nextWeekShiftsToDelete.length > 0) {
+          if (onBatchDeleteShifts) {
+            await onBatchDeleteShifts(nextWeekShiftsToDelete.map(s => s.id));
+          } else {
+            for (const shift of nextWeekShiftsToDelete) {
+              await onDeleteShift(shift.id);
+            }
+          }
+        }
+        if (clonedShifts.length > 0) {
+          if (onBatchSaveShifts) {
+            await onBatchSaveShifts(clonedShifts);
+          } else {
+            for (const shift of clonedShifts) {
+              await onAddShift(shift);
+            }
           }
         }
       }
