@@ -3,6 +3,7 @@ import { format, parseISO } from 'date-fns';
 import { CheckCircle2 } from 'lucide-react';
 import { Employee, Timesheet } from '../types/admin';
 import { safeFormat, safeParseDate } from '../utils/dateUtils';
+import { getLateMinutes } from '../utils/adminHelpers';
 
 interface MonthlyAttendanceTableProps {
   nhanViens: Employee[];
@@ -171,7 +172,7 @@ export const MonthlyAttendanceTable: React.FC<MonthlyAttendanceTableProps> = ({
                     
                     if (isWorked) {
                       const hasAbandoned = dayLogs.some(log => log.isAbandonedShift);
-                      const hasViolations = dayLogs.some(log => (log.lateMinutes || 0) > 0 || (log.SoLanRoiApp || 0) > 0 || log.status === 'pending_approval');
+                      const hasViolations = dayLogs.some(log => getLateMinutes(log) > 0 || (log.SoLanRoiApp || 0) > 0 || log.status === 'pending_approval');
                       
                       if (hasAbandoned) {
                         statusColor = "bg-rose-500";
@@ -202,7 +203,7 @@ export const MonthlyAttendanceTable: React.FC<MonthlyAttendanceTableProps> = ({
                                       <span className="font-black text-emerald-400">VÀO: {log.checkInTime ? safeFormat(log.checkInTime, 'HH:mm', '00:00', log.date) : '00:00'}</span>
                                       <span className="font-black text-rose-400">RA: {log.checkOutTime ? safeFormat(log.checkOutTime, 'HH:mm', '00:00', log.date) : '00:00'}</span>
                                     </div>
-                                    {(log.lateMinutes || 0) > 0 && <span className="text-amber-400 font-bold">Trễ: {log.lateMinutes}p</span>}
+                                    {getLateMinutes(log) > 0 && <span className="text-amber-400 font-bold">Trễ: {getLateMinutes(log) < 60 ? `${getLateMinutes(log)}p` : `${Math.floor(getLateMinutes(log) / 60)}h${getLateMinutes(log) % 60 > 0 ? `${getLateMinutes(log) % 60}p` : ''}`}</span>}
                                   </div>
                                 ))}
                                 <div className="absolute top-full left-1/2 -translate-x-1/2 w-2 h-2 bg-slate-900 rotate-45 border-r border-b border-slate-700/50" />
