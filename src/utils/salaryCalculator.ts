@@ -4,8 +4,26 @@ import { safeFormat } from './dateUtils';
 export const roundToUnit = (num: number) => Math.round(num);
 
 export function calculateTtnPenalty(timesheets: any[], violations: any[] = []) {
-  const lateCountForTtn = timesheets.filter(t => (t.lateMinutes || 0) > 0 && !t.isLateExcused).length;
-  const skipShiftForTtn = timesheets.find(t => (t.lateMinutes || 0) >= 300 && !t.isLateExcused);
+  const getLateMinutes = (t: any) => {
+    if (t.lateMinutes !== undefined) return t.lateMinutes;
+    const extractTimeStr = (tm: string | undefined | null) => {
+        if (!tm) return null;
+        return tm.includes('T') ? tm.split('T')[1].substring(0, 5) : (tm.includes(' ') ? tm.split(' ')[1].substring(0, 5) : tm.substring(0, 5));
+    };
+    const inTimeStr = extractTimeStr(t.checkInTime);
+    const schTimeStr = extractTimeStr(t.scheduledStartTime);
+    if (schTimeStr && inTimeStr) {
+      const [schH, schM] = schTimeStr.split(':').map(Number);
+      const [inH, inM] = inTimeStr.split(':').map(Number);
+      let diff = (inH * 60 + inM) - (schH * 60 + schM);
+      if (diff < 0 && (24 - schH + inH) < 12) diff += 24 * 60;
+      if (diff > 0 && diff < 12 * 60) return diff;
+    }
+    return 0;
+  };
+
+  const lateCountForTtn = timesheets.filter(t => getLateMinutes(t) > 0 && !t.isLateExcused).length;
+  const skipShiftForTtn = timesheets.find(t => getLateMinutes(t) >= 300 && !t.isLateExcused);
   const violationCount = violations.length;
   
   let ttnPenaltyValue = 0;
@@ -67,7 +85,55 @@ export function calculateNetSalary(
   // Filter approved timesheets for salary calculation
   const approvedTimesheets = timesheets.filter(cc => cc.status !== 'pending_approval');
   
-  const totalHours = approvedTimesheets.reduce((sum, cc) => sum + (cc.totalHours || 0), 0);
+  // Dynamically calculate missing totalHours and late minutes
+  const calculatedTimesheets = approvedTimesheets.map(cc => {
+    let computedHours = cc.totalHours || 0;
+    const extractTimeStr = (t: string | undefined | null) => {
+        if (!t) return null;
+        return t.includes('T') ? t.split('T')[1].substring(0, 5) : (t.includes(' ') ? t.split(' ')[1].substring(0, 5) : t.substring(0, 5));
+    };
+    
+    const inTimeStr = extractTimeStr(cc.checkInTime);
+    const outTimeStr = extractTimeStr(cc.checkOutTime);
+
+    if (!computedHours && inTimeStr && outTimeStr) {
+      const [inH, inM] = inTimeStr.split(':').map(Number);
+      const [outH, outM] = outTimeStr.split(':').map(Number);
+      let diff = (outH * 60 + outM) - (inH * 60 + inM);
+      if (diff < 0) diff += 24 * 60;
+      if (diff > 0) computedHours = diff / 60;
+    }
+
+    let lateVal = cc.lateMinutes;
+    if (lateVal === undefined && cc.scheduledStartTime && inTimeStr) {
+        const schTimeStr = extractTimeStr(cc.scheduledStartTime);
+        if (schTimeStr) {
+          const [schH, schM] = schTimeStr.split(':').map(Number);
+          const [inH, inM] = inTimeStr.split(':').map(Number);
+          let diff = (inH * 60 + inM) - (schH * 60 + schM);
+          if (diff < 0 && (24 - schH + inH) < 12) diff += 24 * 60;
+          if (diff > 0 && diff < 12 * 60) {
+              lateVal = diff;
+          }
+        }
+    }
+    
+    let penaltyMins = cc.latePenaltyMinutes || 0;
+    if (cc.isLateExcused) {
+        penaltyMins = 0;
+    } else if ((cc.latePenaltyMinutes === undefined || cc.latePenaltyMinutes === 0) && lateVal >= 10) {
+        penaltyMins = lateVal * 3;
+    }
+
+    return { 
+      ...cc, 
+      _computedTotalHours: computedHours,
+      _computedLateMinutes: lateVal || 0,
+      _computedLatePenaltyMinutes: penaltyMins || 0
+    };
+  });
+
+  const totalHours = calculatedTimesheets.reduce((sum, cc) => sum + cc._computedTotalHours, 0);
   
   const adjustment = adjustments.find(a => (a.empId === employee.id || a.empId === employee.empId) && a.monthYear === month) || {};
   const prevRates = getPreviousMonthRates(employee.id || employee.empId, month, adjustments);
@@ -84,36 +150,38 @@ export function calculateNetSalary(
       ? adjustment.responsibilityBonus
       : (prevRates.responsibilityBonus !== undefined ? prevRates.responsibilityBonus : (employee.responsibilityBonus || 0)));
 
+  const holidaysList = holidays || [];
+
   let holidayBonusTotal = 0;
   let totalLatePenaltyMinutes = 0;
   let totalLateMinutes = 0;
   let lateCount = 0;
   let lateDetails: any[] = [];
 
-  timesheets.forEach(cc => {
-    if (cc.lateMinutes && !cc.isLateExcused) {
+  calculatedTimesheets.forEach(cc => {
+    if (cc._computedLateMinutes && !cc.isLateExcused) {
       if (cc.status !== 'pending_approval') {
-        totalLateMinutes += cc.lateMinutes;
-        if (cc.latePenaltyMinutes) {
-          lateCount++;
-          totalLatePenaltyMinutes += cc.latePenaltyMinutes;
+        totalLateMinutes += cc._computedLateMinutes;
+        lateCount++;
+        if (cc._computedLatePenaltyMinutes) {
+          totalLatePenaltyMinutes += cc._computedLatePenaltyMinutes;
         }
       }
       lateDetails.push({
         date: cc.date,
         shift: cc.selectedShiftTime || 'Không rõ',
-        minutes: cc.lateMinutes,
-        penaltyMinutes: cc.latePenaltyMinutes || 0,
-        penalty: roundToUnit((cc.latePenaltyMinutes || 0) * (currentHourlyRate / 60)),
+        minutes: cc._computedLateMinutes,
+        penaltyMinutes: cc._computedLatePenaltyMinutes || 0,
+        penalty: roundToUnit((cc._computedLatePenaltyMinutes || 0) * (currentHourlyRate / 60)),
         isAbandonedShift: cc.isAbandonedShift,
         status: cc.status
       });
     }
     
     if (cc.status !== 'pending_approval') {
-      const holiday = holidays.find(h => h.date === cc.date);
+      const holiday = holidaysList.find(h => h.date === cc.date);
       if (holiday) {
-        holidayBonusTotal += roundToUnit((cc.totalHours || 0) * currentHourlyRate * (holiday.multiplier - 1));
+        holidayBonusTotal += roundToUnit(cc._computedTotalHours * currentHourlyRate * (holiday.multiplier - 1));
       }
     }
   });
@@ -146,9 +214,9 @@ export function calculateNetSalary(
   const advanceSalaryNote = localAdj.advanceSalaryNote !== undefined ? localAdj.advanceSalaryNote : (adjustment.advanceSalaryNote || '');
   const ttnPercentageNote = localAdj.ttnPercentageNote !== undefined ? localAdj.ttnPercentageNote : (adjustment.ttnPercentageNote || '');
   
-  const hoursForTtn = approvedTimesheets
+  const hoursForTtn = calculatedTimesheets
     .filter(cc => !cc.isAbandonedShift)
-    .reduce((sum, cc) => sum + (cc.totalHours || 0), 0);
+    .reduce((sum, cc) => sum + cc._computedTotalHours, 0);
     
   const responsibilityBonusTotal = roundToUnit(hoursForTtn * currentResponsibilityBonus * (finalTtnPercentage / 100));
   const finalLateCount = (localAdj.overrideLateCount !== undefined ? localAdj.overrideLateCount : adjustment.overrideLateCount);
@@ -174,7 +242,7 @@ export function calculateNetSalary(
 
   const systemPhonePenaltyTotal = roundToUnit(approvedTimesheets.reduce((sum, cc) => sum + (cc.phonePenalty || 0), 0));
   const systemPhonePenaltyCount = approvedTimesheets.reduce((sum, cc) => sum + (cc.SoLanRoiApp || 0), 0);
-  const systemPhoneMinutes = approvedTimesheets.reduce((sum, cc) => sum + (cc.phoneMinutes || 0), 0);
+  const systemPhoneMinutes = approvedTimesheets.reduce((sum, cc) => sum + (cc.phoneMinutes || cc.PhutPhatRoiApp || 0), 0);
   
   const finalPhoneCountRaw = (localAdj.overridePhoneCount !== undefined ? localAdj.overridePhoneCount : adjustment.overridePhoneCount);
   const resolvedPhonePenaltyCount = (finalPhoneCountRaw === null || finalPhoneCountRaw === undefined) ? systemPhonePenaltyCount : finalPhoneCountRaw;
