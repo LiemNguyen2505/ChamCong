@@ -49,17 +49,37 @@ export const useEmployeeAttendance = (
 
     const todayStr = format(new Date(), 'yyyy-MM-dd');
     const todayShifts = workSchedules
-      .filter(s => s.date === todayStr && !s.isOff && s.locationId === kioskBranch)
+      .filter(s => s.date === todayStr && !s.isOff && s.locationId === kioskBranch && s.empId === loggedInEmployee.id)
       .sort((a, b) => a.startTime.localeCompare(b.startTime));
 
     const now = new Date();
     const nowStr = format(now, 'HH:mm');
+    const nowTotal = now.getHours() * 60 + now.getMinutes();
+
+    let matchedShift = todayShifts.length > 0 ? todayShifts[0] : null;
+    if (todayShifts.length > 0) {
+      // Find the shift that is closest to current time, or where current time is within or right before the shift
+      for (const shift of todayShifts) {
+        const [schH, schM] = shift.startTime.split(':').map(Number);
+        const [endH, endM] = shift.endTime.split(':').map(Number);
+        const schTotal = schH * 60 + schM;
+        const endTotal = endH * 60 + endM;
+        // If current time is less than endTime, we can consider this shift!
+        if (nowTotal <= endTotal + 60) { // allow up to 1 hour after shift ends to still select it (though unlikely to checkin)
+           matchedShift = shift;
+           // If we are somewhat close to the start time (e.g. within 2 hours before or currently during it)
+           if (nowTotal >= schTotal - 120 && nowTotal <= endTotal + 60) {
+             break; // Perfect match
+           }
+        }
+      }
+    }
 
     if (type === 'check-in') {
       setSelectedShiftTime(nowStr);
-      if (todayShifts.length > 0) {
-        setScheduledShiftTime(todayShifts[0].startTime);
-        setSelectedShiftId(todayShifts[0].id);
+      if (matchedShift) {
+        setScheduledShiftTime(matchedShift.startTime);
+        setSelectedShiftId(matchedShift.id);
       }
     } else {
       setSelectedShiftTime(nowStr);
@@ -69,6 +89,9 @@ export const useEmployeeAttendance = (
           setScheduledShiftTime(currentShift.endTime);
           setSelectedShiftId(currentShift.id);
         }
+      } else if (matchedShift) {
+        setScheduledShiftTime(matchedShift.endTime);
+        setSelectedShiftId(matchedShift.id);
       }
     }
 
