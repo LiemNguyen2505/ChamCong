@@ -1,6 +1,7 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { MapPin, X, AlertCircle, Calendar, ChevronDown, Clock, AlertTriangle } from 'lucide-react';
 import CameraCapture from '../CameraCapture';
+import { format } from 'date-fns';
 
 interface AttendanceActionFormProps {
   actionType: 'check-in' | 'check-out' | null;
@@ -51,6 +52,16 @@ export const AttendanceActionForm: React.FC<AttendanceActionFormProps> = ({
   format,
   scheduledShiftTime
 }) => {
+  useEffect(() => {
+    if (actionType === 'check-in') {
+      const interval = setInterval(() => {
+        const nowStr = format(new Date(), 'HH:mm');
+        setSelectedShiftTime(nowStr);
+      }, 5000); // Check every 5 seconds
+      return () => clearInterval(interval);
+    }
+  }, [actionType, format, setSelectedShiftTime]);
+
   return (
     <div className="space-y-4 animate-in fade-in zoom-in-95 duration-300">
       <div className="flex items-center justify-between -mt-3 mb-2">
