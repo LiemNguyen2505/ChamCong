@@ -49,29 +49,34 @@ export const useAntiSlacking = (
             try {
               const currentLan = currentLog.SoLanRoiApp || 0;
               const currentPenaltyTotal = currentLog.phonePenalty || 0;
+              const currentPhut = currentLog.phoneMinutes || 0;
+              const hourlyRate = currentEmployee.hourlyRate || 0;
               
               const newLan = currentLan + 1;
               let currentPenalty = 0;
+              let minutesToCharge = 0;
               
-              if (diffMinutesExact > 2 || newLan > 5) {
-                const minutesToCharge = Math.ceil(diffMinutesExact);
-                currentPenalty = minutesToCharge * 2000;
+              if (diffMinutesExact > 2 || newLan > 3) {
+                minutesToCharge = Math.ceil(diffMinutesExact);
+                currentPenalty = minutesToCharge * 3 * Math.round(hourlyRate / 60);
               }
 
               const newPenaltyTotal = currentPenaltyTotal + currentPenalty;
+              const newPhut = currentPhut + minutesToCharge;
 
               await updateDoc(doc(db, 'timesheets', currentLog.id), {
                 phonePenalty: newPenaltyTotal,
-                SoLanRoiApp: newLan
+                SoLanRoiApp: newLan,
+                phoneMinutes: newPhut
               });
 
-              if (newLan > 5) {
+              if (newLan > 3) {
                 await addDoc(collection(db, 'CanhBao'), {
                   empId: currentEmployee.empId,
                   fullName: currentEmployee.fullName,
                   locationId: kioskBranchRef.current || 'Unknown',
                   ThoiGian: new Date().toISOString(),
-                  NoiDung: `Cảnh báo: Nhân viên sử dụng điện thoại lần thứ ${newLan} trong ngày.`
+                  NoiDung: `Cảnh báo: Nhân viên sử dụng điện thoại lần thứ ${newLan} trong ca.`
                 });
               }
             } catch (error) {
