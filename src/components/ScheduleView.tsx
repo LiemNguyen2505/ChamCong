@@ -115,6 +115,35 @@ export const ScheduleView: React.FC<ScheduleViewProps> = ({
                         console.error('Error batch saving shifts:', error);
                     }
                 }}
+                onSyncWeekShifts={async (shiftsToSave, idsToDelete) => {
+                    try {
+                        const batch = writeBatch(db);
+                        
+                        // Delete all original shifts
+                        idsToDelete.forEach(id => {
+                            batch.delete(doc(db, 'LichLamViec', id));
+                        });
+
+                        // Add new shifts
+                        shiftsToSave.forEach(shift => {
+                            const emp = nhanViens.find(e => e.id === shift.empId);
+                            const shiftId = (shift as any).id || doc(collection(db, 'LichLamViec')).id;
+                            batch.set(doc(db, 'LichLamViec', shiftId), {
+                                ...shift,
+                                empName: emp?.fullName || '',
+                                shiftName: `${shift.startTime} - ${shift.endTime}`,
+                                status: 'scheduled',
+                                createdAt: serverTimestamp(),
+                                updatedAt: serverTimestamp()
+                            });
+                        });
+                        
+                        await batch.commit();
+                        await fetchInitialData(filterMonth, true);
+                    } catch (error) {
+                        console.error('Error syncing week shifts:', error);
+                    }
+                }}
             />
         </div>
     );
