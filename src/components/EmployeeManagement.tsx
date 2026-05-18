@@ -114,13 +114,10 @@ export const EmployeeManagement: React.FC<EmployeeManagementProps> = ({
         maPIN = newEmployee.phone.slice(-4);
       }
 
-      const luong = parseInt(luongTheoGioStr.replace(/,/g, '')) || 0;
-      const thuong = parseInt(thuongTrachNhiemStr.replace(/,/g, '')) || 0;
-
       const employeeData = {
         ...newEmployee,
-        hourlyRate: luong,
-        responsibilityBonus: thuong,
+        hourlyRate: 0, // Admin will set this via payroll
+        responsibilityBonus: 0,
         phone: newEmployee.phone || '',
         empId: maNV,
         pinCode: maPIN,
@@ -187,21 +184,11 @@ export const EmployeeManagement: React.FC<EmployeeManagementProps> = ({
     setIsSubmitting(true);
     const loadingToast = toast.loading('Đang cập nhật nhân viên...');
     try {
-      const luong = typeof luongTheoGioStr === 'string' && luongTheoGioStr !== '' 
-        ? parseInt(luongTheoGioStr.replace(/,/g, '')) || 0 
-        : editingEmployee.hourlyRate;
-      
-      const thuong = typeof thuongTrachNhiemStr === 'string' && thuongTrachNhiemStr !== ''
-        ? parseInt(thuongTrachNhiemStr.replace(/,/g, '')) || 0
-        : (editingEmployee.responsibilityBonus || 0);
-
       const oldEmployee = nhanViens.find(nv => nv.id === editingEmployee.id);
       
       const dataToUpdate: any = {
         fullName: editingEmployee.fullName,
         phone: editingEmployee.phone || '',
-        hourlyRate: luong,
-        responsibilityBonus: thuong,
         joinDate: editingEmployee.joinDate,
         locationId: editingEmployee.locationId || 'Góc Phố',
         locationIds: [editingEmployee.locationId || 'Góc Phố'],
@@ -213,10 +200,6 @@ export const EmployeeManagement: React.FC<EmployeeManagementProps> = ({
         cccd: editingEmployee.cccd || ''
       };
 
-      if (oldEmployee && luong > (oldEmployee.hourlyRate || 0)) {
-        dataToUpdate.lastSalaryReviewDate = new Date().toISOString();
-      }
-
       await updateDoc(doc(db, 'employees', editingEmployee.id), dataToUpdate);
       await logAction('Sửa', 'Nhân viên', `Sửa thông tin nhân viên ${editingEmployee.fullName} (Mã: ${editingEmployee.empId})`);
       
@@ -224,8 +207,6 @@ export const EmployeeManagement: React.FC<EmployeeManagementProps> = ({
       await fetchInitialData(undefined, true);
       setShowEditEmployeeModal(false);
       setEditingEmployee(null);
-      setLuongTheoGioStr('');
-      setThuongTrachNhiemStr('');
     } catch (error) {
       console.error(error);
       toast.error('Lỗi khi cập nhật nhân viên', { id: loadingToast });
