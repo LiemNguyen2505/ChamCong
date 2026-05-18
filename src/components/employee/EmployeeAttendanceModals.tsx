@@ -42,19 +42,19 @@ export const CheckoutSummaryModal: React.FC<CheckoutSummaryModalProps> = ({
                 <button type="button" className="group relative focus:outline-none">
                   <Info className="w-4 h-4 text-stone-400 cursor-help" />
                   <div className="absolute bottom-full left-0 mb-2 hidden group-hover:block group-focus:block w-56 p-3 bg-stone-800 text-white text-xs rounded-xl shadow-xl z-10 font-normal normal-case tracking-normal text-left">
-                    Trễ dưới 10p không phạt. Trễ từ 10p trở lên phạt nhân 2 số phút trễ.
+                    Trễ dưới 10p không phạt. Trễ từ 10p trở lên phạt nhân 3 số phút trễ.
                     <div className="absolute top-full left-2 border-4 border-transparent border-t-stone-800"></div>
                   </div>
                 </button>
               </div>
               <span className={`text-xl font-black ${checkoutSummary.lateMinutes > 0 ? theme.text : 'text-stone-400'}`}>
-                {checkoutSummary.lateMinutes}p
+                {checkoutSummary.lateMinutes < 60 ? `${checkoutSummary.lateMinutes}p` : `${Math.floor(checkoutSummary.lateMinutes / 60)}h${checkoutSummary.lateMinutes % 60 > 0 ? `${checkoutSummary.lateMinutes % 60}p` : ''}`}
               </span>
             </div>
             <div className="p-5 bg-stone-50 rounded-2xl border border-stone-100">
               <span className="block text-stone-400 text-xs font-black uppercase mb-1">Phạt trễ</span>
               <span className={`text-xl font-black ${checkoutSummary.latePenaltyMinutes > 0 ? 'text-red-600' : 'text-stone-400'}`}>
-                {checkoutSummary.latePenaltyMinutes}p
+                {checkoutSummary.latePenaltyMinutes < 60 ? `${checkoutSummary.latePenaltyMinutes}p` : `${Math.floor(checkoutSummary.latePenaltyMinutes / 60)}h${checkoutSummary.latePenaltyMinutes % 60 > 0 ? `${checkoutSummary.latePenaltyMinutes % 60}p` : ''}`}
               </span>
             </div>
           </div>
@@ -78,7 +78,7 @@ export const CheckoutSummaryModal: React.FC<CheckoutSummaryModalProps> = ({
             <div className="p-5 bg-stone-50 rounded-2xl border border-stone-100">
               <span className="block text-stone-400 text-xs font-black uppercase mb-1">Phạt rời app</span>
               <span className={`text-xl font-black ${checkoutSummary.exitCount > 3 ? 'text-red-600' : 'text-stone-400'}`}>
-                {Math.max(0, (checkoutSummary.exitCount - 3) * 10)}p
+                {Math.max(0, (checkoutSummary.exitCount - 3) * 10) < 60 ? `${Math.max(0, (checkoutSummary.exitCount - 3) * 10)}p` : `${Math.floor(Math.max(0, (checkoutSummary.exitCount - 3) * 10) / 60)}h${Math.max(0, (checkoutSummary.exitCount - 3) * 10) % 60 > 0 ? `${Math.max(0, (checkoutSummary.exitCount - 3) * 10) % 60}p` : ''}`}
               </span>
             </div>
           </div>
@@ -153,8 +153,8 @@ export const CheckinWarningModal: React.FC<CheckinWarningModalProps> = ({
               const diffH = Math.floor(diffMinutes / 60);
               const diffM = diffMinutes % 60;
               const diffText = diffH > 0 
-                ? (diffM > 0 ? `${diffH}h ${diffM} phút` : `${diffH}h`)
-                : `${diffM} phút`;
+                ? (diffM > 0 ? `${diffH}h${diffM}p` : `${diffH}h`)
+                : `${diffM}p`;
               const diffType = selTotal < schTotal ? 'sớm hơn' : 'trễ hơn';
               const baseMsg = `Bạn đang vào ca lúc ${selectedShiftTime}, ${diffType} ${diffText} so với lịch làm việc là ${scheduledShiftTime}.`;
               const lateMsg = selTotal > schTotal ? ` Đây là lần đi trễ thứ ${monthlyStats.lateCount + 1} trong tháng.` : '';
@@ -170,8 +170,8 @@ export const CheckinWarningModal: React.FC<CheckinWarningModalProps> = ({
                   const diffH = Math.floor(diff / 60);
                   const diffM = diff % 60;
                   const diffText = diffH > 0 
-                    ? (diffM > 0 ? `${diffH}h ${diffM} phút` : `${diffH}h`)
-                    : `${diffM} phút`;
+                    ? (diffM > 0 ? `${diffH}h${diffM}p` : `${diffH}h`)
+                    : `${diffM}p`;
                   const lateMsg = ` Đây là lần đi trễ thứ ${monthlyStats.lateCount + 1} trong tháng.`;
                   msg = `Bạn đang vào ca trễ ${diffText} (${selectedShiftTime} so với lịch ${scheduledShiftTime}).${lateMsg}`;
                 }
