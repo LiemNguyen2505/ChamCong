@@ -1,10 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { StickyNote } from 'lucide-react';
+import { safeParseDate } from './dateUtils';
 
 export const TABLE_COL_WIDTHS = {
   NGAY: 80,
   NAME: 220,
   GIO: 100,
+  PHOTO: 100,
   SD_DT: 120,
   PHAT_DT: 150,
   DI_TRE: 120,
@@ -13,12 +15,59 @@ export const TABLE_COL_WIDTHS = {
   ACTIONS: 120
 };
 
+export const getLateMinutes = (t: any) => {
+  if (t.lateMinutes !== undefined) return t.lateMinutes;
+  if (t.latePenaltyMinutes !== undefined) return t.latePenaltyMinutes / 3;
+  const extractTimeStr = (tm: string | undefined | null) => {
+      if (!tm) return null;
+      return tm.includes('T') ? tm.split('T')[1].substring(0, 5) : (tm.includes(' ') ? tm.split(' ')[1].substring(0, 5) : tm.substring(0, 5));
+  };
+  const inTimeStr = extractTimeStr(t.checkInTime);
+  const schTimeStr = extractTimeStr(t.scheduledStartTime);
+  if (schTimeStr && inTimeStr) {
+    const [schH, schM] = schTimeStr.split(':').map(Number);
+    const [inH, inM] = inTimeStr.split(':').map(Number);
+    let diff = (inH * 60 + inM) - (schH * 60 + schM);
+    if (diff < 0 && (24 - schH + inH) < 12) diff += 24 * 60;
+    if (diff > 0 && diff < 12 * 60) return diff;
+  }
+  return 0;
+};
+
+export const getLatePenaltyMinutes = (t: any) => {
+  if (t.isLateExcused) return 0;
+  if (t.latePenaltyMinutes !== undefined && t.latePenaltyMinutes > 0) return t.latePenaltyMinutes;
+  const lateMins = getLateMinutes(t);
+  if (lateMins >= 10) return lateMins * 3;
+  return 0;
+};
+
+export const getTotalHours = (t: any) => {
+  if (t.totalHours !== undefined) return t.totalHours;
+  const extractTimeStr = (tm: string | undefined | null) => {
+      if (!tm) return null;
+      return tm.includes('T') ? tm.split('T')[1].substring(0, 5) : (tm.includes(' ') ? tm.split(' ')[1].substring(0, 5) : tm.substring(0, 5));
+  };
+  
+  const inTimeStr = extractTimeStr(t.checkInTime);
+  const outTimeStr = extractTimeStr(t.checkOutTime);
+
+  if (inTimeStr && outTimeStr) {
+    const [inH, inM] = inTimeStr.split(':').map(Number);
+    const [outH, outM] = outTimeStr.split(':').map(Number);
+    let diff = (outH * 60 + outM) - (inH * 60 + inM);
+    if (diff < 0) diff += 24 * 60;
+    if (diff > 0) return diff / 60;
+  }
+  return 0;
+};
+
 export const formatMinutes = (minutes: number) => {
   const rounded = Math.round(minutes);
   if (rounded < 60) return `${rounded}p`;
   const h = Math.floor(rounded / 60);
   const m = rounded % 60;
-  return m > 0 ? `${h}h ${m}p` : `${h}h`;
+  return m > 0 ? `${h}h${m}p` : `${h}h`;
 };
 
 export const formatDecimalHours = (decimalHours: number) => {
@@ -26,9 +75,10 @@ export const formatDecimalHours = (decimalHours: number) => {
   return formatMinutes(minutes);
 };
 
-export const getTimeStyle = (timeStr: string | null) => {
+export const getTimeStyle = (timeStr: string | null, dateStr?: string | null) => {
   if (!timeStr) return 'bg-slate-50 text-slate-400 border-slate-100';
-  const hour = new Date(timeStr).getHours();
+  const d = safeParseDate(timeStr, dateStr);
+  const hour = d ? d.getHours() : 0;
   if (hour >= 6 && hour < 12) return 'bg-emerald-50 text-emerald-700 border-emerald-100';     // Sáng
   if (hour >= 12 && hour < 17) return 'bg-amber-50 text-amber-700 border-amber-200';      // Trưa
   if (hour >= 17 && hour < 22) return 'bg-slate-100 text-slate-700 border-slate-200';      // Tối
