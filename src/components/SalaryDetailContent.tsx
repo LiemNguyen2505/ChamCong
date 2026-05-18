@@ -700,21 +700,36 @@ export default function SalaryDetailContent({
               </div>
               
               <div className="p-6 space-y-4">
+                 {/* Split breakdown */}
+                 <div className="grid grid-cols-2 gap-3">
+                   <div className="bg-blue-50 border border-blue-100 p-3 rounded-xl">
+                     <p className="text-[9px] font-black text-blue-400 uppercase tracking-widest mb-1">Tập thể</p>
+                     <p className="font-black text-blue-700 text-sm">{formatCurrency(currentStats.finalMaterialLossShared)}</p>
+                   </div>
+                   <div className="bg-orange-50 border border-orange-100 p-3 rounded-xl">
+                     <p className="text-[9px] font-black text-orange-400 uppercase tracking-widest mb-1">Cá nhân</p>
+                     <p className="font-black text-orange-700 text-sm">{formatCurrency(currentStats.finalMaterialLossIndividual)}</p>
+                   </div>
+                 </div>
+
                  {currentStats.materialLossNote ? (
                    <div className="bg-stone-50 rounded-xl p-4 border border-stone-100">
+                     <p className="text-[10px] font-bold text-stone-400 uppercase tracking-widest mb-2 flex items-center gap-2">
+                       <StickyNote className="w-3 h-3" /> Ghi chú từ quản lý
+                     </p>
                      <p className="text-stone-600 text-sm leading-relaxed whitespace-pre-wrap italic">
                        {currentStats.materialLossNote}
                      </p>
                    </div>
                  ) : (
-                   <div className="py-8 text-center">
-                      <p className="text-stone-400 text-sm italic">Không có chi tiết cụ thể</p>
+                   <div className="py-4 text-center">
+                      <p className="text-stone-400 text-xs italic">Số tiền này được phân bổ từ công cụ tính hao hụt dụng cụ.</p>
                    </div>
                  )}
                  
                  <div className="pt-4 border-t border-stone-100 flex justify-between items-center">
-                   <span className="text-stone-400 text-[10px] font-bold uppercase tracking-wider">Tổng khấu trừ:</span>
-                   <span className="font-black text-rose-600 text-lg">{formatCurrency(currentStats.finalMaterialLoss)}</span>
+                   <span className="text-stone-400 text-[10px] font-black uppercase tracking-wider">Tổng khấu trừ:</span>
+                   <span className="font-black text-rose-600 text-xl">{formatCurrency(currentStats.finalMaterialLoss)}</span>
                  </div>
               </div>
 
