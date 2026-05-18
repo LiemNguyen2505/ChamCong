@@ -161,7 +161,7 @@ export const CheckinWarningModal: React.FC<CheckinWarningModalProps> = ({
               const extraMsg = selTotal < schTotal ? ` Giờ công được tính từ ${scheduledShiftTime}.` : '';
               return `${baseMsg}${lateMsg}${extraMsg} Xác nhận vào ca?`;
             } else {
-              let msg = `Giờ vào ca bạn chọn (${selectedShiftTime}) sớm hơn hiện tại.`;
+              let msg = `Bạn đang vào ca lúc ${selectedShiftTime}.`;
               if (scheduledShiftTime) {
                 const [schH, schM] = scheduledShiftTime.split(':').map(Number);
                 const schTotal = schH * 60 + schM;
@@ -173,10 +173,10 @@ export const CheckinWarningModal: React.FC<CheckinWarningModalProps> = ({
                     ? (diffM > 0 ? `${diffH}h ${diffM} phút` : `${diffH}h`)
                     : `${diffM} phút`;
                   const lateMsg = ` Đây là lần đi trễ thứ ${monthlyStats.lateCount + 1} trong tháng.`;
-                  msg = `Bạn đang vào ca trễ ${diffText} (${selectedShiftTime} so với lịch ${scheduledShiftTime}).${lateMsg} VÀ giờ bạn chọn sớm hơn hiện tại.`;
+                  msg = `Bạn đang vào ca trễ ${diffText} (${selectedShiftTime} so với lịch ${scheduledShiftTime}).${lateMsg}`;
                 }
               }
-              return `${msg} Quản lý sẽ nhận thông báo để đối soát giờ công giúp bạn.`;
+              return msg;
             }
           })()}
         </p>
