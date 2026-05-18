@@ -136,7 +136,7 @@ export const ApprovalSection: React.FC<ApprovalSectionProps> = ({
         {(req.type === 'checkin_late' || req.type === 'checkin_early') && (
           <div>
             Lịch: {req.details?.scheduledStartTime} → Thực tế: {req.details?.actualStartTime}
-            {req.details?.lateMinutes > 0 && <span className="text-red-500 ml-1">(Trễ {req.details.lateMinutes}p)</span>}
+            {req.details?.lateMinutes > 0 && <span className="text-red-500 ml-1">(Trễ {req.details.lateMinutes < 60 ? `${req.details.lateMinutes}p` : `${Math.floor(req.details.lateMinutes / 60)}h${req.details.lateMinutes % 60 > 0 ? `${req.details.lateMinutes % 60}p` : ''}`})</span>}
           </div>
         )}
         {req.type === 'shift_swap' && (
