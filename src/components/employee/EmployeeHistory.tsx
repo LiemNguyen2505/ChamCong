@@ -132,7 +132,35 @@ export const EmployeeHistory: React.FC<EmployeeHistoryProps> = ({
                 
                 <div className="flex-1 flex flex-col gap-2 divide-y divide-stone-100/50">
                   {dayGroup.map((cc: any, idx: number) => {
-                      const lateVal = cc.lateMinutes || (cc.latePenaltyMinutes ? cc.latePenaltyMinutes / 2 : 0);
+                      const extractTimeStr = (t: string | undefined | null) => {
+                        if (!t) return null;
+                        return t.includes('T') ? t.split('T')[1].substring(0, 5) : (t.includes(' ') ? t.split(' ')[1].substring(0, 5) : t.substring(0, 5));
+                      };
+                      
+                      const inTimeStr = extractTimeStr(cc.checkInTime);
+                      const outTimeStr = extractTimeStr(cc.checkOutTime);
+                      
+                      let computedTotalHours = cc.totalHours || 0;
+                      if (!computedTotalHours && inTimeStr && outTimeStr) {
+                          const [inH, inM] = inTimeStr.split(':').map(Number);
+                          const [outH, outM] = outTimeStr.split(':').map(Number);
+                          let diff = (outH * 60 + outM) - (inH * 60 + inM);
+                          if (diff < 0) diff += 24 * 60;
+                          if (diff > 0) computedTotalHours = diff / 60;
+                      }
+
+                      let lateVal = cc.lateMinutes || (cc.latePenaltyMinutes ? cc.latePenaltyMinutes / 3 : 0);
+                      if (!lateVal && cc.scheduledStartTime && inTimeStr) {
+                          const schTimeStr = extractTimeStr(cc.scheduledStartTime);
+                          if (schTimeStr) {
+                            const [schH, schM] = schTimeStr.split(':').map(Number);
+                            const [inH, inM] = inTimeStr.split(':').map(Number);
+                            let diff = (inH * 60 + inM) - (schH * 60 + schM);
+                            if (diff < 0 && (24 - schH + inH) < 12) diff += 24 * 60;
+                            if (diff > 0 && diff < 12 * 60) lateVal = diff;
+                          }
+                      }
+
                       const isLate = lateVal > 0;
                       const hasPhone = (cc.SoLanRoiApp || 0) > 0;
 
@@ -147,9 +175,8 @@ export const EmployeeHistory: React.FC<EmployeeHistoryProps> = ({
                                       <div className="flex flex-col">
                                         <div className="flex items-center gap-1 mb-0.5">
                                           <span className="text-[10px] font-black text-stone-400 uppercase leading-none">Vào</span>
-                                          {cc.checkInTime && (() => {
-                                            const timeStr = cc.checkInTime.includes('T') ? cc.checkInTime.split('T')[1] : (cc.checkInTime.includes(' ') ? cc.checkInTime.split(' ')[1] : cc.checkInTime);
-                                            const hour = parseInt(timeStr.split(':')[0]);
+                                          {inTimeStr && (() => {
+                                            const hour = parseInt(inTimeStr.split(':')[0]);
                                             let shift = '';
                                             let shiftColor = '';
                                             if (hour >= 5 && hour < 11) { shift = 'SÁNG'; shiftColor = 'text-[#166534] bg-emerald-50 border border-emerald-100'; }
@@ -159,7 +186,7 @@ export const EmployeeHistory: React.FC<EmployeeHistoryProps> = ({
                                           })()}
                                         </div>
                                         <span className="text-sm font-black text-slate-700 leading-none">
-                                          {cc.checkInTime ? (cc.checkInTime.includes('T') ? cc.checkInTime.split('T')[1] : (cc.checkInTime.includes(' ') ? cc.checkInTime.split(' ')[1] : cc.checkInTime)).substring(0, 5) : '--:--'}
+                                          {inTimeStr || '--:--'}
                                         </span>
                                       </div>
                                     </div>
@@ -171,7 +198,7 @@ export const EmployeeHistory: React.FC<EmployeeHistoryProps> = ({
                                       <div className="flex flex-col">
                                         <span className="text-[10px] font-black text-stone-400 uppercase leading-none mb-0.5">Ra</span>
                                         <span className="text-sm font-black text-slate-700 leading-none">
-                                          {cc.checkOutTime ? (cc.checkOutTime.includes('T') ? cc.checkOutTime.split('T')[1] : (cc.checkOutTime.includes(' ') ? cc.checkOutTime.split(' ')[1] : cc.checkOutTime)).substring(0, 5) : '--:--'}
+                                          {outTimeStr || '--:--'}
                                         </span>
                                       </div>
                                     </div>
@@ -179,7 +206,7 @@ export const EmployeeHistory: React.FC<EmployeeHistoryProps> = ({
                                     <div className="flex flex-col items-end border-l border-stone-100 pl-2">
                                       <span className="text-[10px] font-black text-stone-400 uppercase leading-none mb-0.5">Tổng</span>
                                       <span className={`text-[13px] font-black ${theme.text} leading-none whitespace-nowrap`}>
-                                        {cc.totalHours ? cc.totalHours.toFixed(1) + 'h' : '---'}
+                                        {outTimeStr ? computedTotalHours.toFixed(1) + 'h' : '---'}
                                       </span>
                                     </div>
                                 </div>
@@ -205,7 +232,7 @@ export const EmployeeHistory: React.FC<EmployeeHistoryProps> = ({
                                     )}
                                     {isLate && (
                                         <span className="px-1.5 py-0.5 bg-orange-50 border border-orange-100 text-orange-600 text-[9px] font-black uppercase rounded-sm flex items-center gap-1 shadow-sm">
-                                            <Clock className="w-2.5 h-2.5" /> Trễ {lateVal}p
+                                            <Clock className="w-2.5 h-2.5" /> Trễ {lateVal < 60 ? `${lateVal}p` : `${Math.floor(lateVal / 60)}h${lateVal % 60 > 0 ? `${lateVal % 60}p` : ''}`}
                                         </span>
                                     )}
                                 </div>
