@@ -131,6 +131,21 @@ export const useEmployeeAttendance = (
     setIsSubmitting(true);
     try {
       if (actionType === 'check-in') {
+        let lateMinutes = 0;
+        let latePenaltyMinutes = 0;
+        if (scheduledShiftTime) {
+          const [schH, schM] = scheduledShiftTime.split(':').map(Number);
+          const [selH, selM] = selectedShiftTime.split(':').map(Number);
+          const selTotal = selH * 60 + selM;
+          const schTotal = schH * 60 + schM;
+          if (selTotal > schTotal) {
+            lateMinutes = selTotal - schTotal;
+            if (lateMinutes >= 10) {
+                latePenaltyMinutes = lateMinutes * 3;
+            }
+          }
+        }
+
         const checkInDoc = {
           empId: loggedInEmployee.empId,
           fullName: loggedInEmployee.fullName,
@@ -148,18 +163,36 @@ export const useEmployeeAttendance = (
           emergencyManager: emergencyManager,
           baseRate: loggedInEmployee.hourlyRate,
           responsibilityBonus: loggedInEmployee.responsibilityBonus || 0,
-          deviceId: localStorage.getItem('browser_device_id') || 'unknown'
+          deviceId: localStorage.getItem('browser_device_id') || 'unknown',
+          lateMinutes: lateMinutes,
+          latePenaltyMinutes: latePenaltyMinutes
         };
         await addDoc(collection(db, 'timesheets'), checkInDoc);
         toast.success('Vào ca thành công!');
       } else {
         if (!latestLog) return;
+        
+        let totalHours = 0;
+        let totalPay = 0;
+        const checkInTimeStr = latestLog.checkInTime || scheduledShiftTime;
+        if (checkInTimeStr) {
+          const checkInISO = new Date(`${latestLog.date}T${checkInTimeStr}`).getTime();
+          const checkOutISO = new Date(`${latestLog.date}T${selectedShiftTime}`).getTime();
+          const diffMs = checkOutISO - checkInISO;
+          if (diffMs > 0) {
+            totalHours = diffMs / (1000 * 60 * 60);
+            totalPay = totalHours * (loggedInEmployee.hourlyRate || 0);
+          }
+        }
+
         await updateDoc(doc(db, 'timesheets', latestLog.id), {
           checkOutTime: selectedShiftTime,
           photoCheckOut: capturedPhoto,
           gpsOut: coords, // Save GPS coords
           noteCheckOut: note,
           scheduledEndTime: scheduledShiftTime,
+          totalHours: totalHours,
+          totalPay: totalPay,
           updatedAt: serverTimestamp()
         });
         toast.success('Ra ca thành công!');
