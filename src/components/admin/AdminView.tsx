@@ -1,256 +1,854 @@
-import React, { useState } from 'react';
-import { X, Wallet, Banknote, RefreshCw, Box, Landmark } from 'lucide-react';
-import { MaterialLossModal } from './MaterialLossModal';
-import { FinancialModal } from './FinancialModal';
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
+const toast: any = (() => {}) as any;
+toast.loading = () => {};
+toast.success = () => {};
+toast.error = () => {};
 
-interface OtherDeductionsGlobalModalProps {
-  show: boolean;
-  onClose: () => void;
-  adminTheme: any;
-  nhanViens: any[];
-  allowedBranches: string[];
-  logAction: (action: string, module: string, details: string) => Promise<void>;
-  openConfirmModal: (title: string, message: string, onConfirm: () => void) => void;
-  fetchInitialData: (month?: string, force?: boolean) => Promise<void>;
-  filterMonth: string;
-  payrollActiveBranch: string;
-  materialItems: any[];
-  materialLossLogs: any[];
-  weightedEmployees: any[];
-  setWeightedEmployees: (val: any[]) => void;
-  itemType: string;
-  setItemType: (val: string) => void;
-  lossType?: 'general' | 'individual';
-  setLossType?: (val: 'general' | 'individual') => void;
-  originalPrice: string;
-  setOriginalPrice: (val: string) => void;
-  deductionPrice?: number;
-  quantity: string;
-  setQuantity: (val: string) => void;
-  totalLossAmount?: string;
-  setTotalLossAmount?: (val: string) => void;
-  isProcessingLoss: boolean;
-  onProcessMaterialLoss: () => Promise<void>;
-  localAdjustments?: Record<string, any>;
-  payrollAdjustments?: Record<string, any>;
-  handlePayrollChange?: (empId: string, field: string, value: any) => void;
-}
+import { useNavigate } from 'react-router-dom';
+import { db, auth } from '../../firebase';
+import { GoogleAuthProvider, signInWithPopup } from 'firebase/auth';
+import { collection, query, orderBy, onSnapshot, addDoc, serverTimestamp, deleteDoc, doc, updateDoc, getDocs, where, deleteField, getDoc, setDoc, increment, limit, writeBatch } from 'firebase/firestore';
+import { format } from 'date-fns';
+import { vi } from 'date-fns/locale';
+import { Search, Filter, LogOut, Users, Clock, Plus, Trash2, Edit2, ShieldCheck, Download, Calendar, CheckCircle, XCircle, AlertCircle, Eye, EyeOff, Bell, BellOff, TrendingUp, DollarSign, History as HistoryIcon, X, Key, Smartphone, CheckCircle2, RefreshCw, Undo2, ChevronLeft, Save, Settings2, ChevronDown, ChevronRight, ArrowLeft, Info, StickyNote, LayoutDashboard, AlertTriangle, TrendingDown, Activity, Banknote, Menu, Phone, MessageSquare, MoreVertical, User, Coffee, TableProperties, Wallet, MoreHorizontal, ChevronUp, Package, FileCheck } from 'lucide-react';
+import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip as RechartsTooltip } from 'recharts';
+import { saveAs } from 'file-saver';
+import { differenceInMonths, parseISO, addMonths } from 'date-fns';
+import { ScheduleView } from '../ScheduleView';
+import { PayrollAdjustmentModal } from '../PayrollAdjustmentModal';
+import { HolidayConfigModal } from '../HolidayConfigModal';
+import { EmployeeAttendanceDetailModal } from '../EmployeeAttendanceDetailModal';
+import EmployeeSalaryDetailModal from '../EmployeeSalaryDetailModal';
+import SalaryDetailContent from '../SalaryDetailContent';
+import { PayrollComponent } from '../PayrollComponent';
+import { EmployeeManagement } from '../EmployeeManagement';
+import { MonthlyAttendanceTable } from '../MonthlyAttendanceTable';
+import { Dashboard } from '../Dashboard';
+import { AdminManagement } from './AdminManagement';
+import { ViolationManagement } from '../ViolationManagement';
+import { RegulationsTab } from './RegulationsTab';
+import { SystemLogs } from '../SystemLogs';
+import { Alerts } from '../Alerts';
+import { AttendanceTab } from '../AttendanceTab';
+import { ManualAttendanceModal, EditAttendanceModal } from '../AttendanceModals';
+import { ChangePinModal, ChangeAdminPinModal, ConfirmModal } from './AdminAuthModals';
+import { FinancialModal } from '../FinancialModal';
+import { MaterialLossModal } from '../MaterialLossModal';
+import { OtherDeductionsGlobalModal } from '../OtherDeductionsGlobalModal';
+import { motion, AnimatePresence } from 'motion/react';
+import { calculateNetSalary, calculateTtnPenalty, getPreviousMonthRates, roundToUnit } from '../../utils/salaryCalculator';
 
-export const OtherDeductionsGlobalModal: React.FC<OtherDeductionsGlobalModalProps> = (props) => {
-  const [activeTab, setActiveTab] = useState<'material' | 'financial' | 'advance'>('material');
-  const [advanceBranch, setAdvanceBranch] = useState<string>(props.allowedBranches.length > 0 ? props.allowedBranches[0] : 'All');
+import { Employee, AdminAccount, ApprovalRequest, PlanningGoal, SalaryHistory, AuditLog, Timesheet, ShiftTask, WorkSchedule, LeaveRequest, Alert, AppNotification, PayrollAdjustment, HolidayConfig } from '../../types/admin';
+import { ApprovalSection } from '../ApprovalSection';
+import { AdminLogin } from './AdminLogin';
+import { AdminSidebar } from './AdminSidebar';
+import { BranchTabs } from '../BranchTabs';
+import { useAdminLogic } from '../../hooks/useAdminLogic';
 
-  if (!props.show) return null;
+const formatCurrency = (val: number) => new Intl.NumberFormat('vi-VN').format(val);
 
-  const getFinalAdvance = (empId: string) => {
-    if (!props.localAdjustments || !props.payrollAdjustments) return 0;
-    const localVal = props.localAdjustments[empId]?.advanceSalary;
-    const savedVal = props.payrollAdjustments[empId]?.advanceSalary;
-    return localVal !== undefined ? localVal : (savedVal || 0);
-  };
+const SUPER_ADMIN: AdminAccount = {
+  id: 'super',
+  email: 'admin',
+  pin: '2608',
+  role: 'SuperAdmin',
+  locationIds: ['Góc Phố', 'Phố Xanh']
+};
 
-  const advanceEmployees = props.nhanViens
-    .filter(nv => advanceBranch === 'All' || nv.locationId === advanceBranch || (Array.isArray(nv.locationIds) && nv.locationIds.includes(advanceBranch)))
-    .map(nv => {
-      const empTimesheets = (props as any).chamCongs?.filter((cc: any) => (cc.empId === nv.id || cc.empId === nv.empId) && cc.date.startsWith(props.filterMonth)) || [];
-      const totalHours = empTimesheets.filter((cc: any) => cc.status !== 'pending_approval').reduce((sum: number, cc: any) => sum + (cc.totalHours || 0), 0);
-      return { ...nv, totalHours };
-    })
-    .filter(nv => nv.totalHours > 0);
+import { TABLE_COL_WIDTHS, formatMinutes, formatDecimalHours, getTimeStyle, calculateShifts, FieldNote } from '../../utils/adminHelpers';
 
-  const formatCurrency = (val: number) => new Intl.NumberFormat('vi-VN').format(val);
+
+import { useNotifications } from '../../hooks/useNotifications';
+import { NotificationModal } from '../NotificationModal';
+
+export default function AdminView({ 
+  globalData, 
+  fetchInitialData, 
+  isLoading: isGlobalLoading 
+}: { 
+  globalData: any, 
+  fetchInitialData: (monthYear?: string, force?: boolean) => Promise<any>, 
+  isLoading: boolean 
+}) {
+  const logic = useAdminLogic(globalData, fetchInitialData, isGlobalLoading);
+  const { notifications: navNotifications, markAsRead, markAllAsRead } = useNotifications(
+    logic.currentAdmin?.role,
+    logic.currentAdmin?.id,
+    logic.currentAdmin?.locationIds
+  );
+
+  const {
+    openMenuEmpId,
+    setOpenMenuEmpId,
+    isAuthenticated,
+    setIsAuthenticated,
+    currentAdmin,
+    setCurrentAdmin,
+    password,
+    setPassword,
+    adminLoginId,
+    setAdminLoginId,
+    showLoginPin,
+    setShowLoginPin,
+    loginIdError,
+    setLoginIdError,
+    pinError,
+    setPinError,
+    activeTab,
+    setActiveTab,
+    historyDay,
+    setHistoryDay,
+    historyEmployee,
+    setHistoryEmployee,
+    mobileHistoryMode,
+    setMobileHistoryMode,
+    isSidebarCollapsed,
+    setIsSidebarCollapsed,
+    isMobileSidebarOpen,
+    setIsMobileSidebarOpen,
+    showCompactActionMenu,
+    setShowCompactActionMenu,
+    showDatePickerGrid,
+    setShowDatePickerGrid,
+    filterBranch,
+    setFilterBranch,
+    filterMonth,
+    setFilterMonth,
+    initializedTabs,
+    setInitializedTabs,
+    requestTypeFilter,
+    setRequestTypeFilter,
+    approvalSubTab,
+    setApprovalSubTab,
+    historySearchTerm,
+    setHistorySearchTerm,
+    showNotifications,
+    setShowNotifications,
+    headerTapCount,
+    setHeaderTapCount,
+    loading,
+    setLoading,
+    successMsg,
+    setSuccessMsg,
+    payrollActiveBranch,
+    setPayrollActiveBranch,
+    showHolidayConfig,
+    setShowHolidayConfig,
+    showFinancialModal,
+    setShowFinancialModal,
+    showMobileUtilities,
+    setShowMobileUtilities,
+    editingAdjustment,
+    setEditingAdjustment,
+    showMaterialLossModal,
+    setShowMaterialLossModal,
+    showOtherDeductionsModal,
+    setShowOtherDeductionsModal,
+    isScheduleModalOpen,
+    setIsScheduleModalOpen,
+    totalLossAmount,
+    setTotalLossAmount,
+    totalLossItems,
+    setTotalLossItems,
+    isProcessingLoss,
+    setIsProcessingLoss,
+    itemType,
+    setItemType,
+    lossType,
+    setLossType,
+    originalPrice,
+    setOriginalPrice,
+    deductionPrice,
+    setDeductionPrice,
+    quantity,
+    setQuantity,
+    weightedEmployees,
+    setWeightedEmployees,
+    visibleColumns,
+    setVisibleColumns,
+    showColumnConfig,
+    setShowColumnConfig,
+    columnWidths,
+    setColumnWidths,
+    showDeductionDetails,
+    setShowDeductionDetails,
+    localAdjustments,
+    setLocalAdjustments,
+    undoStack,
+    setUndoStack,
+    isSavingPayroll,
+    setIsSavingPayroll,
+    salaryReviewNotifications,
+    setSalaryReviewNotifications,
+    showChangeAdminPinModal,
+    setShowChangeAdminPinModal,
+    oldAdminPin,
+    setOldAdminPin,
+    newAdminPin,
+    setNewAdminPin,
+    confirmNewAdminPin,
+    setConfirmNewAdminPin,
+    showOldAdminPin,
+    setShowOldAdminPin,
+    showNewAdminPin,
+    setShowNewAdminPin,
+    showConfirmAdminPin,
+    setShowConfirmAdminPin,
+    adminPinError,
+    setAdminPinError,
+    selectedEmployeeForDetails,
+    setSelectedEmployeeForDetails,
+    selectedEmployeeForSalaryDetails,
+    setSelectedEmployeeForSalaryDetails,
+    showConfirmModal,
+    setShowConfirmModal,
+    confirmAction,
+    setConfirmAction,
+    showManualCheckin,
+    setShowManualCheckin,
+    manualCheckinData,
+    setManualCheckinData,
+    showAdjustModal,
+    setShowAdjustModal,
+    selectedShift,
+    setSelectedShift,
+    newEndTime,
+    setNewEndTime,
+    showEditAttendanceModal,
+    setShowEditAttendanceModal,
+    showChangePinModal,
+    setShowChangePinModal,
+    pinChangeData,
+    setPinChangeData,
+    editingAttendance,
+    setEditingAttendance,
+    manualAttendance,
+    setManualAttendance,
+    removeAccents,
+    handlePrevMonth,
+    handleNextMonth,
+    handleHeaderTap,
+    getAllowedBranches,
+    handleSelectItemType,
+    handleProcessMaterialLoss,
+    logAction,
+    getBranchTheme,
+    handleResize,
+    openConfirmModal,
+    closeConfirmModal,
+    handleChangePin,
+    handleAdjustShift,
+    checkEmployeeReview,
+    handlePayrollChange,
+    BottomNav,
+    SidebarItem,
+    handleSavePayroll,
+    handleUndoPayroll,
+    violations,
+    handleAddViolation,
+    handleDeleteViolation,
+    handleLogin,
+    handleGoogleLogin,
+    handleChangeAdminPin,
+    handleRefresh,
+    exportToCSV,
+    handleSendMonthlyReport,
+    isSendingReport,
+    handleManualAttendance,
+    handleUpdateAttendance,
+    handleApproveAttendance,
+    handleDeleteAttendance,
+    toggleNotifications,
+    setNotificationFilter,
+    headerTapTimeoutRef,
+    currentAdminRef,
+    filterBranchRef,
+    filterMonthRef,
+    isAuthenticatedRef,
+    hasCheckedSalaryRef,
+    nhanViens,
+    adminDisplayName,
+    chamCongs,
+    lichLamViecs,
+    xinNghiPheps,
+    admins,
+    canhBaos,
+    notifications,
+    approvalRequests,
+    payrollAdjustments,
+    salaryHistories,
+    planningGoals,
+    filteredChamCongs,
+    filteredLichLamViecs,
+    filteredXinNghiPheps,
+    filteredApprovalRequests,
+    historySearchTermLower,
+    approvalHistory,
+    pendingRequests,
+    allEmployeeSalaryStatsMap,
+    adminTheme,
+    navigate,
+    calculateEmployeeSalaryStats,
+    auditLogs,
+    materialLossLogs,
+    materialItems,
+    holidays
+  } = logic;
+
+  const [notificationBranch, setNotificationBranch] = useState('All');
+
+  const CommonBranchTabs = (props: any) => (
+    <BranchTabs 
+      currentAdmin={currentAdmin}
+      activeTab={activeTab}
+      payrollActiveBranch={payrollActiveBranch}
+      filterBranch={filterBranch}
+      setPayrollActiveBranch={setPayrollActiveBranch}
+      setFilterBranch={setFilterBranch}
+      adminTheme={adminTheme}
+      {...props}
+    />
+  );
+
+    if (!isAuthenticated) {
+      return (
+        <AdminLogin
+          adminLoginId={adminLoginId} setAdminLoginId={setAdminLoginId}
+          loginIdError={loginIdError} showLoginPin={showLoginPin} setShowLoginPin={setShowLoginPin}
+          password={password} setPassword={setPassword} pinError={pinError}
+          loading={loading} handleLogin={handleLogin} handleGoogleLogin={handleGoogleLogin}
+          navigate={navigate} adminTheme={adminTheme} filterBranch={filterBranch}
+        />
+      );
+    }
 
   return (
-    <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[60] flex items-center justify-center p-4 global-modal-overlay">
-      <div className="bg-white rounded-[2rem] w-full max-w-6xl max-h-[95vh] overflow-hidden flex flex-col shadow-2xl border border-white/20">
-        {/* Header */}
-        <div className={`p-6 border-b border-slate-100 flex justify-between items-center ${props.adminTheme.header} relative overflow-hidden`}>
-          <div className="absolute top-0 right-0 p-8 opacity-10 rotate-12">
-            <Wallet className="w-32 h-32 text-white" />
+    <div className={`flex h-screen w-screen max-w-full ${adminTheme.bg} overflow-x-hidden relative`}>
+
+      
+      <AdminSidebar
+        isSidebarCollapsed={isSidebarCollapsed}
+        isMobileSidebarOpen={isMobileSidebarOpen}
+        setIsMobileSidebarOpen={setIsMobileSidebarOpen}
+        setIsSidebarCollapsed={setIsSidebarCollapsed}
+        activeTab={activeTab}
+        setActiveTab={setActiveTab}
+        adminTheme={adminTheme}
+        currentAdmin={currentAdmin}
+        filteredChamCongs={filteredChamCongs}
+        pendingRequests={pendingRequests}
+        canhBaos={canhBaos}
+        notifications={navNotifications}
+        setShowNotifications={setShowNotifications}
+        handleSendMonthlyReport={handleSendMonthlyReport}
+        isSendingReport={isSendingReport}
+        SidebarItem={SidebarItem}
+      />
+
+      {/* Main Content Area */}
+      <div className={`flex-1 flex flex-col min-w-0 w-full max-w-full overflow-x-hidden ${(!selectedEmployeeForSalaryDetails && !isScheduleModalOpen && ['dashboard', 'bangcongthang', 'duyetgio', 'lichlamviec', 'bangluong'].includes(activeTab)) ? 'pb-16' : 'pb-0'} md:pb-0 ml-0`}>
+        {/* Optimized Header */}
+        <header className={`h-auto whitespace-nowrap ${adminTheme.header} grid grid-cols-[auto_1fr_auto] items-center px-4 md:px-8 flex-none z-40 shadow-md w-full left-0 transition-colors duration-500 pt-4 pb-1 md:py-4`}>
+          <div className="flex items-center">
+            <button 
+              onClick={() => setIsMobileSidebarOpen(true)}
+              className="p-1 px-2 hover:bg-white/10 rounded-xl md:hidden text-white transition-colors flex items-center gap-2"
+            >
+              <Menu className="w-5 h-5 text-white" />
+            </button>
           </div>
-          <div className="relative z-10">
-            <h2 className="text-2xl font-black text-white uppercase tracking-tight">Quản lý Khấu Trừ Khác</h2>
-            <p className="text-white/70 text-sm font-medium">Hao hụt vật tư, Lương giữ tạm và Tạm ứng lương (Tháng {props.filterMonth})</p>
+          
+          <div className="flex flex-col items-start justify-center flex-1 min-w-0 mx-2 py-0.5 gap-0.5">
+            <div className="flex items-center gap-2 py-0.5">
+              <h2 
+                className="text-2xl md:text-3xl font-black text-white leading-normal truncate uppercase tracking-tight"
+              >
+                {filterBranch === 'All' ? 'GÓC PHỐ XANH' : (activeTab === 'bangluong' ? payrollActiveBranch : filterBranch || 'ADMIN PANEL')}
+              </h2>
+              {currentAdmin?.role === 'SuperAdmin' && (
+                <button
+                  onClick={() => {
+                    const nextBranch = (activeTab === 'bangluong' ? payrollActiveBranch : filterBranch) === 'Góc Phố' ? 'Phố Xanh' : 'Góc Phố';
+                    setFilterBranch(nextBranch);
+                    setPayrollActiveBranch(nextBranch);
+                    toast.success(`Đã chuyển sang ${nextBranch.toUpperCase()}`, { icon: '🔄' });
+                  }}
+                  className="p-1.5 bg-white/20 hover:bg-white/30 rounded-full text-white transition-all active:rotate-180 duration-500"
+                  title="Đổi chi nhánh"
+                >
+                  <RefreshCw className="w-4 h-4 md:w-5 h-5" />
+                </button>
+              )}
+            </div>
+            <div className="flex items-center gap-1.5 ml-0.5">
+              <span className="w-1 h-1 bg-white/40 rounded-full" />
+              <span className="text-[11px] md:text-sm font-bold text-white/90">{adminDisplayName}</span>
+            </div>
           </div>
-          <button 
-            onClick={props.onClose}
-            className="p-2 hover:bg-white/10 rounded-full transition-all relative z-10"
-          >
-            <X className="w-6 h-6 text-white" />
-          </button>
-        </div>
 
-        {/* Tab Navigation */}
-        <div className="flex bg-slate-50 p-2 gap-2 border-b border-slate-100">
-          <button
-            onClick={() => setActiveTab('material')}
-            className={`flex-1 py-3 px-4 rounded-2xl flex items-center justify-center gap-2 transition-all ${
-              activeTab === 'material' 
-              ? 'bg-white text-slate-900 shadow-sm border border-slate-200 font-black' 
-              : 'text-slate-500 hover:bg-slate-100 font-bold'
-            }`}
-          >
-            <Box className={`w-4 h-4 ${activeTab === 'material' ? 'text-indigo-500' : ''}`} />
-            <span className="text-xs uppercase tracking-wider">Khấu Trừ Dụng Cụ</span>
-          </button>
-          <button
-            onClick={() => setActiveTab('financial')}
-            className={`flex-1 py-3 px-4 rounded-2xl flex items-center justify-center gap-2 transition-all ${
-              activeTab === 'financial' 
-              ? 'bg-white text-slate-900 shadow-sm border border-slate-200 font-black' 
-              : 'text-slate-500 hover:bg-slate-100 font-bold'
-            }`}
-          >
-            <Landmark className={`w-4 h-4 ${activeTab === 'financial' ? 'text-emerald-500' : ''}`} />
-            <span className="text-xs uppercase tracking-wider">Lương Giữ Tạm</span>
-          </button>
-          <button
-            onClick={() => setActiveTab('advance')}
-            className={`flex-1 py-3 px-4 rounded-2xl flex items-center justify-center gap-2 transition-all ${
-              activeTab === 'advance' 
-              ? 'bg-white text-slate-900 shadow-sm border border-slate-200 font-black' 
-              : 'text-slate-500 hover:bg-slate-100 font-bold'
-            }`}
-          >
-            <Banknote className={`w-4 h-4 ${activeTab === 'advance' ? 'text-amber-500' : ''}`} />
-            <span className="text-xs uppercase tracking-wider">Tạm Ứng Lương</span>
-          </button>
-        </div>
+          <div className="flex items-center justify-end gap-2 text-white">
+            <button
+              onClick={() => setShowChangePinModal(true)}
+              className="p-2 hover:bg-white/10 rounded-xl transition-all"
+              title="Đổi mã PIN"
+            >
+              <Key className="w-5 h-5" />
+            </button>
+            <button
+              onClick={() => setShowNotifications(true)}
+              className="p-2 hover:bg-white/10 rounded-xl transition-all relative"
+            >
+              <Bell className="w-5 h-5" />
+              {navNotifications.some(n => !n.isRead) && (
+                <span className="absolute top-1.5 right-1.5 w-4 h-4 bg-red-500 rounded-full border-2 border-slate-900 flex items-center justify-center text-[10px] font-bold">
+                  {navNotifications.filter(n => !n.isRead).length}
+                </span>
+              )}
+            </button>
+            <button
+              onClick={() => {
+                auth.signOut();
+                setIsAuthenticated(false);
+                setCurrentAdmin(null);
+                setPassword('');
+                navigate('/');
+              }}
+              className="p-2 hover:bg-white/10 rounded-xl transition-all"
+              title="Đăng xuất"
+            >
+              <LogOut className="w-5 h-5" />
+            </button>
+          </div>
+        </header>
 
-        {/* Content Area */}
-        <div className="flex-1 overflow-hidden relative">
-          {activeTab === 'material' && (
-            <div className="h-full overflow-hidden">
-                <MaterialLossModal 
-                  {...props}
-                  materialLossLogs={props.materialLossLogs}
-                  show={true}
-                  onClose={() => {}} // Internal close disabled
-                />
-            </div>
+        {/* Main Content Scroll Area */}
+        <main className="flex-1 overflow-y-auto bg-[#FDFBF7] p-0 md:p-8 md:pt-4 pb-24 md:pb-8 custom-scrollbar">
+          <div className="max-w-[1600px] mx-auto w-full md:p-0">
+            {/* Tab Content Wrapper */}
+            <div className="bg-white rounded-none md:rounded-3xl shadow-sm border-0 md:border border-stone-200 overflow-visible min-h-[calc(100vh-8rem)]">
+              <Dashboard
+                activeTab={activeTab}
+                setActiveTab={setActiveTab}
+                filterBranch={filterBranch}
+                filterMonth={filterMonth}
+                nhanViens={nhanViens}
+                filteredChamCongs={filteredChamCongs}
+                payrollAdjustments={payrollAdjustments}
+                currentAdmin={currentAdmin}
+                adminTheme={adminTheme}
+                formatCurrency={formatCurrency}
+                getPreviousMonthRates={getPreviousMonthRates}
+                toast={toast}
+                pendingRequests={pendingRequests}
+                BranchTabs={CommonBranchTabs}
+              />
+
+              {activeTab === 'duyetgio' && (
+            <ApprovalSection
+              adminTheme={adminTheme}
+              approvalSubTab={approvalSubTab}
+              setApprovalSubTab={setApprovalSubTab}
+              pendingRequests={pendingRequests}
+              historySearchTerm={historySearchTerm}
+              setHistorySearchTerm={setHistorySearchTerm}
+              requestTypeFilter={requestTypeFilter}
+              setRequestTypeFilter={setRequestTypeFilter}
+              currentAdmin={currentAdmin}
+              nhanViens={nhanViens}
+              fetchInitialData={fetchInitialData}
+              logAction={logAction}
+              approvalHistory={approvalHistory}
+              openConfirmModal={openConfirmModal}
+              renderBranchTabs={() => (
+                <CommonBranchTabs />
+              )}
+            />
           )}
-          {activeTab === 'financial' && (
-            <div className="h-full overflow-hidden">
-                <FinancialModal 
-                  {...props}
-                  show={true}
-                  onClose={() => {}} // Internal close disabled
-                />
-            </div>
-          )}
-          {activeTab === 'advance' && (
-            <div className="h-full overflow-y-auto p-6 bg-slate-50 relative flex flex-col">
-              <div className="bg-amber-100 border border-amber-200 p-4 rounded-2xl mb-6 shadow-sm">
-                <div className="flex items-start gap-4">
-                  <div className="p-3 bg-amber-200 text-amber-700 rounded-xl">
-                    <Banknote className="w-6 h-6" />
-                  </div>
-                  <div>
-                    <h3 className="font-black text-amber-900 mb-1">Ứng Lương Nhân Viên</h3>
-                    <p className="text-amber-800/80 text-sm font-medium">Bảng kê liệt kê số tiền nhân viên đã ứng trong tháng. <strong className="font-black">Lưu ý:</strong> Mọi thay đổi ở đây cần được bấm <strong className="font-black text-amber-900 bg-amber-200/50 px-1 rounded">LƯU BẢNG LƯƠNG</strong> tại giao diện Bảng Lương màn hình chính để lưu lại.</p>
-                  </div>
-                </div>
-              </div>
 
-              <div className="bg-white rounded-3xl border border-slate-200 shadow-sm flex flex-col flex-1 overflow-hidden">
-                <div className="p-4 border-b border-slate-100 flex justify-between items-center gap-4">
-                  <h3 className="font-bold text-slate-800">Danh sách nhân viên</h3>
-                  <select 
-                    value={advanceBranch}
-                    onChange={(e) => setAdvanceBranch(e.target.value)}
-                    className="px-4 py-2 border border-slate-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-amber-500 font-bold text-slate-700"
-                  >
-                    {props.allowedBranches.length > 1 && <option value="All">Tất cả chi nhánh</option>}
-                    {props.allowedBranches.map(branch => (
-                      <option key={branch} value={branch}>{branch}</option>
-                    ))}
-                  </select>
-                </div>
 
-                <div className="overflow-x-auto flex-1">
-                  <table className="w-full text-left border-collapse min-w-[600px]">
-                    <thead>
-                      <tr className="bg-slate-50 text-[10px] uppercase font-black text-slate-500 tracking-widest border-b border-slate-100">
-                        <th className="p-4">Nhân viên</th>
-                        <th className="p-4">Chi nhánh</th>
-                        <th className="p-4 text-center">Giờ công</th>
-                        <th className="p-4 text-right">Số tiền tạm ứng (₫)</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {advanceEmployees.map((nv, index) => {
-                        const currentAdvance = getFinalAdvance(nv.id);
-                        return (
-                          <tr key={nv.id} className={`border-b border-slate-50 hover:bg-slate-50/80 transition-colors ${index % 2 === 0 ? 'bg-white' : 'bg-slate-50/30'}`}>
-                            <td className="p-4">
-                              <div className="font-bold text-slate-900">{nv.name}</div>
-                              <div className="text-xs text-slate-500 font-medium">{nv.role}</div>
-                            </td>
-                            <td className="p-4">
-                              <span className="inline-flex items-center px-2 py-1 rounded-md text-[10px] font-black uppercase tracking-wider bg-slate-100 text-slate-600">
-                                {nv.locationId}
-                              </span>
-                            </td>
-                            <td className="p-4 text-center">
-                              <span className={`inline-flex items-center px-2 py-1 rounded-md text-[10px] font-black uppercase tracking-wider ${props.adminTheme.bg} ${props.adminTheme.text}`}>
-                                {nv.totalHours.toFixed(1)}H
-                              </span>
-                            </td>
-                            <td className="p-4">
-                              <div className="flex justify-end">
-                                <input 
-                                  type="text"
-                                  value={currentAdvance === 0 ? '' : formatCurrency(currentAdvance)}
-                                  onChange={(e) => {
-                                    if (props.handlePayrollChange) {
-                                      const val = parseInt(e.target.value.replace(/\D/g, '')) || 0;
-                                      props.handlePayrollChange(nv.id, 'advanceSalary', val);
-                                    }
-                                  }}
-                                  className="w-40 p-3 bg-white border border-slate-200 focus:border-amber-500 rounded-xl text-sm font-bold text-slate-800 text-right outline-none focus:ring-4 focus:ring-amber-500/10 transition-all shadow-sm"
-                                  placeholder="0 ₫"
-                                />
-                              </div>
-                            </td>
-                          </tr>
-                        );
-                      })}
-                      {advanceEmployees.length === 0 && (
-                        <tr>
-                          <td colSpan={3} className="p-8 text-center text-slate-500 font-medium">Không có nhân viên nào.</td>
-                        </tr>
-                      )}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            </div>
+          <AttendanceTab
+            activeTab={activeTab}
+            setActiveTab={setActiveTab}
+            filterBranch={filterBranch}
+            filterMonth={filterMonth}
+            nhanViens={nhanViens}
+            filteredChamCongs={filteredChamCongs}
+            currentAdmin={currentAdmin}
+            adminTheme={adminTheme}
+            historyDay={historyDay}
+            setHistoryDay={setHistoryDay}
+            historyEmployee={historyEmployee}
+            setHistoryEmployee={setHistoryEmployee}
+            mobileHistoryMode={mobileHistoryMode}
+            setMobileHistoryMode={setMobileHistoryMode}
+            showDatePickerGrid={showDatePickerGrid}
+            setShowDatePickerGrid={setShowDatePickerGrid}
+            handlePrevMonth={handlePrevMonth}
+            handleNextMonth={handleNextMonth}
+            handleApproveAttendance={handleApproveAttendance}
+            handleDeleteAttendance={handleDeleteAttendance}
+            setShowEditAttendanceModal={setShowEditAttendanceModal}
+            setEditingAttendance={setEditingAttendance}
+            setShowManualCheckin={setShowManualCheckin}
+            exportToCSV={exportToCSV}
+            checkEmployeeReview={checkEmployeeReview}
+            BranchTabs={CommonBranchTabs}
+            isLoading={loading}
+          />
+
+          {activeTab === 'bangluong' && (
+            <PayrollComponent 
+                nhanViens={nhanViens}
+                filterMonth={filterMonth}
+                setFilterMonth={setFilterMonth}
+                payrollActiveBranch={payrollActiveBranch}
+                calculateEmployeeSalaryStats={calculateEmployeeSalaryStats}
+                formatCurrency={formatCurrency}
+                localAdjustments={localAdjustments}
+                isSavingPayroll={isSavingPayroll}
+                handleSavePayroll={handleSavePayroll}
+                handleUndoPayroll={handleUndoPayroll}
+                undoStack={undoStack}
+                BranchTabs={CommonBranchTabs}
+                showMobileUtilities={showMobileUtilities}
+                setShowMobileUtilities={setShowMobileUtilities}
+                setShowHolidayConfig={setShowHolidayConfig}
+                setShowMaterialLossModal={setShowMaterialLossModal}
+                setShowFinancialModal={setShowFinancialModal}
+                showOtherDeductionsModal={showOtherDeductionsModal}
+                setShowOtherDeductionsModal={setShowOtherDeductionsModal}
+                showColumnConfig={showColumnConfig}
+                setShowColumnConfig={setShowColumnConfig}
+                visibleColumns={visibleColumns}
+                setVisibleColumns={setVisibleColumns}
+                columnWidths={columnWidths}
+                handleResize={handleResize}
+                payrollAdjustments={payrollAdjustments}
+                setSelectedEmployeeForSalaryDetails={setSelectedEmployeeForSalaryDetails}
+                isSalaryDetailOpen={!!selectedEmployeeForSalaryDetails}
+                payrollTheme={getBranchTheme(payrollActiveBranch)}
+                handlePayrollChange={handlePayrollChange}
+                showDeductionDetails={showDeductionDetails}
+                setShowDeductionDetails={setShowDeductionDetails}
+                handlePrevMonth={handlePrevMonth}
+                handleNextMonth={handleNextMonth}
+                exportToCSV={exportToCSV}
+                handleSendMonthlyReport={handleSendMonthlyReport}
+                formatDecimalHours={formatDecimalHours}
+                activeTab={activeTab}
+                currentAdmin={currentAdmin}
+                onEmployeeClick={(nv: any) => {
+                  setHistoryEmployee(nv);
+                  setHistoryDay(null);
+                  setMobileHistoryMode('employee');
+                  setActiveTab('bangcongthang');
+                }}
+                checkEmployeeReview={checkEmployeeReview}
+                isLoading={loading}
+            />
           )}
-        </div>
+
+            {activeTab === 'nhanvien' && (
+              <EmployeeManagement
+                currentAdmin={currentAdmin}
+                adminTheme={adminTheme}
+                activeTab={activeTab}
+                setActiveTab={setActiveTab}
+                nhanViens={nhanViens}
+                filterBranch={filterBranch}
+                planningGoals={planningGoals}
+                openConfirmModal={openConfirmModal}
+                fetchInitialData={fetchInitialData}
+                BranchTabs={CommonBranchTabs}
+                logAction={logAction}
+                filterMonth={filterMonth}
+                localGoals={logic.localGoals}
+                setLocalGoals={logic.setLocalGoals}
+                handleUpdatePlanningGoal={logic.handleUpdatePlanningGoal}
+              />
+            )}
+
+          {/* Tab: Vi phạm */}
+          <ViolationManagement
+            activeTab={activeTab}
+            nhanViens={nhanViens}
+            violations={violations}
+            handleAddViolation={handleAddViolation}
+            handleDeleteViolation={handleDeleteViolation}
+            adminTheme={adminTheme}
+            filterMonth={filterMonth}
+            BranchTabs={CommonBranchTabs}
+          />
+
+          {activeTab === 'lichlamviec' && (
+            <ScheduleView 
+              nhanViens={nhanViens}
+              lichLamViecs={lichLamViecs}
+              filterBranch={filterBranch}
+              filterMonth={filterMonth}
+              currentAdmin={currentAdmin}
+              planningGoals={planningGoals}
+              adminTheme={adminTheme}
+              setIsScheduleModalOpen={setIsScheduleModalOpen}
+              fetchInitialData={fetchInitialData}
+              exportToCSV={exportToCSV}
+              BranchTabs={CommonBranchTabs}
+            />
+          )}
+
+          <AdminManagement
+            activeTab={activeTab}
+            currentAdmin={currentAdmin}
+            adminTheme={adminTheme}
+            admins={admins}
+            SUPER_ADMIN={SUPER_ADMIN}
+            fetchInitialData={fetchInitialData}
+            logAction={logAction}
+            getAllowedBranches={getAllowedBranches}
+            openConfirmModal={openConfirmModal}
+            handleSendMonthlyReport={handleSendMonthlyReport}
+          />
+
+          <Alerts
+            activeTab={activeTab}
+            canhBaos={canhBaos}
+          />
+
+          <SystemLogs
+            activeTab={activeTab}
+            currentAdmin={currentAdmin}
+            auditLogs={auditLogs}
+          />
+
+          <RegulationsTab 
+            activeTab={activeTab}
+            adminTheme={adminTheme}
+          />
+
+      <ChangePinModal
+        show={showChangePinModal}
+        onClose={() => {
+          setShowChangePinModal(false);
+          setPinChangeData({ currentPin: '', newPin: '', confirmNewPin: '' });
+        }}
+        onSubmit={handleChangePin}
+        pinChangeData={{
+          currentPin: pinChangeData.currentPin,
+          newPin: pinChangeData.newPin,
+          confirmPin: pinChangeData.confirmNewPin
+        }}
+        setPinChangeData={(data: any) => setPinChangeData({
+          currentPin: data.currentPin,
+          newPin: data.newPin,
+          confirmNewPin: data.confirmPin
+        })}
+        adminTheme={adminTheme}
+      />
+
+      <ChangeAdminPinModal
+        show={showChangeAdminPinModal}
+        onClose={() => {
+          setShowChangeAdminPinModal(false);
+          setOldAdminPin('');
+          setNewAdminPin('');
+          setConfirmNewAdminPin('');
+          setAdminPinError(null);
+        }}
+        oldAdminPin={oldAdminPin}
+        setOldAdminPin={setOldAdminPin}
+        newAdminPin={newAdminPin}
+        setNewAdminPin={setNewAdminPin}
+        confirmNewAdminPin={confirmNewAdminPin}
+        setConfirmNewAdminPin={setConfirmNewAdminPin}
+        showOldAdminPin={showOldAdminPin}
+        setShowOldAdminPin={setShowOldAdminPin}
+        showNewAdminPin={showNewAdminPin}
+        setShowNewAdminPin={setShowNewAdminPin}
+        showConfirmAdminPin={showConfirmAdminPin}
+        setShowConfirmAdminPin={setShowConfirmAdminPin}
+        adminPinError={adminPinError || ''}
+        onSubmit={handleChangeAdminPin}
+        adminTheme={adminTheme}
+      />
+
+      <ManualAttendanceModal
+        show={showManualCheckin}
+        onClose={() => setShowManualCheckin(false)}
+        manualAttendance={manualAttendance}
+        setManualAttendance={setManualAttendance}
+        onSubmit={handleManualAttendance}
+        nhanViens={nhanViens}
+        adminTheme={adminTheme}
+      />
+
+      <EditAttendanceModal
+        show={showEditAttendanceModal && !!editingAttendance}
+        onClose={() => {
+          setShowEditAttendanceModal(false);
+          setEditingAttendance(null);
+        }}
+        editingAttendance={editingAttendance}
+        setEditingAttendance={setEditingAttendance}
+        onSubmit={handleUpdateAttendance}
+        nhanViens={nhanViens}
+        getAllowedBranches={getAllowedBranches}
+        adminTheme={adminTheme}
+      />
+
+      <ConfirmModal
+        show={showConfirmModal && !!confirmAction}
+        config={confirmAction || { title: '', message: '', onConfirm: () => {} }}
+        onClose={closeConfirmModal}
+        adminTheme={adminTheme}
+      />
+      {showHolidayConfig && (
+        <HolidayConfigModal
+          holidays={holidays}
+          onClose={() => setShowHolidayConfig(false)}
+          fetchInitialData={fetchInitialData}
+          adminTheme={adminTheme}
+        />
+      )}
+
+      {showFinancialModal && (
+        <FinancialModal
+          nhanViens={nhanViens}
+          allowedBranches={getAllowedBranches()}
+          logAction={logAction}
+          openConfirmModal={openConfirmModal}
+          onClose={() => setShowFinancialModal(false)}
+          adminTheme={adminTheme}
+        />
+      )}
+
+      {editingAdjustment && (
+        <PayrollAdjustmentModal
+          adjustment={editingAdjustment}
+          empName={nhanViens.find(e => e.id === editingAdjustment.empId)?.fullName || ''}
+          monthYear={editingAdjustment.monthYear}
+          empId={editingAdjustment.empId}
+          onClose={() => setEditingAdjustment(null)}
+          onSave={() => { setEditingAdjustment(null); fetchInitialData(filterMonth, true); }}
+          adminTheme={adminTheme}
+        />
+      )}
+
+      {selectedEmployeeForDetails && (
+        <EmployeeAttendanceDetailModal
+          employee={selectedEmployeeForDetails}
+          timesheets={chamCongs.filter(cc => cc.empId === selectedEmployeeForDetails.id || cc.empId === selectedEmployeeForDetails.empId)}
+          schedules={lichLamViecs.filter(s => s.empId === selectedEmployeeForDetails.id || s.empId === selectedEmployeeForDetails.empId)}
+          month={filterMonth}
+          onClose={() => setSelectedEmployeeForDetails(null)}
+          adminTheme={adminTheme}
+        />
+      )}
+
+      {selectedEmployeeForSalaryDetails && (
+        <EmployeeSalaryDetailModal
+          employee={selectedEmployeeForSalaryDetails}
+          month={filterMonth}
+          timesheets={chamCongs.filter(cc => (cc.empId === selectedEmployeeForSalaryDetails.id || cc.empId === selectedEmployeeForSalaryDetails.empId) && cc.date.startsWith(filterMonth))}
+          schedules={lichLamViecs.filter(s => (s.empId === selectedEmployeeForSalaryDetails.id || s.empId === selectedEmployeeForSalaryDetails.empId) && s.date.startsWith(filterMonth))}
+          adjustments={payrollAdjustments}
+          holidays={holidays}
+          onClose={() => setSelectedEmployeeForSalaryDetails(null)}
+          theme={{ isAdmin: ['SuperAdmin', 'BranchAdmin'].includes(currentAdmin?.role || '') }}
+          adminTheme={adminTheme}
+          localAdj={localAdjustments[selectedEmployeeForSalaryDetails.id] || {}}
+          onAdjustmentChange={handlePayrollChange}
+          onMonthChange={(m) => setFilterMonth(m)}
+          onSave={(empId, adj) => {
+            handleSavePayroll(empId, adj);
+            setSelectedEmployeeForSalaryDetails(null);
+          }}
+          violations={violations}
+        />
+      )}
+
+      <MaterialLossModal
+        show={showMaterialLossModal}
+        onClose={() => setShowMaterialLossModal(false)}
+        filterMonth={filterMonth}
+        payrollActiveBranch={payrollActiveBranch}
+        materialItems={materialItems}
+        materialLossLogs={materialLossLogs}
+        weightedEmployees={weightedEmployees}
+        setWeightedEmployees={setWeightedEmployees}
+        itemType={itemType}
+        setItemType={setItemType}
+        originalPrice={originalPrice}
+        setOriginalPrice={setOriginalPrice}
+        quantity={quantity}
+        setQuantity={setQuantity}
+        isProcessing={isProcessingLoss}
+        onProcess={handleProcessMaterialLoss}
+        adminTheme={adminTheme}
+      />
+
+      <OtherDeductionsGlobalModal 
+        show={showOtherDeductionsModal}
+        onClose={() => setShowOtherDeductionsModal(false)}
+        adminTheme={adminTheme}
+        nhanViens={nhanViens}
+        allowedBranches={getAllowedBranches()}
+        logAction={logAction}
+        openConfirmModal={openConfirmModal}
+        fetchInitialData={fetchInitialData}
+        filterMonth={filterMonth}
+        payrollActiveBranch={payrollActiveBranch}
+        materialItems={materialItems}
+        materialLossLogs={materialLossLogs}
+        weightedEmployees={weightedEmployees}
+        setWeightedEmployees={setWeightedEmployees}
+        itemType={itemType}
+        setItemType={setItemType}
+        lossType={lossType}
+        setLossType={setLossType}
+        originalPrice={originalPrice}
+        setOriginalPrice={setOriginalPrice}
+        deductionPrice={deductionPrice}
+        quantity={quantity}
+        setQuantity={setQuantity}
+        totalLossAmount={totalLossAmount}
+        setTotalLossAmount={setTotalLossAmount}
+        isProcessingLoss={isProcessingLoss}
+        onProcessMaterialLoss={handleProcessMaterialLoss}
+        localAdjustments={localAdjustments}
+        payrollAdjustments={payrollAdjustments}
+        handlePayrollChange={handlePayrollChange}
+      />
+
+            </div>
+          </div>
+        </main>
       </div>
-
-      <style>{`
-        /* Overriding internal modal styles to fit inside the tabbed modal */
-        .flex-1.overflow-hidden.relative .fixed.inset-0 {
-          position: relative !important;
-          background: transparent !important;
-          backdrop-filter: none !important;
-          z-index: 10 !important;
-          padding: 0 !important;
-          display: block !important;
-        }
-        .flex-1.overflow-hidden.relative .bg-white.rounded-3xl {
-          max-width: 100% !important;
-          max-height: 100% !important;
-          box-shadow: none !important;
-          border-radius: 0 !important;
-          border: none !important;
-        }
-        .flex-1.overflow-hidden.relative .p-6.border-b.border-slate-100.flex.justify-between, 
-        .flex-1.overflow-hidden.relative .p-6.border-b.border-white\\/10 {
-          display: none !important; /* Hide individual headers */
-        }
-      `}</style>
+      
+      {/* Bottom Navigation for Mobile */}
+      {!selectedEmployeeForSalaryDetails && 
+       !showHolidayConfig && 
+       !showFinancialModal && 
+       !showAdjustModal && 
+       !showEditAttendanceModal && 
+       !showChangePinModal && 
+       !showChangeAdminPinModal && 
+       !showConfirmModal && 
+       !showMaterialLossModal &&
+       !isScheduleModalOpen &&
+       ['dashboard', 'bangcongthang', 'duyetgio', 'lichlamviec', 'bangluong'].includes(activeTab) && <BottomNav />}
+      <NotificationModal 
+        isOpen={showNotifications}
+        onClose={() => setShowNotifications(false)}
+        notifications={navNotifications}
+        onMarkAsRead={markAsRead}
+        onMarkAllAsRead={markAllAsRead}
+        isAdmin={['Admin', 'SuperAdmin', 'BranchAdmin'].includes(currentAdmin?.role || '')}
+        isSuperAdmin={currentAdmin?.role === 'SuperAdmin'}
+        allowedBranches={currentAdmin?.locationIds}
+        selectedBranch={notificationBranch}
+        onBranchChange={setNotificationBranch}
+        adminTheme={adminTheme}
+      />
     </div>
   );
-};
+}
