@@ -194,6 +194,8 @@ export function calculateNetSalary(
   const finalExtraAdditions = localAdj.extraAdditions !== undefined ? localAdj.extraAdditions : (adjustment.extraAdditions || 0);
   const finalAdvance = localAdj.advanceSalary !== undefined ? localAdj.advanceSalary : (adjustment.advanceSalary || 0);
   const finalMaterialLoss = localAdj.materialLoss !== undefined ? localAdj.materialLoss : (adjustment.materialLoss || 0);
+  const finalMaterialLossShared = localAdj.materialLossShared !== undefined ? localAdj.materialLossShared : (adjustment.materialLossShared || 0);
+  const finalMaterialLossIndividual = localAdj.materialLossIndividual !== undefined ? localAdj.materialLossIndividual : (adjustment.materialLossIndividual || 0);
   
   const baseTtnPercentage = localAdj.ttnPercentage !== undefined ? localAdj.ttnPercentage : (adjustment.ttnPercentage ?? 100);
   
@@ -311,6 +313,8 @@ export function calculateNetSalary(
     finalReturnRetained,
     finalAdvance,
     finalMaterialLoss,
+    finalMaterialLossShared,
+    finalMaterialLossIndividual,
     finalExtraAdditions,
     finalNote,
     materialLossNote,
