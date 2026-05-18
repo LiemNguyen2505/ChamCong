@@ -119,14 +119,7 @@ export const AttendanceActionForm: React.FC<AttendanceActionFormProps> = ({
                       setScheduledShiftTime(shift.startTime);
                       const now = new Date();
                       const nowStr = format(now, 'HH:mm');
-                      const [schH, schM] = shift.startTime.split(':').map(Number);
-                      const schTotal = schH * 60 + schM;
-                      const nowTotal = now.getHours() * 60 + now.getMinutes();
-                      if (nowTotal > schTotal) {
-                        setSelectedShiftTime(nowStr);
-                      } else {
-                        setSelectedShiftTime(shift.startTime);
-                      }
+                      setSelectedShiftTime(nowStr);
                     } else {
                       setScheduledShiftTime(shift.endTime);
                     }
