@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'motion/react';
 import { Download, Users, Calendar, Banknote, Wallet, Settings2, MoreVertical, Save, RefreshCw, Undo2, Info, ChevronRight, FileText, Smartphone, Clock, X, Edit2, Trash2, StickyNote, SmartphoneNfc } from 'lucide-react';
 
@@ -14,7 +15,8 @@ const PenaltyPopover = ({
   onReset,
   unitRate,
   isEdited: isEditedProp,
-  textColor
+  textColor,
+  id
 }: { 
   label: string; 
   amount: number; 
@@ -28,8 +30,9 @@ const PenaltyPopover = ({
   unitRate?: number;
   isEdited?: boolean;
   textColor?: string;
+  id: string;
 }) => {
-  const [isOpen, setIsOpen] = React.useState(false);
+  const [isOpen, setIsOpen] = useState(false);
   const isEdited = isEditedProp;
   
   return (
@@ -42,80 +45,77 @@ const PenaltyPopover = ({
       </div>
 
       <button 
-        onClick={() => setIsOpen(!isOpen)}
+        id={id}
+        onClick={(e) => {
+          e.stopPropagation();
+          setIsOpen(!isOpen);
+        }}
         className={`p-0.5 rounded-full transition-all ml-0.5 opacity-0 group-hover/penalty:opacity-100 ${isEdited ? 'text-amber-500 bg-amber-50 opacity-100' : 'text-slate-300 hover:text-sky-600 hover:bg-sky-50'}`}
       >
         <Info className="w-2.5 h-2.5" />
       </button>
 
-      <AnimatePresence>
-        {isOpen && (
-          <>
-            <div className="fixed inset-0 z-[110] bg-slate-900/5 backdrop-blur-[2px]" onClick={() => setIsOpen(false)} />
-            <motion.div 
-              initial={{ opacity: 0, scale: 0.95, y: 5 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.95, y: 5 }}
-              className="absolute z-[120] bottom-full right-0 mb-3 w-64 p-4 bg-white rounded-2xl shadow-xl shadow-slate-200/50 border border-slate-200 animate-in fade-in"
-              onClick={e => e.stopPropagation()}
-            >
-              <div className="flex justify-between items-center mb-3">
-                <h4 className="text-[11px] font-black text-rose-600 uppercase tracking-widest leading-none">{label}</h4>
-                <button onClick={() => setIsOpen(false)} className="p-1 hover:bg-slate-100 rounded-full transition-colors">
-                  <X className="w-3.5 h-3.5 text-slate-400" />
-                </button>
-              </div>
+      <PopoverPortal 
+        isOpen={isOpen}
+        onClose={() => setIsOpen(false)}
+        anchorId={id}
+        position="top"
+        className="w-64"
+      >
+        <div className="flex justify-between items-center mb-3">
+          <h4 className="text-[11px] font-black text-rose-600 uppercase tracking-widest leading-none">{label}</h4>
+          <button onClick={() => setIsOpen(false)} className="p-1 hover:bg-slate-100 rounded-full transition-colors">
+            <X className="w-3.5 h-3.5 text-slate-400" />
+          </button>
+        </div>
 
-              <div className="space-y-4">
-                <div className="p-3 bg-slate-50 rounded-xl border border-slate-100">
-                  <div className="text-[9px] font-black text-slate-400 uppercase mb-2">Hệ thống (Bảng chấm công)</div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-xs font-bold text-slate-700">{rawQuantityValue} {quantityLabel}</span>
-                    <span className="text-sm font-bold text-slate-500">{new Intl.NumberFormat('vi-VN').format(rawAmount)}đ</span>
-                  </div>
-                </div>
+        <div className="space-y-4">
+          <div className="p-3 bg-slate-50 rounded-xl border border-slate-100">
+            <div className="text-[9px] font-black text-slate-400 uppercase mb-2">Hệ thống (Bảng chấm công)</div>
+            <div className="flex justify-between items-center">
+              <span className="text-xs font-bold text-slate-700">{rawQuantityValue} {quantityLabel}</span>
+              <span className="text-sm font-bold text-slate-500">{new Intl.NumberFormat('vi-VN').format(rawAmount)}đ</span>
+            </div>
+          </div>
 
-                <div className="p-3 bg-sky-50 rounded-xl border border-sky-100">
-                  <div className="text-[9px] font-black text-sky-500 uppercase mb-2">Quản lý điều chỉnh</div>
-                  <div className="flex items-center justify-between mb-2">
-                     <span className="text-xs font-bold text-sky-700">{quantityLabel}:</span>
-                     <input 
-                        type="number"
-                        autoFocus
-                        value={quantityValue}
-                        onChange={(e) => {
-                          const val = parseInt(e.target.value) || 0;
-                          onQuantityChange(val);
-                        }}
-                        className="w-28 p-1.5 bg-white border border-sky-200 rounded text-sm font-bold text-sky-900 text-center outline-none focus:border-sky-400 transition-all font-mono"
-                     />
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold text-sky-700">Tiền phạt:</span>
-                    <input 
-                      type="text"
-                      value={new Intl.NumberFormat('vi-VN').format(amount)}
-                      onChange={(e) => {
-                        const val = parseInt(e.target.value.replace(/\D/g, '')) || 0;
-                        onAmountChange(val);
-                      }}
-                      className="w-28 p-1.5 bg-white border border-sky-200 rounded text-sm font-bold text-rose-600 text-center outline-none focus:border-sky-400 transition-all font-mono"
-                    />
-                  </div>
-                </div>
-                
-                <button 
-                  onClick={() => { onReset(); setIsOpen(false); }}
-                  className="w-full mt-2 py-2 bg-amber-50 text-amber-700 rounded-lg text-xs font-bold hover:bg-amber-100 transition-all flex items-center justify-center gap-2"
-                >
-                  <Undo2 className="w-3.5 h-3.5" /> Khôi phục dữ liệu gốc
-                </button>
-              </div>
-              <div className="absolute top-full right-4 border-8 border-transparent border-t-white" />
-            </motion.div>
-          </>
-        )}
-      </AnimatePresence>
+          <div className="p-3 bg-sky-50 rounded-xl border border-sky-100">
+            <div className="text-[9px] font-black text-sky-500 uppercase mb-2">Quản lý điều chỉnh</div>
+            <div className="flex items-center justify-between mb-2">
+               <span className="text-xs font-bold text-sky-700">{quantityLabel}:</span>
+               <input 
+                  type="number"
+                  autoFocus
+                  value={quantityValue}
+                  onChange={(e) => {
+                    const val = parseInt(e.target.value) || 0;
+                    onQuantityChange(val);
+                  }}
+                  className="w-28 p-1.5 bg-white border border-sky-200 rounded text-sm font-bold text-sky-900 text-center outline-none focus:border-sky-400 transition-all font-mono"
+               />
+            </div>
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-bold text-sky-700">Tiền phạt:</span>
+              <input 
+                type="text"
+                value={new Intl.NumberFormat('vi-VN').format(amount)}
+                onChange={(e) => {
+                  const val = parseInt(e.target.value.replace(/\D/g, '')) || 0;
+                  onAmountChange(val);
+                }}
+                className="w-28 p-1.5 bg-white border border-sky-200 rounded text-sm font-bold text-rose-600 text-center outline-none focus:border-sky-400 transition-all font-mono"
+              />
+            </div>
+          </div>
+          
+          <button 
+            onClick={() => { onReset(); setIsOpen(false); }}
+            className="w-full mt-2 py-2 bg-amber-50 text-amber-700 rounded-lg text-xs font-bold hover:bg-amber-100 transition-all flex items-center justify-center gap-2"
+          >
+            <Undo2 className="w-3.5 h-3.5" /> Khôi phục dữ liệu gốc
+          </button>
+        </div>
+        <div className="absolute top-full right-4 border-8 border-transparent border-t-white" />
+      </PopoverPortal>
     </div>
   );
 };
@@ -130,16 +130,18 @@ const FieldNote = ({
   onChange: (val: string) => void; 
   placeholder?: string;
 }) => {
-  const [isOpen, setIsOpen] = React.useState(false);
-  const [localValue, setLocalValue] = React.useState(value || '');
+  const [isOpen, setIsOpen] = useState(false);
+  const [localValue, setLocalValue] = useState(value || '');
+  const id = useMemo(() => 'field-note-' + Math.random().toString(36).substr(2, 9), []);
 
-  React.useEffect(() => {
+  useEffect(() => {
     setLocalValue(value || '');
   }, [value]);
 
   return (
     <div className="relative inline-flex items-center ml-1">
       <button 
+        id={id}
         onClick={(e) => {
           e.stopPropagation();
           setIsOpen(!isOpen);
@@ -150,36 +152,88 @@ const FieldNote = ({
         <StickyNote className="w-3 h-3" />
       </button>
 
-      <AnimatePresence>
-        {isOpen && (
-          <motion.div 
-            initial={{ opacity: 0, scale: 0.95 }}
-            animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0, scale: 0.95 }}
-            className="absolute z-[110] bottom-full right-0 mb-2 w-48 p-2 bg-white rounded-xl shadow-2xl border border-slate-200 animate-in fade-in slide-in-from-bottom-2"
-            onClick={e => e.stopPropagation()}
-          >
-            <textarea
-              autoFocus
-              value={localValue}
-              onChange={(e) => setLocalValue(e.target.value)}
-              onBlur={() => {
-                onChange(localValue);
-                setIsOpen(false);
-              }}
-              onKeyDown={(e) => {
-                if (e.key === 'Escape') {
-                  onChange(localValue);
-                  setIsOpen(false);
-                }
-              }}
-              className="w-full p-2 bg-slate-50 border border-slate-100 rounded-lg text-xs outline-none focus:ring-1 focus:ring-sky-500 min-h-[60px]"
-              placeholder={placeholder}
-            />
-          </motion.div>
-        )}
-      </AnimatePresence>
+      <PopoverPortal
+        isOpen={isOpen}
+        onClose={() => setIsOpen(false)}
+        anchorId={id}
+        position="top"
+        className="w-48 p-2"
+      >
+        <textarea
+          autoFocus
+          value={localValue}
+          onChange={(e) => setLocalValue(e.target.value)}
+          onBlur={() => {
+            onChange(localValue);
+            setIsOpen(false);
+          }}
+          onKeyDown={(e) => {
+            if (e.key === 'Escape') {
+              onChange(localValue);
+              setIsOpen(false);
+            }
+          }}
+          className="w-full p-2 bg-slate-50 border border-slate-100 rounded-lg text-xs outline-none focus:ring-1 focus:ring-sky-500 min-h-[60px]"
+          placeholder={placeholder}
+        />
+        <div className="absolute top-full right-2 border-4 border-transparent border-t-white" />
+      </PopoverPortal>
     </div>
+  );
+};
+
+const PopoverPortal = ({ isOpen, onClose, anchorId, align = 'right', position = 'bottom', className = '', children }: any) => {
+  const [coords, setCoords] = useState({ top: 0, bottom: 0, left: 0, right: 0, width: 0 });
+
+  useEffect(() => {
+    const updateCoords = () => {
+      if (isOpen) {
+        const anchor = document.getElementById(anchorId);
+        if (anchor) {
+          const rect = anchor.getBoundingClientRect();
+          setCoords({
+            top: rect.top,
+            bottom: rect.bottom,
+            left: rect.left,
+            right: window.innerWidth - rect.right,
+            width: rect.width
+          });
+        }
+      }
+    };
+    if (isOpen) {
+      updateCoords();
+      window.addEventListener('resize', updateCoords);
+      window.addEventListener('scroll', updateCoords, true);
+    }
+    return () => {
+      window.removeEventListener('resize', updateCoords);
+      window.removeEventListener('scroll', updateCoords, true);
+    };
+  }, [isOpen, anchorId]);
+
+  if (!isOpen) return null;
+
+  return createPortal(
+    <>
+      <div className="fixed inset-0 z-[110]" onClick={(e) => { e.stopPropagation(); onClose(); }} />
+      <motion.div 
+        initial={{ opacity: 0, scale: 0.95, y: position === 'top' ? 5 : -5 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        exit={{ opacity: 0, scale: 0.95, y: position === 'top' ? 5 : -5 }}
+        style={{
+          position: 'fixed',
+          ...(position === 'bottom' ? { top: coords.bottom + 4 } : { top: coords.top - 8, transform: 'translateY(-100%)' }),
+          ...(align === 'right' ? { right: coords.right } : { left: coords.left }),
+          zIndex: 120
+        }}
+        className={`bg-white rounded-xl shadow-2xl border border-slate-200 p-4 text-left ${className}`}
+        onClick={e => e.stopPropagation()}
+      >
+        {children}
+      </motion.div>
+    </>,
+    document.body
   );
 };
 
@@ -187,7 +241,8 @@ export const PayrollComponent: React.FC<any> = ({
     nhanViens, filterMonth, setFilterMonth, payrollActiveBranch, calculateEmployeeSalaryStats,
     formatCurrency, localAdjustments, isSavingPayroll, handleSavePayroll, handleUndoPayroll,
     undoStack, BranchTabs, showMobileUtilities, setShowMobileUtilities, setShowHolidayConfig,
-    setShowMaterialLossModal, setShowFinancialModal, showColumnConfig, setShowColumnConfig,
+    setShowMaterialLossModal, setShowFinancialModal, showOtherDeductionsModal, setShowOtherDeductionsModal,
+    showColumnConfig, setShowColumnConfig,
     visibleColumns, setVisibleColumns, columnWidths, handleResize, payrollAdjustments,
     setSelectedEmployeeForSalaryDetails, isSalaryDetailOpen,
     payrollTheme,
@@ -489,7 +544,7 @@ export const PayrollComponent: React.FC<any> = ({
                       )}
                       {visibleColumns.otherDeductions && (
                         <th style={{ width: Math.max(columnWidths.otherDeductions, 140) }} className="p-3 font-bold text-slate-500 border-r border-slate-300 text-right relative group">
-                          Khấu trừ khác
+                          KHẤU TRỪ KHÁC
                           <div onMouseDown={(e) => handleResize('otherDeductions', e)} className="absolute right-0 top-0 h-full w-1 cursor-col-resize bg-transparent group-hover:bg-sky-400 z-10" />
                         </th>
                       )}
@@ -625,6 +680,7 @@ export const PayrollComponent: React.FC<any> = ({
                               {visibleColumns.latePenalty && (
                                 <td className="p-3 border-r border-slate-100 text-right">
                                   <PenaltyPopover 
+                                    id={`late-penalty-${emp.id}`}
                                     label="Phạt đi trễ"
                                     amount={stats.latePenaltyTotal}
                                     rawAmount={stats.rawLatePenaltyTotal}
@@ -646,6 +702,7 @@ export const PayrollComponent: React.FC<any> = ({
                               {visibleColumns.phonePenalty && (
                                 <td className="p-3 border-r border-slate-100 text-right">
                                   <PenaltyPopover 
+                                    id={`phone-penalty-${emp.id}`}
                                     label="Sử dụng ĐT"
                                     amount={stats.phonePenaltyTotal}
                                     rawAmount={stats.rawPhonePenaltyTotal}
@@ -668,6 +725,7 @@ export const PayrollComponent: React.FC<any> = ({
                                     <td className="p-3 border-r border-slate-100 text-right relative group/ded">
                                       <div className="flex items-center justify-end gap-2">
                                         <button 
+                                          id={`deduction-btn-${emp.id}`}
                                           onClick={() => setShowDeductionDetails(showDeductionDetails === emp.id ? null : emp.id)}
                                           className="text-right hover:text-sky-600 transition-all font-medium flex flex-col items-end leading-none"
                                         >
@@ -677,66 +735,111 @@ export const PayrollComponent: React.FC<any> = ({
                                         </button>
                                       </div>
                                       
-                                      {showDeductionDetails === emp.id && (
-                                        <div className="absolute z-[100] top-full right-0 mt-1 w-60 bg-white rounded-xl shadow-2xl border border-slate-200 p-4 text-left animate-in fade-in slide-in-from-top-1">
-                                          <div className="flex justify-between items-center mb-3 pb-2 border-b border-slate-100">
-                                            <h4 className="font-black text-slate-900 text-[10px] uppercase tracking-wider">Chi phí khấu trừ</h4>
+                                       <PopoverPortal 
+                                        isOpen={showDeductionDetails === emp.id} 
+                                        onClose={() => setShowDeductionDetails(null)}
+                                        anchorId={`deduction-btn-${emp.id}`}
+                                        className="w-72"
+                                      >
+                                          <div className="flex justify-between items-center mb-0 pb-2 border-b border-slate-100">
+                                            <h4 className="font-black text-slate-900 text-[10px] uppercase tracking-wider">Khấu Trừ Khác</h4>
                                             <button onClick={() => setShowDeductionDetails(null)} className="text-slate-400 hover:text-rose-500 transition-colors">
                                               <X className="w-3.5 h-3.5" />
                                             </button>
                                           </div>
-                                          <div className="space-y-4">
-                                            <div className="flex flex-col gap-1">
-                                               <div className="flex justify-between items-center px-0.5">
-                                                  <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Tiền Giữ Tạm</label>
-                                                  {isEdited('retainedSalary') && <div className="w-1 h-1 rounded-full bg-amber-500" />}
-                                               </div>
-                                               <input 
-                                                 type="text"
-                                                 value={(stats.finalRetained === 0 || stats.finalRetained === null) ? '' : formatCurrency(stats.finalRetained)}
-                                                 onChange={(e) => {
-                                                   const val = parseInt(e.target.value.replace(/\D/g, '')) || 0;
-                                                   handlePayrollChange(emp.id, 'retainedSalary', val);
-                                                 }}
-                                                 className="w-full p-2 bg-slate-50 border border-slate-200 rounded-lg text-sm text-rose-600 font-bold outline-none focus:ring-2 focus:ring-sky-500 focus:bg-white"
-                                                 placeholder="0"
-                                               />
-                                            </div>
-                                            <div className="flex flex-col gap-1">
-                                              <div className="flex justify-between items-center px-0.5">
-                                                <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Khấu Trừ Dụng Cụ</label>
-                                                {isEdited('materialLoss') && <div className="w-1 h-1 rounded-full bg-amber-500" />}
-                                              </div>
-                                              <input 
-                                                type="text"
-                                                value={(stats.finalMaterialLoss === 0 || stats.finalMaterialLoss === null) ? '' : formatCurrency(stats.finalMaterialLoss)}
-                                                onChange={(e) => {
-                                                  const val = parseInt(e.target.value.replace(/\D/g, '')) || 0;
-                                                  handlePayrollChange(emp.id, 'materialLoss', val);
+
+                                          <div className="flex mt-2 mb-4 bg-slate-50 p-1 rounded-xl gap-1">
+                                            {['retained', 'material', 'advance'].map((tab) => (
+                                              <button
+                                                key={tab}
+                                                onClick={() => {
+                                                  const nextTab = tab as any;
+                                                  (window as any).activeDeductionSubTab = (window as any).activeDeductionSubTab || {};
+                                                  (window as any).activeDeductionSubTab[emp.id] = nextTab;
+                                                  setShowDeductionDetails(emp.id); // Triggers re-render
                                                 }}
-                                                className="w-full p-2 bg-slate-50 border border-slate-200 rounded-lg text-sm text-rose-600 font-bold outline-none focus:ring-2 focus:ring-sky-500 focus:bg-white"
-                                                placeholder="0"
-                                              />
-                                            </div>
-                                            <div className="flex flex-col gap-1">
-                                              <div className="flex justify-between items-center px-0.5">
-                                                <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Tạm Ứng</label>
-                                                {isEdited('advanceSalary') && <div className="w-1 h-1 rounded-full bg-amber-500" />}
-                                              </div>
-                                              <input 
-                                                type="text"
-                                                value={(stats.finalAdvance === 0 || stats.finalAdvance === null) ? '' : formatCurrency(stats.finalAdvance)}
-                                                onChange={(e) => {
-                                                  const val = parseInt(e.target.value.replace(/\D/g, '')) || 0;
-                                                  handlePayrollChange(emp.id, 'advanceSalary', val);
-                                                }}
-                                                className="w-full p-2 bg-slate-50 border border-slate-200 rounded-lg text-sm text-sky-600 font-bold outline-none focus:ring-2 focus:ring-sky-500 focus:bg-white"
-                                                placeholder="0"
-                                              />
-                                            </div>
+                                                className={`flex-1 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-tight transition-all ${
+                                                  ((window as any).activeDeductionSubTab?.[emp.id] || 'retained') === tab
+                                                  ? 'bg-white text-slate-900 shadow-sm border border-slate-200'
+                                                  : 'text-slate-400 hover:bg-slate-100'
+                                                }`}
+                                              >
+                                                {tab === 'retained' ? 'Giữ tạm' : tab === 'material' ? 'Hao hụt' : 'Ứng lương'}
+                                              </button>
+                                            ))}
                                           </div>
-                                        </div>
-                                      )}
+
+                                          <div className="space-y-4 min-h-[80px]">
+                                              {((window as any).activeDeductionSubTab?.[emp.id] || 'retained') === 'retained' && (
+                                                <div className="flex flex-col gap-1">
+                                                   <div className="flex justify-between items-center px-0.5">
+                                                      <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Tiền Giữ Tạm</label>
+                                                      {isEdited('retainedSalary') && <div className="w-1 h-1 rounded-full bg-amber-500" />}
+                                                   </div>
+                                                   <input 
+                                                     type="text"
+                                                     autoFocus
+                                                     value={(stats.finalRetained === 0 || stats.finalRetained === null) ? '' : formatCurrency(stats.finalRetained)}
+                                                     onChange={(e) => {
+                                                       const val = parseInt(e.target.value.replace(/\D/g, '')) || 0;
+                                                       handlePayrollChange(emp.id, 'retainedSalary', val);
+                                                     }}
+                                                     className="w-full p-2 bg-slate-50 border border-slate-200 rounded-lg text-sm text-rose-600 font-bold outline-none focus:ring-2 focus:ring-sky-500 focus:bg-white"
+                                                     placeholder="0"
+                                                   />
+                                                   <p className="text-[9px] text-slate-400 italic mt-1 leading-tight">
+                                                     Số tiền này sẽ được giữ lại trong quỹ chung.
+                                                   </p>
+                                                </div>
+                                              )}
+
+                                              {((window as any).activeDeductionSubTab?.[emp.id] || 'retained') === 'material' && (
+                                                <div className="flex flex-col gap-1">
+                                                  <div className="flex justify-between items-center px-0.5">
+                                                     <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Khấu Trừ Dụng Cụ</label>
+                                                     {isEdited('materialLoss') && <div className="w-1 h-1 rounded-full bg-amber-500" />}
+                                                   </div>
+                                                   <input 
+                                                     type="text"
+                                                     autoFocus
+                                                     value={(stats.finalMaterialLoss === 0 || stats.finalMaterialLoss === null) ? '' : formatCurrency(stats.finalMaterialLoss)}
+                                                     onChange={(e) => {
+                                                       const val = parseInt(e.target.value.replace(/\D/g, '')) || 0;
+                                                       handlePayrollChange(emp.id, 'materialLoss', val);
+                                                     }}
+                                                     className="w-full p-2 bg-slate-200/50 border border-slate-300 rounded-lg text-sm text-rose-600 font-bold outline-none focus:ring-2 focus:ring-sky-500 focus:bg-white"
+                                                     placeholder="0"
+                                                   />
+                                                   <p className="text-[9px] text-slate-400 italic mt-1 leading-tight">
+                                                     Khấu trừ ly, tách, trang thiết bị hư hỏng.
+                                                   </p>
+                                                </div>
+                                              )}
+
+                                              {((window as any).activeDeductionSubTab?.[emp.id] || 'retained') === 'advance' && (
+                                                <div className="flex flex-col gap-1">
+                                                  <div className="flex justify-between items-center px-0.5">
+                                                     <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Ứng Lương</label>
+                                                     {isEdited('advanceSalary') && <div className="w-1 h-1 rounded-full bg-amber-500" />}
+                                                  </div>
+                                                  <input 
+                                                    type="text"
+                                                    autoFocus
+                                                    value={(stats.finalAdvance === 0 || stats.finalAdvance === null) ? '' : formatCurrency(stats.finalAdvance)}
+                                                    onChange={(e) => {
+                                                      const val = parseInt(e.target.value.replace(/\D/g, '')) || 0;
+                                                      handlePayrollChange(emp.id, 'advanceSalary', val);
+                                                    }}
+                                                    className="w-full p-2 bg-amber-50 border border-amber-200 rounded-lg text-sm text-sky-600 font-bold outline-none focus:ring-2 focus:ring-sky-500 focus:bg-white"
+                                                    placeholder="0"
+                                                  />
+                                                  <p className="text-[9px] text-slate-400 italic mt-1 leading-tight">
+                                                    Nhân viên đã tạm ứng trong tháng.
+                                                  </p>
+                                                </div>
+                                              )}
+                                          </div>
+                                      </PopoverPortal>
                                     </td>
                                   )}
                                   {visibleColumns.extraAdditions && (
