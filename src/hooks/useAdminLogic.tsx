@@ -552,7 +552,7 @@ export function useAdminLogic(globalData: any, fetchInitialData: any, isLoading:
 
   const handleProcessMaterialLoss = async () => {
     if (!itemType) {
-      toast.error('Vui lòng nhập loại vật tư');
+      toast.error('Vui lòng nhập tên dụng cụ');
       return;
     }
     if (!totalLossAmount || isNaN(Number(totalLossAmount)) || Number(totalLossAmount) <= 0) {
@@ -567,20 +567,52 @@ export function useAdminLogic(globalData: any, fetchInitialData: any, isLoading:
     }
 
     setIsProcessingLoss(true);
-    const loadingToast = toast.loading('Đang xử lý khấu trừ vật tư...');
+    const loadingToast = toast.loading('Đang xử lý khấu trừ dụng cụ...');
     try {
       const totalHours = activeWeightedEmployees.reduce((sum, e) => sum + e.totalHours, 0);
       const amountPerHour = totalHours > 0 ? Number(totalLossAmount) / totalHours : 0;
+
+      // Determine loss type automatically
+      const currentLossType = activeWeightedEmployees.length === 1 ? 'individual' : 'general';
 
       // Save/Update Material Item Price
       await setDoc(doc(db, 'MaterialItems', itemType), {
         name: itemType,
         price: Number(originalPrice),
-        lastUpdated: serverTimestamp()
+        updatedAt: serverTimestamp()
       }, { merge: true });
 
+      // Save to Logs for History
+      await addDoc(collection(db, 'MaterialLossLogs'), {
+        itemType,
+        originalPrice: Number(originalPrice),
+        deductionPrice: Math.round(Number(originalPrice) * 0.7),
+        quantity: Number(quantity),
+        totalAmount: Number(totalLossAmount),
+        type: currentLossType, // "general" or "individual"
+        branch: payrollActiveBranch || 'all',
+        monthYear: filterMonth,
+        processedAt: serverTimestamp(),
+        affectedEmployeeCount: activeWeightedEmployees.length,
+        affectedEmployees: activeWeightedEmployees.map(e => e.fullName)
+      });
+
       const batchPromises = activeWeightedEmployees.map(async (emp) => {
-        const deductionForEmp = Math.round(amountPerHour * emp.totalHours);
+        let deductionForEmp = 0;
+        let note = '';
+        let message = '';
+        const isIndividual = currentLossType === 'individual';
+        
+        if (!isIndividual) {
+            deductionForEmp = Math.round(amountPerHour * emp.totalHours);
+            note = `Khấu trừ chung ${itemType} x${quantity} (Dựa trên ${emp.totalHours.toFixed(2)} giờ công làm việc)`;
+            message = `Ghi nhận khấu trừ dụng cụ ${itemType} - Số lượng ${quantity}. Tổng giá trị chia sẻ của bạn tháng này là ${formatCurrency(deductionForEmp)} VNĐ.`;
+        } else {
+            deductionForEmp = Math.round(Number(totalLossAmount));
+            note = `Khấu trừ riêng ${itemType} x${quantity}`;
+            message = `Ghi nhận khấu trừ riêng dụng cụ ${itemType} - Số lượng ${quantity}. Tổng giá trị khấu trừ là ${formatCurrency(deductionForEmp)} VNĐ.`;
+        }
+
         const adjId = `${emp.id}_${filterMonth}`;
         const adjRef = doc(db, 'PayrollAdjustments', adjId);
         
@@ -588,14 +620,16 @@ export function useAdminLogic(globalData: any, fetchInitialData: any, isLoading:
           empId: emp.id,
           monthYear: filterMonth,
           materialLoss: increment(deductionForEmp),
-          materialLossNote: `Khấu trừ ${itemType} x${quantity} (Dựa trên ${emp.totalHours.toFixed(2)} giờ công làm việc)`
+          materialLossShared: increment(!isIndividual ? deductionForEmp : 0),
+          materialLossIndividual: increment(isIndividual ? deductionForEmp : 0),
+          materialLossNote: note
         }, { merge: true });
 
         await addDoc(collection(db, 'Notifications'), {
           recipientId: emp.id,
           locationId: payrollActiveBranch || 'all',
           title: 'Khấu trừ vật tư',
-          message: `Ghi nhận khấu trừ vật tư ${itemType} - Số lượng ${quantity}. Tổng giá trị chia sẻ của bạn tháng này là ${formatCurrency(deductionForEmp)} VNĐ.`,
+          message: message,
           type: 'penalty',
           priority: 'medium',
           isRead: false,
@@ -796,6 +830,7 @@ export function useAdminLogic(globalData: any, fetchInitialData: any, isLoading:
   const [isSendingReport, setIsSendingReport] = useState(false);
 
   // New states for Material Loss Module
+  const [lossType, setLossType] = useState<'general' | 'individual'>('general');
   const [itemType, setItemType] = useState('');
   const [originalPrice, setOriginalPrice] = useState('');
   const [deductionPrice, setDeductionPrice] = useState(0);
@@ -809,29 +844,7 @@ export function useAdminLogic(globalData: any, fetchInitialData: any, isLoading:
     checked: boolean
   }[]>([]);
 
-  useEffect(() => {
-    if (showMaterialLossModal) {
-      const branchEmployees = nhanViens.filter(emp => emp.locationId === payrollActiveBranch);
-      const employeesWithWeights = branchEmployees.map(emp => {
-        const empTimesheets = chamCongs.filter(cc => (cc.empId === emp.id || cc.empId === emp.empId) && cc.date.startsWith(filterMonth));
-        const approvedTimesheets = empTimesheets.filter(cc => cc.status !== 'pending_approval');
-        const totalHours = approvedTimesheets.reduce((sum, cc) => sum + (cc.totalHours || 0), 0);
-        
-        return {
-          id: emp.id,
-          empId: emp.empId,
-          fullName: emp.fullName,
-          totalHours,
-          weight: totalHours >= 200 ? 1 : 0.5,
-          checked: true
-        };
-      });
-      setWeightedEmployees(employeesWithWeights);
-      setItemType('');
-      setOriginalPrice('');
-      setQuantity('');
-    }
-  }, [showMaterialLossModal, nhanViens, chamCongs, filterMonth, payrollActiveBranch]);
+
 
   useEffect(() => {
     const price = Number(originalPrice) || 0;
@@ -948,6 +961,33 @@ export function useAdminLogic(globalData: any, fetchInitialData: any, isLoading:
     // Very fallback logic if called for different month
     return calculateNetSalary(emp, month, [], payrollAdjustments, holidays, localAdjustments[emp.id] || {}, violations.filter(v => (v.empId === emp.id || v.empId === emp.empId) && v.monthYear === month));
   }, [allEmployeeSalaryStatsMap, filterMonth, payrollAdjustments, holidays, localAdjustments, violations]);
+
+  useEffect(() => {
+    if (showMaterialLossModal || showOtherDeductionsModal) {
+      const branchEmployees = nhanViens.filter(emp => 
+        payrollActiveBranch === 'All' || 
+        emp.locationId === payrollActiveBranch || 
+        (Array.isArray(emp.locationIds) && emp.locationIds.includes(payrollActiveBranch))
+      );
+      const employeesWithWeights = branchEmployees.map(emp => {
+        const stats = allEmployeeSalaryStatsMap[emp.id] || { totalHours: 0 };
+        const totalHours = stats.totalHours || 0;
+        
+        return {
+          id: emp.id,
+          empId: emp.empId,
+          fullName: emp.fullName,
+          totalHours,
+          weight: totalHours >= 200 ? 1 : 0.5,
+          checked: true
+        };
+      }).filter(emp => emp.totalHours > 0);
+      setWeightedEmployees(employeesWithWeights);
+      setItemType('');
+      setOriginalPrice('');
+      setQuantity('');
+    }
+  }, [showMaterialLossModal, showOtherDeductionsModal, nhanViens, allEmployeeSalaryStatsMap, payrollActiveBranch]);
 
   useEffect(() => {
     if (currentAdmin && currentAdmin.locationIds && currentAdmin.locationIds.length > 0) {
@@ -2378,6 +2418,8 @@ export function useAdminLogic(globalData: any, fetchInitialData: any, isLoading:
     setIsProcessingLoss,
     itemType,
     setItemType,
+    lossType,
+    setLossType,
     originalPrice,
     setOriginalPrice,
     deductionPrice,
@@ -2515,6 +2557,7 @@ export function useAdminLogic(globalData: any, fetchInitialData: any, isLoading:
     adminTheme,
     calculateEmployeeSalaryStats,
     auditLogs,
+    materialLossLogs: globalData.materialLossLogs || [],
     materialItems,
     holidays
   };
