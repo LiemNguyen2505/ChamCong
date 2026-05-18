@@ -26,7 +26,7 @@ interface MaterialLossModalProps {
   deductionPrice?: number;
 }
 
-export const MaterialLossModal: React.FC<MaterialLossModalProps> = ({
+const MaterialLossModal: React.FC<MaterialLossModalProps> = ({
   show,
   onClose,
   onProcess,
@@ -70,8 +70,8 @@ export const MaterialLossModal: React.FC<MaterialLossModalProps> = ({
               <Box className="w-6 h-6" />
             </div>
             <div>
-              <h2 className="text-xl font-bold text-white">Khấu trừ hao hụt dụng cụ</h2>
-              <p className="text-sm text-white/70">Ghi nhận và phân bổ chi phí đền bù dụng cụ</p>
+              <h2 className="text-xl font-bold text-white">Khấu trừ hao hụt dụng cụ (Ly tách)</h2>
+              <p className="text-sm text-white/70">Ghi nhận và phân bổ chi phí đền bù dụng cụ/ly tách</p>
             </div>
           </div>
           <button onClick={handleClose} className="p-2 hover:bg-white/10 rounded-full transition-colors">
@@ -326,3 +326,5 @@ export const MaterialLossModal: React.FC<MaterialLossModalProps> = ({
     </div>
   );
 };
+
+export default MaterialLossModal;
