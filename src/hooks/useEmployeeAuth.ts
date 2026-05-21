@@ -23,7 +23,53 @@ export interface Employee {
 
 export const useEmployeeAuth = (employees: Employee[], admins: any[], kioskBranch: string | null) => {
   const navigate = useNavigate();
-  const [loggedInEmployee, setLoggedInEmployee] = useState<Employee | null>(null);
+  const [loggedInEmployee, setLoggedInEmployee] = useState<Employee | null>(() => {
+    // Try to recover employee session from localStorage
+    const savedEmp = localStorage.getItem('loggedInEmployee');
+    if (savedEmp) {
+      try {
+        return JSON.parse(savedEmp);
+      } catch (e) {
+        return null;
+      }
+    }
+    return null;
+  });
+
+  // Auto-login from admin session if privileged
+  useEffect(() => {
+    // If already logged in, or we've explicitly logged out in this session, don't auto-login
+    if (loggedInEmployee || sessionStorage.getItem('explicitlyLoggedOut')) return;
+
+    const savedAdmin = localStorage.getItem('currentAdmin');
+    if (savedAdmin) {
+      try {
+        const admin = JSON.parse(savedAdmin);
+        // Find employee matching admin
+        const emp = employees.find(e => 
+          e.phone === admin.phone || 
+          e.phone === admin.email || 
+          e.fullName === admin.email
+        );
+        if (emp) {
+          setLoggedInEmployee(emp);
+          localStorage.setItem('loggedInEmployee', JSON.stringify(emp));
+        }
+      } catch (e) {
+        console.error("Auto-login error", e);
+      }
+    }
+  }, [loggedInEmployee, employees]);
+
+  useEffect(() => {
+    if (loggedInEmployee) {
+      localStorage.setItem('loggedInEmployee', JSON.stringify(loggedInEmployee));
+      sessionStorage.removeItem('explicitlyLoggedOut');
+    } else {
+      localStorage.removeItem('loggedInEmployee');
+    }
+  }, [loggedInEmployee]);
+
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
@@ -92,6 +138,7 @@ export const useEmployeeAuth = (employees: Employee[], admins: any[], kioskBranc
 
       localStorage.setItem('hasLoggedInBefore', 'true');
       setLoggedInEmployee(emp);
+      sessionStorage.removeItem('explicitlyLoggedOut');
       if (emp.isFirstLogin) {
         setShowChangePinModal(true);
       }
@@ -106,6 +153,7 @@ export const useEmployeeAuth = (employees: Employee[], admins: any[], kioskBranc
     setLoggedInEmployee(null);
     setEmpIdInput('');
     setPinInput('');
+    sessionStorage.setItem('explicitlyLoggedOut', 'true');
   };
 
   const handleConfirmDeviceChange = async () => {
