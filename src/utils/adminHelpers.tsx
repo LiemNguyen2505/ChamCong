@@ -42,6 +42,19 @@ export const getLatePenaltyMinutes = (t: any) => {
   return 0;
 };
 
+export const getPhonePenalty = (t: any, hourlyRate: number) => {
+  let penalty = Number(t.phonePenalty) || 0;
+  const mins = Number(t.phoneMinutes) || Number(t.PhutPhatRoiApp) || 0;
+  const count = Number(t.SoLanRoiApp) || 0;
+  const hr = Number(hourlyRate) || 0;
+
+  if (penalty === 0 && (mins > 3 || count > 3)) {
+    penalty = Math.round(mins * 3 * (hr / 60));
+  }
+  
+  return penalty;
+};
+
 export const getTotalHours = (t: any) => {
   if (t.totalHours !== undefined) return t.totalHours;
   const extractTimeStr = (tm: string | undefined | null) => {
@@ -71,8 +84,7 @@ export const formatMinutes = (minutes: number) => {
 };
 
 export const formatDecimalHours = (decimalHours: number) => {
-  const minutes = Math.round(decimalHours * 60);
-  return formatMinutes(minutes);
+  return Number(decimalHours).toFixed(2);
 };
 
 export const getTimeStyle = (timeStr: string | null, dateStr?: string | null) => {
@@ -113,19 +125,19 @@ export const calculateShifts = (checkIn: string | null, checkOut: string | null)
   // Morning Shift
   const morningHours = getOverlap(inDate, outDate, mStart, mEnd);
   if (morningHours > 0) {
-    shifts.push({ name: 'SÁNG', hours: Number(morningHours.toFixed(1)), color: 'bg-emerald-50 text-emerald-700 border-emerald-100' });
+    shifts.push({ name: 'SÁNG', hours: Number(morningHours.toFixed(2)), color: 'bg-emerald-50 text-emerald-700 border-emerald-100' });
   }
 
   // Afternoon Shift
   const afternoonHours = getOverlap(inDate, outDate, mEnd, aEnd);
   if (afternoonHours > 0) {
-    shifts.push({ name: 'TRƯA', hours: Number(afternoonHours.toFixed(1)), color: 'bg-amber-50 text-amber-700 border-amber-100' });
+    shifts.push({ name: 'TRƯA', hours: Number(afternoonHours.toFixed(2)), color: 'bg-amber-50 text-amber-700 border-amber-100' });
   }
 
   // Evening Shift
   const eveningHours = getOverlap(inDate, outDate, aEnd, eEnd);
   if (eveningHours > 0) {
-    shifts.push({ name: 'TỐI', hours: Number(eveningHours.toFixed(1)), color: 'bg-slate-100 text-slate-700 border-slate-100' });
+    shifts.push({ name: 'TỐI', hours: Number(eveningHours.toFixed(2)), color: 'bg-slate-100 text-slate-700 border-slate-100' });
   }
 
   return shifts;
