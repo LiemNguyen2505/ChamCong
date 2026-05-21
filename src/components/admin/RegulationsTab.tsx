@@ -30,17 +30,20 @@ export const RegulationsTab = ({ activeTab, adminTheme }: RegulationsTabProps) =
     },
     {
       id: 'phone_rules',
-      title: 'QUY TẮC SỬ DỤNG ĐIỆN THOẠI',
+      title: 'QUY TẮC SỬ DỤNG ĐIỆN THOẠI & RỜI APP',
       icon: Phone,
       color: 'text-blue-600',
       bgColor: 'bg-blue-50',
       borderColor: 'border-blue-100',
       rules: [
-        'Hệ thống ghi nhận việc rời khỏi ứng dụng trong giờ làm việc để tính vào thưởng trách nhiệm và một phần lương',
-        'Ảnh hưởng đến Thưởng Trách Nhiệm (TTN):',
-        '  . Giảm 50% TTN nếu tổng số lần rời app từ 5 đến 7 lần/ngày',
-        '  . Mất 100% TTN nếu tổng số lỗi vi phạm từ 8 lần trở lên.',
-        'Số tiền trừ sẽ được tính dựa trên dữ liệu thực tế mà app ghi nhận được trong từng ca làm việc (được tổng hợp vào mục "Phạt Điện Thoại" trong bảng lương).'
+        'Hệ thống tự động ghi nhận việc rời khỏi ứng dụng hoặc tắt màn hình trong giờ làm việc (tính theo từng ca).',
+        'Ca làm việc bị tính là VI PHẠM lỗi điện thoại nếu:',
+        '  . Rời app quá 3 lần / ca.',
+        '  . HOẶC có 1 lần rời app liên tục quá 3 phút.',
+        '1. Trừ thẳng vào Lương (Phạt vi phạm):',
+        '  . Khi phát sinh vi phạm trên, hệ thống sẽ phạt tiền với công thức: Tổng số phút rời app × 3 × (Lương cơ bản / 60 phút).',
+        '2. Ảnh hưởng đến Thưởng Trách Nhiệm (TTN):',
+        '  . Mỗi ca làm việc vi phạm lỗi điện thoại sẽ bị tính là 1 gạch vi phạm (tương đương trừ 10% Thưởng Trách Nhiệm của tháng).'
       ]
     },
     {
