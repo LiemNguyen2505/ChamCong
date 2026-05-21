@@ -80,7 +80,7 @@ export const MonthlyAttendanceTable: React.FC<MonthlyAttendanceTableProps> = ({
                     {attendanceData
                       .filter(cc => filteredEmployees.some(emp => emp.id === cc.empId || emp.empId === cc.empId))
                       .reduce((sum, cc) => sum + (cc.status !== 'pending_approval' ? (cc.totalHours || 0) : 0), 0)
-                      .toFixed(1)}h
+                      .toFixed(2)}h
                  </span>
                  {attendanceData
                     .filter(cc => filteredEmployees.some(emp => emp.id === cc.empId || emp.empId === cc.empId) && cc.status === 'pending_approval')
@@ -89,7 +89,7 @@ export const MonthlyAttendanceTable: React.FC<MonthlyAttendanceTableProps> = ({
                       (+{attendanceData
                           .filter(cc => filteredEmployees.some(emp => emp.id === cc.empId || emp.empId === cc.empId) && cc.status === 'pending_approval')
                           .reduce((sum, cc) => sum + (cc.totalHours || 0), 0)
-                          .toFixed(1)}h pnd)
+                          .toFixed(2)}h pnd)
                     </span>
                  )}
               </div>
@@ -218,10 +218,10 @@ export const MonthlyAttendanceTable: React.FC<MonthlyAttendanceTableProps> = ({
                   })}
                   <td className="sticky right-0 z-10 bg-amber-50/50 group-hover:bg-amber-50 border-l border-amber-200 p-4 text-center">
                     <div className="flex flex-col items-center">
-                      <span className={`text-sm font-black ${adminTheme.text}`}>{approvedHours.toFixed(1)}</span>
+                      <span className={`text-sm font-black ${adminTheme.text}`}>{approvedHours.toFixed(2)}</span>
                       {pendingHours > 0 && (
-                        <span className="text-[9px] font-black text-amber-600 mt-0.5 animate-pulse" title={`Có ${pendingHours.toFixed(1)}h chưa duyệt`}>
-                          (+{pendingHours.toFixed(1)}?)
+                        <span className="text-[9px] font-black text-amber-600 mt-0.5 animate-pulse" title={`Có ${pendingHours.toFixed(2)}h chưa duyệt`}>
+                          (+{pendingHours.toFixed(2)}?)
                         </span>
                       )}
                     </div>
