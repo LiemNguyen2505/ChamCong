@@ -99,7 +99,12 @@ const CameraCapture = forwardRef<CameraCaptureRef, CameraCaptureProps>(({ onCapt
       console.error('Error accessing camera:', err);
       const errorMsg = err.message || '';
       if (err.name === 'NotAllowedError' || errorMsg.includes('Permission denied')) {
-        setError('Không thể truy cập camera. Vui lòng cấp quyền camera trong cài đặt trình duyệt và thử lại.');
+        const isIframe = window.self !== window.top;
+        if (isIframe) {
+          setError('Không thể truy cập camera. Vui lòng MỞ ỨNG DỤNG BẰNG THẺ MỚI (Open App in New Tab ở góc trên bên phải màn hình nếu có) hoặc cấp quyền camera trong cài đặt trình duyệt và thử lại.');
+        } else {
+          setError('Không thể truy cập camera. Vui lòng cấp quyền camera trong cài đặt trình duyệt và thử lại.');
+        }
       } else if (err.name === 'NotFoundError') {
         setError('Không tìm thấy thiết bị camera.');
       } else if (err.name === 'NotReadableError' || err.name === 'TrackStartError') {
