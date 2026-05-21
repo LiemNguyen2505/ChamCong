@@ -47,36 +47,44 @@ export const useAntiSlacking = (
           
           if (diffSeconds >= 10) {
             try {
-              const currentLan = currentLog.SoLanRoiApp || 0;
-              const currentPenaltyTotal = currentLog.phonePenalty || 0;
-              const currentPhut = currentLog.phoneMinutes || 0;
-              const hourlyRate = currentEmployee.hourlyRate || 0;
+              const currentLan = Number(currentLog.SoLanRoiApp) || 0;
+              const currentPenaltyTotal = Number(currentLog.phonePenalty) || 0;
+              const currentPhut = Number(currentLog.phoneMinutes) || Number(currentLog.PhutPhatRoiApp) || 0;
+              const hourlyRate = Number(currentEmployee.hourlyRate) || 0;
               
               const newLan = currentLan + 1;
               let currentPenalty = 0;
               let minutesToCharge = 0;
+              let hasViolation = currentLog.hasPhoneViolation || false;
               
-              if (diffMinutesExact > 2 || newLan > 3) {
+              // Rule: Penalty money if a single session > 3 minutes OR if usage count > 3 times
+              if (diffMinutesExact > 3 || newLan > 3) {
                 minutesToCharge = Math.ceil(diffMinutesExact);
-                currentPenalty = minutesToCharge * 3 * Math.round(hourlyRate / 60);
+                // Formula: minutes * 3 * (hourly_rate / 60)
+                currentPenalty = Math.round(minutesToCharge * 3 * (hourlyRate / 60));
+                hasViolation = true;
               }
 
               const newPenaltyTotal = currentPenaltyTotal + currentPenalty;
-              const newPhut = currentPhut + minutesToCharge;
+              const newPhut = currentPhut + (minutesToCharge || Math.ceil(diffMinutesExact));
 
               await updateDoc(doc(db, 'timesheets', currentLog.id), {
                 phonePenalty: newPenaltyTotal,
                 SoLanRoiApp: newLan,
-                phoneMinutes: newPhut
+                phoneMinutes: newPhut,
+                PhutPhatRoiApp: newPhut,
+                hasPhoneViolation: hasViolation
               });
 
-              if (newLan > 3) {
+              if (newLan > 3 || diffMinutesExact > 3) {
                 await addDoc(collection(db, 'CanhBao'), {
                   empId: currentEmployee.empId,
                   fullName: currentEmployee.fullName,
                   locationId: kioskBranchRef.current || 'Unknown',
                   ThoiGian: new Date().toISOString(),
-                  NoiDung: `Cảnh báo: Nhân viên sử dụng điện thoại lần thứ ${newLan} trong ca.`
+                  NoiDung: diffMinutesExact > 3 
+                    ? `Cảnh báo: Sử dụng điện thoại ${Math.ceil(diffMinutesExact)} phút (> 3 phút). Phạt: ${new Intl.NumberFormat('vi-VN').format(currentPenalty)}đ`
+                    : `Cảnh báo: Sử dụng điện thoại lần thứ ${newLan} trong ca. Phạt: ${new Intl.NumberFormat('vi-VN').format(currentPenalty)}đ`
                 });
               }
             } catch (error) {
