@@ -3,6 +3,8 @@ import { format, parseISO, getDaysInMonth, startOfMonth, addDays } from 'date-fn
 import { X, Clock, AlertTriangle, CheckCircle, XCircle, CalendarOff, UserX } from 'lucide-react';
 import { safeFormat, safeParseDate } from '../utils/dateUtils';
 
+import { getPhonePenalty } from '../utils/adminHelpers';
+
 interface EmployeeAttendanceDetailModalProps {
   employee: any;
   timesheets: any[];
@@ -75,7 +77,7 @@ export const EmployeeAttendanceDetailModal: React.FC<EmployeeAttendanceDetailMod
         const checkOut = ts.checkOutTime ? safeFormat(ts.checkOutTime, 'HH:mm', '--:--', ts.date) : '--:--';
         const hours = ts.totalHours || 0;
         const lateMins = (!ts.isLateExcused && ts.latePenaltyMinutes) ? ts.latePenaltyMinutes / 3 : (ts.lateMinutes || 0);
-        const phonePenalty = ts.phonePenalty || 0;
+        const phonePenalty = getPhonePenalty(ts, employee?.hourlyRate || 0);
 
         totalHours += hours;
         totalLateMinutes += lateMins;
