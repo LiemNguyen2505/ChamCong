@@ -2,6 +2,7 @@ import React, { useEffect } from 'react';
 import { MapPin, X, AlertCircle, Calendar, ChevronDown, Clock, AlertTriangle } from 'lucide-react';
 import CameraCapture from '../CameraCapture';
 import { format } from 'date-fns';
+import toast from 'react-hot-toast';
 
 interface AttendanceActionFormProps {
   actionType: 'check-in' | 'check-out' | null;
@@ -220,11 +221,22 @@ export const AttendanceActionForm: React.FC<AttendanceActionFormProps> = ({
         </button>
         <button 
           type="button"
-          onClick={onConfirm}
-          disabled={isSubmitting}
-          className={`flex-[2] ${actionType === 'check-in' ? 'bg-emerald-600' : 'bg-red-600'} text-white py-4 rounded-2xl font-bold text-lg disabled:opacity-50 shadow-lg active:scale-95 transition-all`}
+          onClick={() => {
+            if (distance === null) {
+              toast.error('Đang xác định vị trí của bạn. Vui lòng đợi trong giây lát...');
+              return;
+            }
+            if (distance > MAX_DISTANCE_METERS) {
+              toast.error('Bạn ở quá xa chi nhánh. Vui lòng di chuyển đến quán để chấm công.');
+              return;
+            }
+            onConfirm();
+          }}
+          disabled={isSubmitting || (distance !== null && distance > MAX_DISTANCE_METERS) || (distance === null)}
+          className={`flex-[2] ${distance === null ? 'bg-stone-200' : (distance > MAX_DISTANCE_METERS ? 'bg-stone-300' : (actionType === 'check-in' ? 'bg-emerald-600' : 'bg-red-600'))} text-white py-4 rounded-2xl font-bold text-lg disabled:opacity-50 shadow-lg active:scale-[0.98] transition-all flex items-center justify-center gap-2`}
         >
-          {actionType === 'check-in' ? 'Vào ca' : 'Ra ca'}
+          {distance === null && <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />}
+          {distance === null ? 'Đang tải vị trí...' : (actionType === 'check-in' ? 'Vào ca' : 'Ra ca')}
         </button>
       </div>
 
