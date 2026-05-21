@@ -25,34 +25,43 @@ export function calculateTtnPenalty(timesheets: any[], violations: any[] = []) {
   const lateCountForTtn = timesheets.filter(t => getLateMinutes(t) > 0 && !t.isLateExcused).length;
   const skipShiftForTtn = timesheets.find(t => getLateMinutes(t) >= 300 && !t.isLateExcused);
   const violationCount = violations.length;
+  const phoneViolationCount = timesheets.filter(t => t.hasPhoneViolation).length;
   
   let ttnPenaltyValue = 0;
   let ttnPenaltyReason = "";
 
-  // Check skip shift first (most severe)
+  // 1. Check skip shift first (immediate 100% loss)
   if (skipShiftForTtn) {
     ttnPenaltyValue = 100;
     ttnPenaltyReason = `Bỏ ca ngày ${safeFormat(skipShiftForTtn.date, 'dd/MM')}`;
   } 
-  // Check violation count (new requirement)
-  else if (violationCount >= 8) {
-    ttnPenaltyValue = 100;
-    ttnPenaltyReason = `Vi phạm nhắc nhở ${violationCount} lần`;
-  }
-  else if (violationCount >= 5) {
-    ttnPenaltyValue = 50;
-    ttnPenaltyReason = `Vi phạm nhắc nhở ${violationCount} lần`;
-  }
-  // Fallback to late count check
-  else if (lateCountForTtn >= 10) {
-    ttnPenaltyValue = 100;
-    ttnPenaltyReason = `Vi phạm trễ ${lateCountForTtn} lần`;
-  } else if (lateCountForTtn >= 5) {
-    ttnPenaltyValue = 50;
-    ttnPenaltyReason = `Vi phạm trễ ${lateCountForTtn} lần`;
+  else {
+    // 2. Accumulate "gạch" (steps)
+    // - Each late = 1 gạch (10%)
+    // - Each phone violation = 1 gạch (10%)
+    // - Each official violation = 2 gạchs (20%)? Or follow the old 5/8 rule.
+    // Let's stick to the new requirement for phone: 1 violation = 1 gạch.
+    
+    const lateGach = lateCountForTtn * 10;
+    const phoneGach = phoneViolationCount * 10;
+    
+    // Official violations: keep existing thresholds for now but make them additive
+    let officialVioGach = 0;
+    if (violationCount >= 8) officialVioGach = 100;
+    else if (violationCount >= 5) officialVioGach = 50;
+    else if (violationCount > 0) officialVioGach = violationCount * 10;
+
+    ttnPenaltyValue = Math.min(100, lateGach + phoneGach + officialVioGach);
+    
+    const reasons = [];
+    if (lateCountForTtn > 0) reasons.push(`Trễ ${lateCountForTtn} lần`);
+    if (phoneViolationCount > 0) reasons.push(`Sử dụng ĐT ${phoneViolationCount} lần`);
+    if (violationCount > 0) reasons.push(`Vi phạm ${violationCount} lần`);
+
+    ttnPenaltyReason = reasons.join(', ');
   }
 
-  return { penaltyValue: ttnPenaltyValue, penaltyReason: ttnPenaltyReason, violationCount };
+  return { penaltyValue: ttnPenaltyValue, penaltyReason: ttnPenaltyReason, violationCount, phoneViolationCount };
 }
 
 export function getPreviousMonthRates(employeeId: string, currentMonth: string, payrollAdjustments: any[]) {
@@ -242,27 +251,38 @@ export function calculateNetSalary(
     latePenaltyTotal = roundToUnit(totalLatePenaltyMinutes * (currentHourlyRate / 60));
   }
 
-  const systemPhonePenaltyTotal = roundToUnit(approvedTimesheets.reduce((sum, cc) => sum + (cc.phonePenalty || 0), 0));
-  const systemPhonePenaltyCount = approvedTimesheets.reduce((sum, cc) => sum + (cc.SoLanRoiApp || 0), 0);
-  const systemPhoneMinutes = approvedTimesheets.reduce((sum, cc) => sum + (cc.phoneMinutes || cc.PhutPhatRoiApp || 0), 0);
+  const hr = Number(currentHourlyRate) || 0;
+
+  const systemPhonePenaltyTotal = roundToUnit(approvedTimesheets.reduce((sum, cc) => {
+    let penalty = Number(cc.phonePenalty) || 0;
+    const mins = Number(cc.phoneMinutes) || Number(cc.PhutPhatRoiApp) || 0;
+    const count = Number(cc.SoLanRoiApp) || 0;
+    if (penalty === 0 && (mins > 3 || count > 3)) {
+      penalty = roundToUnit(mins * 3 * (hr / 60));
+    }
+    return sum + penalty;
+  }, 0));
+  // Count shifts with at least one phone use session, not total session count across all shifts
+  const systemPhonePenaltyCount = approvedTimesheets.filter(cc => (Number(cc.SoLanRoiApp) || 0) > 0).length;
+  // Total sessions across all shifts
+  const totalPhoneSessions = approvedTimesheets.reduce((sum, cc) => sum + (Number(cc.SoLanRoiApp) || 0), 0);
+  const systemPhoneMinutes = approvedTimesheets.reduce((sum, cc) => sum + (Number(cc.phoneMinutes) || Number(cc.PhutPhatRoiApp) || 0), 0);
   
   const finalPhoneCountRaw = (localAdj.overridePhoneCount !== undefined ? localAdj.overridePhoneCount : adjustment.overridePhoneCount);
-  const resolvedPhonePenaltyCount = (finalPhoneCountRaw === null || finalPhoneCountRaw === undefined) ? systemPhonePenaltyCount : finalPhoneCountRaw;
+  const resolvedPhonePenaltyCount = (finalPhoneCountRaw === null || finalPhoneCountRaw === undefined) ? systemPhonePenaltyCount : Number(finalPhoneCountRaw);
 
   const finalPhoneMinutesRaw = (localAdj.overridePhoneMinutes !== undefined ? localAdj.overridePhoneMinutes : adjustment.overridePhoneMinutes);
-  const resolvedPhoneMinutes = (finalPhoneMinutesRaw === null || finalPhoneMinutesRaw === undefined) ? systemPhoneMinutes : finalPhoneMinutesRaw;
+  const resolvedPhoneMinutes = (finalPhoneMinutesRaw === null || finalPhoneMinutesRaw === undefined) ? systemPhoneMinutes : Number(finalPhoneMinutesRaw);
 
   const phonePenaltyTotalRaw = (localAdj.overridePhonePenalty !== undefined ? localAdj.overridePhonePenalty : adjustment.overridePhonePenalty);
   
   let phonePenaltyTotal;
   if (phonePenaltyTotalRaw !== undefined && phonePenaltyTotalRaw !== null) {
-    phonePenaltyTotal = phonePenaltyTotalRaw;
+    phonePenaltyTotal = Number(phonePenaltyTotalRaw);
   } else if (finalPhoneMinutesRaw !== undefined && finalPhoneMinutesRaw !== null || finalPhoneCountRaw !== undefined && finalPhoneCountRaw !== null) {
     // Calculate from phone minutes/count if overridden
-    if (systemPhoneMinutes > 0) {
-      phonePenaltyTotal = roundToUnit(resolvedPhoneMinutes * (systemPhonePenaltyTotal / systemPhoneMinutes));
-    } else if (systemPhonePenaltyCount > 0) {
-      phonePenaltyTotal = roundToUnit(resolvedPhonePenaltyCount * (systemPhonePenaltyTotal / systemPhonePenaltyCount));
+    if (resolvedPhoneMinutes > 0) {
+      phonePenaltyTotal = roundToUnit(resolvedPhoneMinutes * 3 * (hr / 60));
     } else {
       phonePenaltyTotal = 0;
     }
