@@ -287,57 +287,85 @@ export default function SalaryDetailContent({
               </div>
             )}
             
-            {/* Thu nhập khác */}
-            {(isAdmin || currentStats.finalExtraAdditions !== 0) && (
+            {/* Thu Nhập Bổ Sung */}
+            {(isAdmin || currentStats.extraAdditionsTotal !== 0) && (
               <div className="p-3 bg-white rounded-xl shadow-[0_4px_12px_rgb(0,0,0,0.04)] border border-stone-100 transition-all group">
                 <div className="flex justify-between items-center text-sm font-medium">
                   <span className="flex items-center gap-3 text-stone-500">
-                    <PlusCircle className="w-4 h-4 text-emerald-400"/> 
-                    Thu nhập khác
-                    {isAdmin && (
+                    <PlusCircle className={`w-4 h-4 ${currentStats.finalReturnRetained > 0 ? 'text-sky-400' : 'text-emerald-400'}`}/> 
+                    Thu Nhập Bổ Sung
+                    {(isAdmin || currentStats.finalReturnRetained > 0) && (
                       <button 
                         onClick={() => toggleNoteField('extraAdditions')}
-                        className={`ml-1 p-0.5 rounded transition-colors ${currentStats.extraAdditionsNote ? 'text-stone-600 bg-stone-100' : 'text-stone-300 hover:text-stone-500'}`}
+                        className={`ml-1 p-0.5 rounded transition-colors ${(currentStats.extraAdditionsNote || currentStats.finalReturnRetained > 0) ? 'text-stone-600 bg-stone-100' : 'text-stone-300 hover:text-stone-50'}`}
                       >
                         <StickyNote className="w-3 h-3" />
                       </button>
                     )}
                   </span>
-                  {isAdmin ? (
-                    editingField === 'extraAdditions' ? (
-                      <input 
-                        type="text" 
-                        autoFocus
-                        value={currentStats.finalExtraAdditions?.toLocaleString('vi-VN') || ''} 
-                        onBlur={() => setEditingField(null)}
-                        onFocus={handleFocus} 
-                        onChange={(e) => handleInputChange('extraAdditions', e.target.value)} 
-                        className="w-32 bg-white border border-stone-200 text-right font-black text-stone-800 rounded-lg p-1.5 focus:ring-1 focus:ring-stone-200 outline-none transition-all font-mono" 
-                      />
-                    ) : (
-                      <button 
-                        onClick={() => setEditingField('extraAdditions')}
-                        className={`w-32 text-right p-1.5 rounded-lg font-black transition-all font-mono ${internalAdj.extraAdditions !== undefined ? 'text-amber-700 bg-amber-50' : 'text-stone-800 border-b border-transparent hover:bg-stone-50'}`}
-                      >
-                        {formatNumber(currentStats.finalExtraAdditions)}
-                      </button>
-                    )
-                  ) : (
-                    <div className="flex items-center gap-2">
-                      {currentStats.extraAdditionsNote && <StickyNote className="w-3 h-3 text-stone-300" />}
-                      <span className="font-black text-stone-800 font-mono text-xs">{formatNumber(currentStats.finalExtraAdditions)}</span>
-                    </div>
-                  )}
+                  <div className="flex flex-col items-end leading-tight">
+                    <span className={`font-black font-mono text-sm ${currentStats.extraAdditionsTotal > 0 ? 'text-emerald-600' : 'text-stone-800'}`}>
+                      {formatNumber(currentStats.extraAdditionsTotal)}
+                    </span>
+                    {currentStats.finalReturnRetained > 0 && (
+                      <span className="text-[9px] text-sky-500 font-bold uppercase tracking-wider">Bao gồm hoàn trả</span>
+                    )}
+                  </div>
                 </div>
-                {isAdmin && showNoteFields['extraAdditions'] && (
-                  <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }}>
-                    <input 
-                      type="text" 
-                      placeholder="Lý do thu nhập khác..." 
-                      value={currentStats.extraAdditionsNote || ''} 
-                      onChange={(e) => handleNoteChange('extraAdditionsNote', e.target.value)} 
-                      className="w-full bg-stone-50 border-none text-[10px] italic text-stone-400 p-2 rounded-lg focus:ring-1 focus:ring-stone-100 outline-none" 
-                    />
+
+                {/* Breakdown for Admin & Tooltip/Info for Employee */}
+                {(showNoteFields['extraAdditions'] || currentStats.finalReturnRetained > 0) && (
+                  <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} className="space-y-2 mt-2 pt-2 border-t border-stone-50">
+                    {currentStats.finalReturnRetained > 0 && (
+                      <div className="flex justify-between items-center bg-sky-50 p-2 rounded-lg">
+                        <div className="flex items-center gap-2">
+                          <History className="w-3 h-3 text-sky-400" />
+                          <span className="text-[10px] font-bold text-sky-600 uppercase">Hoàn Trả Giữ Tạm</span>
+                        </div>
+                        <span className="text-[10px] font-black text-sky-600 font-mono">+{formatNumber(currentStats.finalReturnRetained)}</span>
+                      </div>
+                    )}
+                    
+                    {isAdmin ? (
+                      <div className="flex flex-col gap-2">
+                        <div className="flex justify-between items-center">
+                          <span className="text-[10px] font-bold text-stone-400 uppercase">Thưởng/Khác</span>
+                          <div className="relative">
+                            {editingField === 'extraAdditions' ? (
+                              <input 
+                                type="text" 
+                                autoFocus
+                                value={currentStats.finalExtraAdditions?.toLocaleString('vi-VN') || ''} 
+                                onBlur={() => setEditingField(null)}
+                                onFocus={handleFocus} 
+                                onChange={(e) => handleInputChange('extraAdditions', e.target.value)} 
+                                className="w-24 bg-white border border-stone-200 text-right font-black text-emerald-600 rounded-lg p-1 focus:ring-1 focus:ring-stone-200 outline-none transition-all font-mono text-xs" 
+                              />
+                            ) : (
+                              <button 
+                                onClick={() => setEditingField('extraAdditions')}
+                                className={`min-w-[80px] text-right p-1 rounded font-black transition-all font-mono text-xs ${internalAdj.extraAdditions !== undefined ? 'text-amber-700 bg-amber-50' : 'text-emerald-600 hover:bg-stone-50'}`}
+                              >
+                                {formatNumber(currentStats.finalExtraAdditions)}
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                        <input 
+                          type="text" 
+                          placeholder="Lý do..." 
+                          value={currentStats.extraAdditionsNote || ''} 
+                          onChange={(e) => handleNoteChange('extraAdditionsNote', e.target.value)} 
+                          className="w-full bg-stone-50 border-stone-100 text-[10px] italic text-stone-500 p-2 rounded-lg outline-none focus:ring-1 focus:ring-stone-200" 
+                        />
+                      </div>
+                    ) : (
+                      currentStats.extraAdditionsNote && (
+                        <div className="bg-stone-50 p-2 rounded-lg">
+                           <span className="text-[9px] text-stone-400 italic leading-relaxed">{currentStats.extraAdditionsNote}</span>
+                        </div>
+                      )
+                    )}
                   </motion.div>
                 )}
               </div>
@@ -450,9 +478,19 @@ export default function SalaryDetailContent({
               <div className="p-3 bg-white rounded-base shadow-[0_4px_12px_rgb(0,0,0,0.04)] border border-stone-100/50 space-y-2 group transition-all">
                 <div className="flex justify-between items-center text-sm">
                   <div className="flex flex-col gap-0.5">
-                    <span className="text-stone-500 font-medium flex items-center gap-3">
-                      <Smartphone className="w-4 h-4 text-stone-400 group-hover:text-stone-500 transition-colors"/> Sử dụng ĐT
-                    </span>
+                    <div className="flex items-center gap-2">
+                      <span className="text-stone-500 font-medium flex items-center gap-3">
+                        <Smartphone className="w-4 h-4 text-stone-400 group-hover:text-stone-500 transition-colors"/> Sử dụng ĐT
+                      </span>
+                      <div className="group relative">
+                        <Info className="w-3 h-3 text-stone-300 cursor-help" />
+                        <div className="absolute left-0 bottom-full mb-2 w-48 p-2 bg-stone-900 text-white text-[9px] rounded-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50 shadow-xl font-bold uppercase tracking-wider leading-relaxed">
+                          Quy định: Tối đa 3 lần/ca & mỗi lần &lt; 3p. 
+                          Nếu &gt; 3p: phạt số phút x3 đơn giá lương. 
+                          Nếu &gt; 3 lần hoặc có lần &gt; 3p: Trừ 10% thưởng TN.
+                        </div>
+                      </div>
+                    </div>
                     {currentStats.phonePenaltyTotal < currentStats.rawPhonePenaltyTotal && (
                       <span className="ml-7 text-[8px] font-black bg-emerald-50 text-emerald-700 px-1.5 py-0.5 rounded tracking-tighter w-fit uppercase">
                         Quản lý đã giảm
@@ -480,7 +518,7 @@ export default function SalaryDetailContent({
                       )}
                       <div className="flex flex-col gap-1 items-end">
                          <div className="flex items-center gap-1.5">
-                            <span className="text-stone-400 text-xs font-mono">{currentStats.phonePenaltyCount} lần</span>
+                            <span className="text-stone-400 text-xs font-mono" title="Số ca vi phạm">{currentStats.phonePenaltyCount} ca</span>
                             <span className="text-stone-200 text-[10px]">|</span>
                             
                             <div className="relative flex items-center bg-stone-50 rounded-lg border border-stone-200 px-2 py-1 focus-within:ring-1 focus-within:ring-stone-200 transition-all">
@@ -505,11 +543,11 @@ export default function SalaryDetailContent({
                     <div className="flex flex-col items-end">
                       {currentStats.phonePenaltyMinutes !== currentStats.systemPhoneMinutes && (
                         <span className="text-[10px] text-stone-300 line-through font-mono">
-                          HT: {currentStats.systemPhonePenaltyCount} lần | {currentStats.systemPhoneMinutes}p | -{formatNumber(currentStats.rawPhonePenaltyTotal)}
+                          HT: {currentStats.systemPhonePenaltyCount} ca | {currentStats.systemPhoneMinutes}p | -{formatNumber(currentStats.rawPhonePenaltyTotal)}
                         </span>
                       )}
                       <span className="font-black text-rose-800 font-mono text-[10px] sm:text-xs">
-                        {currentStats.phonePenaltyCount} lần | {currentStats.phonePenaltyMinutes}p | -{formatNumber(currentStats.phonePenaltyTotal)}
+                        {currentStats.phonePenaltyCount} ca vi phạm | {currentStats.phonePenaltyMinutes}p trễ | -{formatNumber(currentStats.phonePenaltyTotal)}
                       </span>
                     </div>
                   )}
