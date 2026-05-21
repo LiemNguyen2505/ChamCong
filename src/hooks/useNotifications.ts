@@ -73,7 +73,7 @@ export const useNotifications = (
           n.recipientId === 'all_admins' || 
           n.recipientId === 'all' ||
           n.recipientId === userId ||
-          (role === 'SuperAdmin' && (n.recipientId === 'admin' || n.recipientId === 'all_admins'))
+          role === 'SuperAdmin' // Super admin sees all notifications in their list
         );
       }
 
