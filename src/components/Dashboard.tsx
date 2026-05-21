@@ -157,7 +157,7 @@ const FinancialMetrics = React.memo(({
           <div className="flex justify-between items-center mb-2">
             <p className="text-[10px] md:text-sm font-black text-stone-400 uppercase tracking-widest italic">TỔNG GIỜ</p>
             <div className="flex items-baseline gap-1">
-              <span className="text-xl md:text-3xl font-black text-slate-900">{totalHoursMonth.toFixed(1)}</span>
+              <span className="text-xl md:text-3xl font-black text-slate-900">{totalHoursMonth.toFixed(2)}</span>
               <span className="text-[12px] font-black text-slate-900">h</span>
             </div>
           </div>
@@ -198,7 +198,7 @@ const FinancialMetrics = React.memo(({
             <span className="text-[10px] md:text-sm font-black uppercase tracking-tight">TB GIỜ/NGÀY</span>
           </div>
           <span className="text-[12px] md:text-lg font-black text-slate-700 whitespace-nowrap">
-            {(avgHoursDay || 0).toFixed(1)}h / ngày
+            {(avgHoursDay || 0).toFixed(2)}h / ngày
           </span>
         </div>
         <div className="flex items-center justify-between">
@@ -261,7 +261,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
       .filter(Boolean);
 
     // Aggregate stats for discipline progress
-    const stats: Record<string, { lates: number, onTime: number, total: number, name: string }> = {};
+    const stats: Record<string, { lates: number, onTime: number, phoneViolations: number, total: number, name: string }> = {};
     
     filteredChamCongs
       .filter(cc => cc.date.startsWith(filterMonth) && branchEmpIds.has(cc.empId) && cc.status !== 'pending_approval')
@@ -269,19 +269,31 @@ export const Dashboard: React.FC<DashboardProps> = ({
         const id = cc.empId;
         if (!stats[id]) {
           const emp = nhanViens.find(e => e.id === id || e.empId === id);
-          stats[id] = { lates: 0, onTime: 0, total: 0, name: emp?.fullName?.split(' ').pop() || 'NV' };
+          stats[id] = { lates: 0, onTime: 0, phoneViolations: 0, total: 0, name: emp?.fullName?.split(' ').pop() || 'NV' };
         }
         stats[id].total++;
         if ((cc.lateMinutes || 0) > 0) stats[id].lates++;
         else stats[id].onTime++;
+        
+        if (cc.hasPhoneViolation) {
+          stats[id].phoneViolations++;
+        }
       });
 
     const sortedByLate = Object.values(stats).sort((a, b) => b.lates - a.lates);
     const sortedByOnTime = Object.values(stats).sort((a, b) => b.onTime - a.onTime);
+    const sortedByPhone = Object.values(stats).filter(s => s.phoneViolations > 0).sort((a, b) => b.phoneViolations - a.phoneViolations);
 
     const top3 = [];
     if (sortedByOnTime[0]) top3.push({ label: '🐝 Ong Chăm Chỉ', ...sortedByOnTime[0], detail: `Đúng ${sortedByOnTime[0].onTime}/${sortedByOnTime[0].total}` });
-    if (sortedByLate[0] && sortedByLate[0].lates > 0) top3.push({ label: '🧶 Dây Thun', ...sortedByLate[0], detail: `Trễ ${sortedByLate[0].lates}/${sortedByLate[0].total}` });
+    
+    // Prioritize phone violations if they are significant
+    if (sortedByPhone[0]) {
+      top3.push({ label: '📱 Nghiện ĐT', ...sortedByPhone[0], detail: `Vi phạm ${sortedByPhone[0].phoneViolations} ca` });
+    } else if (sortedByLate[0] && sortedByLate[0].lates > 0) {
+      top3.push({ label: '🧶 Dây Thun', ...sortedByLate[0], detail: `Trễ ${sortedByLate[0].lates}/${sortedByLate[0].total}` });
+    }
+    
     if (sortedByOnTime[1]) top3.push({ label: '🌟 Tiềm Năng', ...sortedByOnTime[1], detail: `Đúng ${sortedByOnTime[1].onTime}/${sortedByOnTime[1].total}` });
 
     return { 
