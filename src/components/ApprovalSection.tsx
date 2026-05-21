@@ -460,8 +460,8 @@ export const ApprovalSection: React.FC<ApprovalSectionProps> = ({
                                   checkinApprovedAt: serverTimestamp()
                                 });
                               } else if (req.type === 'off_sudden') {
-                                const todayStr = format(new Date(), 'yyyy-MM-dd');
-                                const q = query(collection(db, 'LichLamViec'), where('empId', '==', req.empId), where('date', '==', todayStr));
+                                const offDate = req.details?.requestDate || format(new Date(), 'yyyy-MM-dd');
+                                const q = query(collection(db, 'LichLamViec'), where('empId', '==', req.empId), where('date', '==', offDate));
                                 const snap = await getDocs(q);
                                 for (const d of snap.docs) {
                                   await updateDoc(doc(db, 'LichLamViec', d.id), { isOff: true });
@@ -474,9 +474,23 @@ export const ApprovalSection: React.FC<ApprovalSectionProps> = ({
                                 for (const d of snap1.docs) await updateDoc(doc(db, 'LichLamViec', d.id), { empId: req.details.swapWithEmpId });
                                 for (const d of snap2.docs) await updateDoc(doc(db, 'LichLamViec', d.id), { empId: req.empId });
                               } else if (req.type === 'salary_advance' && req.details?.advanceAmount) {
-                                const monthYear = format(new Date(), 'yyyy-MM');
+                                const reqDate = req.details.requestDate || format(new Date(), 'yyyy-MM-dd');
+                                const monthYear = reqDate.substring(0, 7);
                                 const targetEmp = nhanViens.find(e => e.empId === req.empId || e.id === req.empId);
                                 const firestoreId = targetEmp ? targetEmp.id : req.empId;
+                                
+                                // 1. Create record in SalaryAdvanceRecords for UI visibility in Tab TẠM ỨNG LƯƠNG
+                                await addDoc(collection(db, 'SalaryAdvanceRecords'), {
+                                  empId: firestoreId,
+                                  fullName: req.fullName,
+                                  amount: Number(req.details.advanceAmount),
+                                  monthYear: monthYear,
+                                  locationId: req.locationId,
+                                  createdAt: serverTimestamp(),
+                                  createdBy: currentAdmin?.email || 'admin'
+                                });
+
+                                // 2. Update PayrollAdjustment
                                 const adjId = `${firestoreId}_${monthYear}`;
                                 const adjRef = doc(db, 'PayrollAdjustments', adjId);
                                 await setDoc(adjRef, {
@@ -485,6 +499,62 @@ export const ApprovalSection: React.FC<ApprovalSectionProps> = ({
                                   advanceSalary: increment(req.details.advanceAmount),
                                   advanceSalaryNote: req.note || 'Ứng lương (Duyệt từ yêu cầu)'
                                 }, { merge: true });
+                              } else if (req.type === 'forgot_check' && req.details?.requestDate) {
+                                // Create/Update timesheet for forgotten check-in/out
+                                const targetEmp = nhanViens.find(e => e.empId === req.empId || e.id === req.empId);
+                                if (targetEmp) {
+                                  const dateStr = req.details.requestDate;
+                                  const startTime = req.details.requestTime || '08:00';
+                                  const endTime = req.details.requestSubTime || '12:00';
+                                  
+                                  // Calculate total hours
+                                  const [sH, sM] = startTime.split(':').map(Number);
+                                  const [eH, eM] = endTime.split(':').map(Number);
+                                  let duration = (eH + eM/60) - (sH + sM/60);
+                                  if (duration < 0) duration += 24; 
+                                  
+                                  const totalPay = duration * (targetEmp.hourlyRate || 0);
+
+                                  // Check if timesheet already exists
+                                  const q = query(collection(db, 'timesheets'), where('empId', '==', req.empId), where('date', '==', dateStr));
+                                  const snap = await getDocs(q);
+                                  
+                                  if (!snap.empty) {
+                                    await updateDoc(doc(db, 'timesheets', snap.docs[0].id), {
+                                      checkInTime: startTime,
+                                      checkOutTime: endTime,
+                                      totalHours: duration,
+                                      totalPay: totalPay,
+                                      status: 'approved',
+                                      approvedBy: currentAdmin?.email || 'admin',
+                                      approvedAt: serverTimestamp()
+                                    });
+                                  } else {
+                                    await addDoc(collection(db, 'timesheets'), {
+                                      empId: req.empId,
+                                      fullName: targetEmp.fullName,
+                                      date: dateStr,
+                                      checkInTime: startTime,
+                                      checkOutTime: endTime,
+                                      totalHours: duration,
+                                      totalPay: totalPay,
+                                      locationId: req.locationId,
+                                      status: 'approved',
+                                      approvedBy: currentAdmin?.email || 'admin',
+                                      approvedAt: serverTimestamp(),
+                                      createdAt: serverTimestamp()
+                                    });
+                                  }
+                                }
+                              } else if (req.type === 'late_early' && req.details?.requestDate) {
+                                const q = query(collection(db, 'timesheets'), where('empId', '==', req.empId), where('date', '==', req.details.requestDate));
+                                const snap = await getDocs(q);
+                                for (const d of snap.docs) {
+                                  await updateDoc(doc(db, 'timesheets', d.id), {
+                                    isLateExcused: true,
+                                    latePenaltyMinutes: 0
+                                  });
+                                }
                               }
                               
                               await logAction('Duyệt yêu cầu', req.fullName, `Duyệt ${getRequestTypeLabel(req.type).label} cho ${req.fullName}`);
@@ -688,8 +758,8 @@ export const ApprovalSection: React.FC<ApprovalSectionProps> = ({
                                         checkinApprovedAt: serverTimestamp()
                                       });
                                     } else if (req.type === 'off_sudden') {
-                                      const todayStr = format(new Date(), 'yyyy-MM-dd');
-                                      const q = query(collection(db, 'LichLamViec'), where('empId', '==', req.empId), where('date', '==', todayStr));
+                                      const offDate = req.details?.requestDate || format(new Date(), 'yyyy-MM-dd');
+                                      const q = query(collection(db, 'LichLamViec'), where('empId', '==', req.empId), where('date', '==', offDate));
                                       const snap = await getDocs(q);
                                       for (const d of snap.docs) {
                                         await updateDoc(doc(db, 'LichLamViec', d.id), { isOff: true });
@@ -702,9 +772,23 @@ export const ApprovalSection: React.FC<ApprovalSectionProps> = ({
                                       for (const d of snap1.docs) await updateDoc(doc(db, 'LichLamViec', d.id), { empId: req.details.swapWithEmpId });
                                       for (const d of snap2.docs) await updateDoc(doc(db, 'LichLamViec', d.id), { empId: req.empId });
                                     } else if (req.type === 'salary_advance' && req.details?.advanceAmount) {
-                                      const monthYear = format(new Date(), 'yyyy-MM');
+                                      const reqDate = req.details.requestDate || format(new Date(), 'yyyy-MM-dd');
+                                      const monthYear = reqDate.substring(0, 7);
                                       const targetEmp = nhanViens.find(e => e.empId === req.empId || e.id === req.empId);
                                       const firestoreId = targetEmp ? targetEmp.id : req.empId;
+
+                                      // 1. Create record in SalaryAdvanceRecords for UI visibility in Tab TẠM ỨNG LƯƠNG
+                                      await addDoc(collection(db, 'SalaryAdvanceRecords'), {
+                                        empId: firestoreId,
+                                        fullName: req.fullName,
+                                        amount: Number(req.details.advanceAmount),
+                                        monthYear: monthYear,
+                                        locationId: req.locationId,
+                                        createdAt: serverTimestamp(),
+                                        createdBy: currentAdmin?.email || 'admin'
+                                      });
+
+                                      // 2. Update PayrollAdjustment
                                       const adjId = `${firestoreId}_${monthYear}`;
                                       const adjRef = doc(db, 'PayrollAdjustments', adjId);
                                       await setDoc(adjRef, {
@@ -713,6 +797,62 @@ export const ApprovalSection: React.FC<ApprovalSectionProps> = ({
                                         advanceSalary: increment(req.details.advanceAmount),
                                         advanceSalaryNote: req.note || 'Ứng lương (Duyệt từ yêu cầu)'
                                       }, { merge: true });
+                                    } else if (req.type === 'forgot_check' && req.details?.requestDate) {
+                                      // Create/Update timesheet for forgotten check-in/out
+                                      const targetEmp = nhanViens.find(e => e.empId === req.empId || e.id === req.empId);
+                                      if (targetEmp) {
+                                        const dateStr = req.details.requestDate;
+                                        const startTime = req.details.requestTime || '08:00';
+                                        const endTime = req.details.requestSubTime || '12:00';
+                                        
+                                        // Calculate total hours
+                                        const [sH, sM] = startTime.split(':').map(Number);
+                                        const [eH, eM] = endTime.split(':').map(Number);
+                                        let duration = (eH + eM/60) - (sH + sM/60);
+                                        if (duration < 0) duration += 24; 
+                                        
+                                        const totalPay = duration * (targetEmp.hourlyRate || 0);
+
+                                        // Check if timesheet already exists
+                                        const q = query(collection(db, 'timesheets'), where('empId', '==', req.empId), where('date', '==', dateStr));
+                                        const snap = await getDocs(q);
+                                        
+                                        if (!snap.empty) {
+                                          await updateDoc(doc(db, 'timesheets', snap.docs[0].id), {
+                                            checkInTime: startTime,
+                                            checkOutTime: endTime,
+                                            totalHours: duration,
+                                            totalPay: totalPay,
+                                            status: 'approved',
+                                            approvedBy: currentAdmin?.email || 'admin',
+                                            approvedAt: serverTimestamp()
+                                          });
+                                        } else {
+                                          await addDoc(collection(db, 'timesheets'), {
+                                            empId: req.empId,
+                                            fullName: targetEmp.fullName,
+                                            date: dateStr,
+                                            checkInTime: startTime,
+                                            checkOutTime: endTime,
+                                            totalHours: duration,
+                                            totalPay: totalPay,
+                                            locationId: req.locationId,
+                                            status: 'approved',
+                                            approvedBy: currentAdmin?.email || 'admin',
+                                            approvedAt: serverTimestamp(),
+                                            createdAt: serverTimestamp()
+                                          });
+                                        }
+                                      }
+                                    } else if (req.type === 'late_early' && req.details?.requestDate) {
+                                      const q = query(collection(db, 'timesheets'), where('empId', '==', req.empId), where('date', '==', req.details.requestDate));
+                                      const snap = await getDocs(q);
+                                      for (const d of snap.docs) {
+                                        await updateDoc(doc(db, 'timesheets', d.id), {
+                                          isLateExcused: true,
+                                          latePenaltyMinutes: 0
+                                        });
+                                      }
                                     }
                                     
                                     await logAction('Duyệt yêu cầu', req.fullName, `Duyệt ${getRequestTypeLabel(req.type).label} cho ${req.fullName}`);
