@@ -146,6 +146,8 @@ export interface WorkSchedule {
   roleInShift?: 'QUẦY' | 'PV' | 'BOTH';
   taskNote?: string;
   tasks?: ShiftTask[];
+  notes?: string;
+  colorLabel?: string;
 }
 
 export interface LeaveRequest {
