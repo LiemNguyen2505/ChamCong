@@ -202,7 +202,7 @@ export const EmployeeAttendancePanel: React.FC<EmployeeAttendancePanelProps> = (
             </div>
             <div className="flex items-baseline gap-1">
               <span className={`text-xl font-semibold text-emerald-500 tracking-tighter leading-none transition-colors`}>
-                {monthlyStats.totalHours.toFixed(1)}
+                {monthlyStats.totalHours.toFixed(2)}
               </span>
              {/* <span className={`text-[10px] font-black text-emerald-500 opacity-40  leading-none ml-0.5`}>h</span> */}
             </div>
