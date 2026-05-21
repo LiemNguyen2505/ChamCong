@@ -94,36 +94,6 @@ export const useEmployeeAttendance = (
         setSelectedShiftId(matchedShift.id);
       }
     }
-
-    // GPS Logic
-    const isAdmin = loggedInEmployee.empId.toUpperCase() === 'ADMIN' || 
-                    admins.some(a => a.email === loggedInEmployee.fullName);
-    if (isAdmin) {
-      setDistance(0);
-      return;
-    }
-
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition((position) => {
-        const { latitude, longitude } = position.coords;
-        setCoords({ lat: latitude, lng: longitude });
-        const branch = BRANCHES.find(b => b.id === kioskBranch);
-        if (branch) {
-          const dist = calculateDistance(
-            latitude,
-            longitude,
-            branch.lat,
-            branch.lng
-          );
-          setDistance(dist);
-          if (dist > 50) {
-            toast.error(`Bạn ở quá xa (${Math.round(dist)}m). Hãy lại gần chi nhánh.`);
-          }
-        }
-      }, () => {
-        toast.error('Không thể lấy vị trí. Vui lòng bật GPS.');
-      }, { enableHighAccuracy: true });
-    }
   };
 
   const handleConfirmAction = async (capturedPhoto: string) => {
@@ -211,6 +181,46 @@ export const useEmployeeAttendance = (
     setPhotoData(data);
     handleConfirmAction(data); // Auto-confirm on capture
   };
+
+  useEffect(() => {
+    if (!actionType) {
+      setDistance(null);
+      setCoords(null);
+      return;
+    }
+
+    if (!kioskBranch || !loggedInEmployee) return;
+
+    const isAdmin = loggedInEmployee.empId.toUpperCase() === 'ADMIN' || 
+                    admins.some(a => a.email === loggedInEmployee.fullName);
+    
+    if (isAdmin) {
+      setDistance(0);
+      return;
+    }
+
+    if (navigator.geolocation) {
+      const watchId = navigator.geolocation.watchPosition((position) => {
+        const { latitude, longitude } = position.coords;
+        setCoords({ lat: latitude, lng: longitude });
+        const branch = BRANCHES.find(b => b.id === kioskBranch);
+        if (branch) {
+          const dist = calculateDistance(
+            latitude,
+            longitude,
+            branch.lat,
+            branch.lng
+          );
+          setDistance(dist);
+        }
+      }, (error) => {
+        console.error('GPS Error:', error);
+        // Don't toast every time on error if it's already toast once
+      }, { enableHighAccuracy: true });
+
+      return () => navigator.geolocation.clearWatch(watchId);
+    }
+  }, [actionType, kioskBranch, loggedInEmployee, admins]);
 
   return {
     actionType, setActionType,
