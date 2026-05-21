@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { db } from '../firebase';
 import { updateDoc, doc } from 'firebase/firestore';
-import { Clock, CheckCircle, AlertCircle, X } from 'lucide-react';
+import { Clock, CheckCircle, AlertCircle, X, ArrowLeft } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { format } from 'date-fns';
 import toast from 'react-hot-toast';
@@ -9,7 +9,7 @@ import { useNavigate } from 'react-router-dom';
 import confetti from 'canvas-confetti';
 
 import { EmployeeClock } from './employee/EmployeeClock';
-import { EmployeeSchedule } from './employee/EmployeeSchedule';
+import { SmartScheduleBuilder } from './SmartScheduleBuilder';
 import { EmployeeRequests } from './employee/EmployeeRequests';
 import { EmployeeHistory } from './employee/EmployeeHistory';
 import { EmployeeSalaryDetails } from './employee/EmployeeSalaryDetails';
@@ -135,19 +135,6 @@ export default function EmployeeView({
     }
   }, [loggedInEmployee, kioskBranch]);
 
-  const [selectedMonth, setSelectedMonth] = useState(format(new Date(), 'yyyy-MM'));
-
-  const [outsideScheduleReason, setOutsideScheduleReason] = useState('');
-
-  const employeeTodayShifts = useMemo(() => {
-    if (!loggedInEmployee) return [];
-    return globalData.lichLamViecs
-      .filter((s: any) => s.date === format(new Date(), 'yyyy-MM-dd') && !s.isOff && s.locationId === kioskBranch && s.empId === loggedInEmployee.id)
-      .sort((a: any, b: any) => a.startTime.localeCompare(b.startTime));
-  }, [globalData.lichLamViecs, loggedInEmployee, kioskBranch]);
-
-  const { monthlyStats } = useEmployeeSalary(loggedInEmployee, monthTimesheets, payrollAdjustments, holidays, selectedMonth, globalData.violations);
-
   const {
     showWeeklySchedule, setShowWeeklySchedule,
     showStats, setShowStats,
@@ -166,6 +153,17 @@ export default function EmployeeView({
     scheduleViewMode, setScheduleViewMode,
     teamScheduleBranch, setTeamScheduleBranch
   } = useEmployeeUI(kioskBranch);
+
+  const [selectedMonth, setSelectedMonth] = useState(format(new Date(), 'yyyy-MM'));
+
+  const employeeTodayShifts = useMemo(() => {
+    if (!loggedInEmployee) return [];
+    return globalData.lichLamViecs
+      .filter((s: any) => s.date === format(new Date(), 'yyyy-MM-dd') && !s.isOff && s.locationId === kioskBranch && s.empId === loggedInEmployee.id)
+      .sort((a: any, b: any) => a.startTime.localeCompare(b.startTime));
+  }, [globalData.lichLamViecs, loggedInEmployee, kioskBranch]);
+
+  const { monthlyStats } = useEmployeeSalary(loggedInEmployee, monthTimesheets, payrollAdjustments, holidays, selectedMonth, globalData.violations);
 
   useAntiSlacking(loggedInEmployee, latestLog, admins, kioskBranch);
 
@@ -203,8 +201,16 @@ export default function EmployeeView({
     handleLogout();
   };
 
+  const currentUserAdmin = useMemo(() => {
+    if (!loggedInEmployee) return null;
+    return admins.find(a => 
+      (a.email === loggedInEmployee.fullName || a.phone === loggedInEmployee.phone) ||
+      (a.role === 'Manager' && a.locationIds?.includes(kioskBranch))
+    );
+  }, [loggedInEmployee, admins, kioskBranch]);
+
   const { notifications: navNotifications, markAsRead, markAllAsRead } = useNotifications(
-    'Employee',
+    currentUserAdmin ? (currentUserAdmin.role === 'SuperAdmin' ? 'SuperAdmin' : 'BranchAdmin') : 'Employee',
     loggedInEmployee?.id,
     [kioskBranch || '']
   );
@@ -347,6 +353,13 @@ export default function EmployeeView({
               setNote={setNote}
               onCancel={() => setActionType(null)}
               onConfirm={() => {
+                const isAdmin = loggedInEmployee?.empId?.toUpperCase() === 'ADMIN' || 
+                                admins.some(a => a.email === loggedInEmployee?.fullName);
+                if (!isAdmin && distance !== null && distance > 50) {
+                  toast.error('Bạn ở quá xa chi nhánh. Vui lòng di chuyển đến quán để chấm công.');
+                  return;
+                }
+
                 if (actionType === 'check-in') {
                   if (emergencyManager) {
                     cameraRef.current?.capturePhoto();
@@ -390,7 +403,8 @@ export default function EmployeeView({
                     return;
                   }
 
-                  if (selTotal > schTotal + 30 && note.trim() === '') {
+                  // Bypass checkout reason if shift was outside schedule (emergency)
+                  if (selTotal > schTotal + 30 && note.trim() === '' && !latestLog?.isEmergency) {
                     setCheckoutWarningStep(4); // Tăng ca cần ghi chú
                     return;
                   }
@@ -520,10 +534,13 @@ export default function EmployeeView({
       <EmergencyCheckInModal
         showEmergencyCheckInModal={showEmergencyCheckInModal}
         setShowEmergencyCheckInModal={setShowEmergencyCheckInModal}
+        theme={theme}
         emergencyManager={emergencyManager}
         setEmergencyManager={setEmergencyManager}
-        theme={theme}
+        outsideScheduleReason={note}
+        setOutsideScheduleReason={setNote}
         admins={admins}
+        kioskBranch={kioskBranch}
         onConfirm={() => {
           setShowEmergencyCheckInModal(false);
           cameraRef.current?.capturePhoto();
@@ -556,23 +573,33 @@ export default function EmployeeView({
       />
 
       {showWeeklySchedule && (
-        <EmployeeSchedule
-          showWeeklySchedule={showWeeklySchedule}
-          setShowWeeklySchedule={setShowWeeklySchedule}
-          teamScheduleBranch={teamScheduleBranch}
-          setTeamScheduleBranch={setTeamScheduleBranch}
-          allSchedules={globalData.lichLamViecs}
-          employees={employees}
-          selectedCalendarDate={selectedCalendarDate}
-          setSelectedCalendarDate={setSelectedCalendarDate}
-          scheduleZoom={1}
-          setScheduleZoom={() => {}}
-          scheduleViewMode={scheduleViewMode}
-          setScheduleViewMode={setScheduleViewMode}
-          loggedInEmployee={loggedInEmployee}
-          theme={theme}
-          BRANCHES={BRANCHES}
-        />
+        <div className="fixed inset-0 z-[100] bg-slate-900 flex flex-col overflow-hidden animate-in fade-in duration-300">
+          <div className={`p-4 ${theme.accent} border-b border-white/10 flex items-center gap-3 shadow-lg flex-shrink-0`}>
+            <button 
+              onClick={() => setShowWeeklySchedule(false)}
+              className="w-10 h-10 bg-white/20 hover:bg-white/30 text-white rounded-full flex items-center justify-center transition-all active:scale-90 shadow-sm"
+            >
+              <ArrowLeft className="w-5 h-5" />
+            </button>
+            <div>
+              <h2 className="text-lg font-black text-white uppercase tracking-widest leading-none">Quay lại</h2>
+              <p className="text-[10px] text-white/60 font-bold uppercase tracking-widest mt-1">Đội ngũ {teamScheduleBranch}</p>
+            </div>
+          </div>
+          <div className="flex-1 bg-white overflow-hidden flex flex-col p-1 md:p-4">
+            <SmartScheduleBuilder
+              employees={employees}
+              schedules={globalData.lichLamViecs}
+              currentBranchFilter={teamScheduleBranch === 'All' ? employees[0]?.locationId || 'Góc Phố' : teamScheduleBranch}
+              managedBranches={BRANCHES.map(b => b.id)}
+              onAddShift={async () => {}}
+              onUpdateShift={async () => {}}
+              onDeleteShift={async () => {}}
+              isReadOnly={true}
+              planningGoals={[]}
+            />
+          </div>
+        </div>
       )}
 
       <EmployeeRequests
@@ -616,27 +643,11 @@ export default function EmployeeView({
         showOutsideScheduleModal={showOutsideScheduleModal}
         setShowOutsideScheduleModal={setShowOutsideScheduleModal}
         theme={theme}
-        outsideScheduleReason={outsideScheduleReason}
-        setOutsideScheduleReason={setOutsideScheduleReason}
+        outsideScheduleReason={note}
+        setOutsideScheduleReason={setNote}
         onConfirm={() => {
           setShowOutsideScheduleModal(false);
           setShowEmergencyCheckInModal(true);
-        }}
-      />
-
-      <EmergencyCheckInModal
-        showEmergencyCheckInModal={showEmergencyCheckInModal}
-        setShowEmergencyCheckInModal={setShowEmergencyCheckInModal}
-        theme={theme}
-        emergencyManager={emergencyManager}
-        setEmergencyManager={setEmergencyManager}
-        outsideScheduleReason={outsideScheduleReason}
-        setOutsideScheduleReason={setOutsideScheduleReason}
-        admins={admins}
-        kioskBranch={kioskBranch}
-        onConfirm={() => {
-          setShowEmergencyCheckInModal(false);
-          cameraRef.current?.capturePhoto();
         }}
       />
 
