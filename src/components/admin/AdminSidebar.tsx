@@ -1,5 +1,7 @@
 import React from 'react';
-import { LayoutDashboard, CheckCircle2, Calendar, TableProperties, Users, DollarSign, AlertCircle, ShieldCheck, History as HistoryIcon, X, ChevronLeft, Bell, Mail, RefreshCw, ShieldAlert } from 'lucide-react';
+import { LayoutDashboard, CheckCircle2, Calendar, TableProperties, Users, DollarSign, AlertCircle, ShieldCheck, History as HistoryIcon, X, ChevronLeft, Bell, Mail, RefreshCw, ShieldAlert, FileCheck, XCircle } from 'lucide-react';
+
+import { SidebarItem as RawSidebarItem } from './AdminNavigation';
 
 export const AdminSidebar = ({
   isSidebarCollapsed,
@@ -17,9 +19,20 @@ export const AdminSidebar = ({
   setShowNotifications,
   handleSendMonthlyReport,
   isSendingReport,
-  SidebarItem
+  filterBranch
 }: any) => {
   const unreadCount = notifications.filter((n: any) => !n.isRead).length;
+
+  const SidebarItem = (props: any) => (
+    <RawSidebarItem 
+      {...props} 
+      isSidebarCollapsed={isSidebarCollapsed} 
+      setIsMobileSidebarOpen={setIsMobileSidebarOpen} 
+      isMobileSidebarOpen={isMobileSidebarOpen} 
+      adminTheme={adminTheme} 
+      filterBranch={filterBranch} 
+    />
+  );
 
   return (
     <>
@@ -129,10 +142,11 @@ export const AdminSidebar = ({
               onClick={() => setActiveTab('bangluong')} 
             />
             <SidebarItem 
-              icon={AlertCircle} 
+              icon={XCircle} 
               label="Vi phạm" 
               active={activeTab === 'vipham'} 
               onClick={() => setActiveTab('vipham')} 
+              variant="danger"
             />
           </div>
 
@@ -143,31 +157,20 @@ export const AdminSidebar = ({
             )}
             
             <SidebarItem 
-              icon={ShieldAlert} 
+              icon={FileCheck} 
               label="Quy định quán" 
               active={activeTab === 'quydinh'} 
               onClick={() => setActiveTab('quydinh')} 
             />
 
-            <button
-              onClick={() => {
-                setActiveTab('canhbao');
-                setIsMobileSidebarOpen(false);
-              }}
-              className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl font-bold transition-all ${
-                activeTab === 'canhbao' 
-                  ? 'bg-red-600 text-white shadow-lg shadow-red-900/20' 
-                  : 'text-red-400 hover:bg-red-500/10 hover:text-red-300'
-              } ${(isSidebarCollapsed && !isMobileSidebarOpen) ? 'justify-center px-0' : ''}`}
-            >
-              <AlertCircle className="w-5 h-5 flex-shrink-0" />
-              {(!isSidebarCollapsed || isMobileSidebarOpen) && <span className="text-sm whitespace-nowrap">Cảnh báo khẩn</span>}
-              {(!isSidebarCollapsed || isMobileSidebarOpen) && canhBaos.length > 0 && (
-                <span className="ml-auto bg-white text-red-600 py-0.5 px-2 rounded-full text-[10px] font-black">
-                  {canhBaos.length}
-                </span>
-              )}
-            </button>
+            <SidebarItem 
+              icon={AlertCircle} 
+              label="Cảnh báo khẩn" 
+              active={activeTab === 'canhbao'} 
+              onClick={() => setActiveTab('canhbao')} 
+              badge={canhBaos.length}
+              variant="danger"
+            />
 
             {(currentAdmin?.role === 'SuperAdmin') && (
               <button
