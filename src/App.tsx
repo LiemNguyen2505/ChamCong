@@ -26,7 +26,9 @@ export default function App() {
     planningGoals: [],
     violations: [],
     bulletinNotes: [],
-    materialLossLogs: []
+    materialLossLogs: [],
+    retainedSalaryRecords: [],
+    salaryAdvanceRecords: []
   });
 
   const [dataCache, setDataCache] = useState<Record<string, any>>({});
@@ -107,6 +109,8 @@ export default function App() {
         { key: 'payrollAdjustments', query: query(collection(db, 'PayrollAdjustments'), where('monthYear', '==', targetMonth)), type: 'dynamic' },
         { key: 'violations', query: query(collection(db, 'Violations'), where('monthYear', '==', targetMonth)), type: 'dynamic' },
         { key: 'materialLossLogs', query: query(collection(db, 'MaterialLossLogs'), where('monthYear', '==', targetMonth), orderBy('processedAt', 'desc'), limit(100)), type: 'dynamic' },
+        { key: 'retainedSalaryRecords', query: query(collection(db, 'RetainedSalaryRecords'), orderBy('createdAt', 'desc'), limit(500)), type: 'dynamic' },
+        { key: 'salaryAdvanceRecords', query: query(collection(db, 'SalaryAdvanceRecords'), where('monthYear', '==', targetMonth), orderBy('createdAt', 'desc')), type: 'dynamic' },
         { key: 'chamCongs', query: query(collection(db, 'timesheets'), where('date', '>=', startDate), where('date', '<=', endDate), limit(3000)), type: 'dynamic' },
         { key: 'lichLamViecs', query: query(collection(db, 'LichLamViec'), where('date', '>=', startDate), where('date', '<=', endDate), limit(3000)), type: 'dynamic' },
         { key: 'bulletinNotes', query: query(collection(db, 'BulletinBoard'), orderBy('isPinned', 'desc'), orderBy('createdAt', 'desc'), limit(100)), type: 'dynamic' },
