@@ -6,7 +6,7 @@ import { Plus, Download, Calendar, X, ChevronLeft, ChevronRight, CheckCircle2, E
 import { MonthlyAttendanceTable } from './MonthlyAttendanceTable';
 import { Employee, Timesheet, AdminAccount } from '../types/admin';
 import { safeFormat, safeParseDate } from '../utils/dateUtils';
-import { TABLE_COL_WIDTHS, formatMinutes, formatDecimalHours, getTimeStyle, calculateShifts, getLateMinutes, getLatePenaltyMinutes, getTotalHours } from '../utils/adminHelpers';
+import { TABLE_COL_WIDTHS, formatMinutes, formatDecimalHours, getTimeStyle, calculateShifts, getLateMinutes, getLatePenaltyMinutes, getTotalHours, getPhonePenalty } from '../utils/adminHelpers';
 
 interface AttendanceTabProps {
   activeTab: string;
@@ -491,7 +491,10 @@ export const AttendanceTab: React.FC<AttendanceTabProps> = ({
             });
 
             const totalPhone = dayLogs.reduce((sum, log) => sum + (log.SoLanRoiApp || 0), 0);
-            const totalPhonePenalty = dayLogs.reduce((sum, log) => sum + (log.phonePenalty || 0), 0);
+            const totalPhonePenalty = dayLogs.reduce((sum, log) => {
+              const emp = nhanViens.find(nv => nv.empId === log.empId);
+              return sum + getPhonePenalty(log, emp?.hourlyRate || 0);
+            }, 0);
             const totalLate = dayLogs.reduce((sum, log) => sum + getLateMinutes(log), 0);
             const totalPenalty = dayLogs.reduce((sum, log) => {
               const emp = nhanViens.find(nv => nv.empId === log.empId);
@@ -531,9 +534,9 @@ export const AttendanceTab: React.FC<AttendanceTabProps> = ({
                         </th>
                         <th className="p-[8px_12px] text-center border-l-2 border-emerald-400 bg-[#723a10]">
                            <div className="relative inline-block">
-                             <span className="text-[15px] font-black text-emerald-300 tracking-tighter tabular-nums">{totalHours.toFixed(1)}</span>
+                             <span className="text-[15px] font-black text-emerald-300 tracking-tighter tabular-nums">{totalHours.toFixed(2)}</span>
                              {pendingHours > 0 && (
-                               <div className="absolute -top-1.5 -right-3.5 w-3.5 h-3.5 bg-amber-500 text-white rounded-full flex items-center justify-center text-[7px] font-black border border-white shadow-sm" title={`Chưa duyệt: ${pendingHours.toFixed(1)}h`}>!</div>
+                               <div className="absolute -top-1.5 -right-3.5 w-3.5 h-3.5 bg-amber-500 text-white rounded-full flex items-center justify-center text-[7px] font-black border border-white shadow-sm" title={`Chưa duyệt: ${pendingHours.toFixed(2)}h`}>!</div>
                              )}
                            </div>
                         </th>
@@ -649,14 +652,19 @@ export const AttendanceTab: React.FC<AttendanceTabProps> = ({
                             )}
                             <td className="border border-[#e0e0e0] p-[8px_12px] text-xs text-center" style={{ width: `${TABLE_COL_WIDTHS.SD_DT}px` }}>
                               {log.SoLanRoiApp > 0 ? (
-                                <span className="text-rose-600 font-bold tabular-nums">{log.SoLanRoiApp}</span>
+                                <div className="flex flex-col items-center leading-none gap-0.5">
+                                  <span className="text-rose-600 font-bold tabular-nums pr-0.5">{log.SoLanRoiApp}</span>
+                                  {(log.phoneMinutes > 0 || log.PhutPhatRoiApp > 0) && (
+                                    <span className="text-[9px] text-rose-400 font-medium">({log.phoneMinutes || log.PhutPhatRoiApp}p)</span>
+                                  )}
+                                </div>
                               ) : (
                                 <span className="text-slate-200">-</span>
                               )}
                             </td>
                             <td className="border border-[#e0e0e0] p-[8px_12px] text-xs text-center font-mono" style={{ width: `${TABLE_COL_WIDTHS.PHAT_DT}px` }}>
-                              {log.phonePenalty > 0 ? (
-                                <span className="text-rose-600 font-bold tabular-nums">{formatCurrency(log.phonePenalty)}</span>
+                              {getPhonePenalty(log, employee?.hourlyRate || 0) > 0 ? (
+                                <span className="text-rose-600 font-bold tabular-nums">{formatCurrency(getPhonePenalty(log, employee?.hourlyRate || 0))}</span>
                               ) : (
                                 <span className="text-slate-200">-</span>
                               )}
@@ -743,7 +751,10 @@ export const AttendanceTab: React.FC<AttendanceTabProps> = ({
               const lateMins = dayLogs.reduce((sum, log) => sum + getLateMinutes(log), 0);
               const phoneViolations = dayLogs.reduce((sum, log) => sum + (log.SoLanRoiApp || 0), 0);
               const lateLogsCount = dayLogs.filter(log => getLateMinutes(log) > 0).length;
-              const totalPhonePenalty = dayLogs.reduce((sum, log) => sum + (log.phonePenalty || 0), 0);
+              const totalPhonePenalty = dayLogs.reduce((sum, log) => {
+                const employee = nhanViens.find(nv => nv.empId === log.empId);
+                return sum + getPhonePenalty(log, employee?.hourlyRate || 0);
+              }, 0);
               const totalLatePenalty = dayLogs.reduce((sum, log) => {
                 const employee = nhanViens.find(nv => nv.empId === log.empId);
                 const hourlyRate = employee?.hourlyRate || 0;
@@ -794,8 +805,8 @@ export const AttendanceTab: React.FC<AttendanceTabProps> = ({
                     </div>
                     <div className="flex justify-end items-center gap-1 pt-1 border-t border-slate-200/50">
                        <span className="text-slate-500 uppercase tracking-tighter">Tổng giờ công:</span>
-                       <span className="text-[12px] text-slate-800 tabular-nums">{approvedHrs.toFixed(1)}h</span>
-                       {pendingHrs > 0 && <span className="text-amber-500 text-[10px] font-bold">(+{pendingHrs.toFixed(1)})</span>}
+                       <span className="text-[12px] text-slate-800 tabular-nums">{approvedHrs.toFixed(2)}h</span>
+                       {pendingHrs > 0 && <span className="text-amber-500 text-[10px] font-bold">(+{pendingHrs.toFixed(2)})</span>}
                     </div>
                   </div>
 
@@ -876,7 +887,7 @@ export const AttendanceTab: React.FC<AttendanceTabProps> = ({
                                         )}
                                       </div>
                                     </div>
-                                    <span className={`text-xs font-black ${adminTheme.text} tabular-nums whitespace-nowrap bg-white px-2 py-1 rounded-lg border border-slate-100 shadow-sm`}>{getTotalHours(log) > 0 ? getTotalHours(log).toFixed(1) : '---'}h</span>
+                                    <span className={`text-xs font-black ${adminTheme.text} tabular-nums whitespace-nowrap bg-white px-2 py-1 rounded-lg border border-slate-100 shadow-sm`}>{getTotalHours(log) > 0 ? getTotalHours(log).toFixed(2) : '---'}h</span>
                                   </div>
                                   <div className="flex flex-wrap gap-2 pt-2 border-t border-slate-50">
                                     {log.SoLanRoiApp > 0 && (
@@ -921,7 +932,7 @@ export const AttendanceTab: React.FC<AttendanceTabProps> = ({
             const totalHours = approvedLogs.reduce((sum, cc) => sum + getTotalHours(cc), 0);
             const pendingHours = pendingLogs.reduce((sum, cc) => sum + getTotalHours(cc), 0);
             const totalPhone = logs.reduce((sum, l) => sum + (l.SoLanRoiApp || 0), 0);
-            const totalPhonePenalty = logs.reduce((sum, l) => sum + (l.phonePenalty || 0), 0);
+            const totalPhonePenalty = logs.reduce((sum, l) => sum + getPhonePenalty(l, historyEmployee.hourlyRate || 0), 0);
             const totalLate = logs.reduce((sum, l) => sum + getLateMinutes(l), 0);
             const totalLateLogs = logs.filter(l => getLateMinutes(l) > 0).length;
             const totalPenalty = logs.reduce((sum, l) => {
@@ -958,7 +969,7 @@ export const AttendanceTab: React.FC<AttendanceTabProps> = ({
                         </th>
                         <th className="p-[8px_12px] text-center border-l-2 border-emerald-400 bg-[#723a10]">
                            <div className="relative inline-block">
-                             <span className="text-[15px] font-black text-emerald-300 tracking-tighter tabular-nums">{totalHours.toFixed(1)}</span>
+                             <span className="text-[15px] font-black text-emerald-300 tracking-tighter tabular-nums">{totalHours.toFixed(2)}</span>
                              {pendingHours > 0 && (
                                <div className="absolute -top-1.5 -right-3.5 w-3.5 h-3.5 bg-amber-500 text-white rounded-full flex items-center justify-center text-[7px] font-black border border-white shadow-sm">!</div>
                              )}
@@ -1056,14 +1067,19 @@ export const AttendanceTab: React.FC<AttendanceTabProps> = ({
                             )}
                             <td className="border border-[#e0e0e0] p-[8px_12px] text-center" style={{ width: `${TABLE_COL_WIDTHS.SD_DT}px` }}>
                               {log.SoLanRoiApp > 0 ? (
-                                <span className="text-rose-600 font-bold tabular-nums">{log.SoLanRoiApp}</span>
+                                <div className="flex flex-col items-center leading-none gap-0.5">
+                                  <span className="text-rose-600 font-bold tabular-nums">{log.SoLanRoiApp}</span>
+                                  {(log.phoneMinutes > 0 || log.PhutPhatRoiApp > 0) && (
+                                    <span className="text-[9px] text-rose-400 font-medium">({log.phoneMinutes || log.PhutPhatRoiApp}p)</span>
+                                  )}
+                                </div>
                               ) : (
                                 <span className="text-slate-200 font-light">-</span>
                               )}
                             </td>
                             <td className="border border-[#e0e0e0] p-[8px_12px] text-center" style={{ width: `${TABLE_COL_WIDTHS.PHAT_DT}px` }}>
-                              {log.phonePenalty > 0 ? (
-                                <span className="text-rose-600 font-bold font-mono tabular-nums">{formatCurrency(log.phonePenalty)}</span>
+                              {getPhonePenalty(log, historyEmployee.hourlyRate || 0) > 0 ? (
+                                <span className="text-rose-600 font-bold font-mono tabular-nums">{formatCurrency(getPhonePenalty(log, historyEmployee.hourlyRate || 0))}</span>
                               ) : (
                                 <span className="text-slate-200 font-light">-</span>
                               )}
@@ -1127,8 +1143,8 @@ export const AttendanceTab: React.FC<AttendanceTabProps> = ({
                           </div>
                           <div className="flex justify-end items-center gap-1 pt-1 border-t border-slate-200/50">
                              <span className="text-slate-500 uppercase tracking-tighter">Tổng giờ công:</span>
-                             <span className="text-[12px] text-slate-800 tabular-nums">{totalHours.toFixed(1)}h</span>
-                             {pendingHours > 0 && <span className="text-amber-500 text-[10px] font-bold">(+{pendingHours.toFixed(1)})</span>}
+                             <span className="text-[12px] text-slate-800 tabular-nums">{totalHours.toFixed(2)}h</span>
+                             {pendingHours > 0 && <span className="text-amber-500 text-[10px] font-bold">(+{pendingHours.toFixed(2)})</span>}
                           </div>
                         </div>
 
@@ -1194,7 +1210,7 @@ export const AttendanceTab: React.FC<AttendanceTabProps> = ({
                                           )}
                                         </div>
                                       </div>
-                                      <span className={`text-[11px] font-black ${adminTheme.text} whitespace-nowrap bg-white px-1.5 py-0.5 rounded shadow-sm border border-slate-100`}>{getTotalHours(log) > 0 ? getTotalHours(log).toFixed(1) : '---'}h</span>
+                                      <span className={`text-[11px] font-black ${adminTheme.text} whitespace-nowrap bg-white px-1.5 py-0.5 rounded shadow-sm border border-slate-100`}>{getTotalHours(log) > 0 ? getTotalHours(log).toFixed(2) : '---'}h</span>
                                     </div>
                                       <div className="flex flex-wrap gap-1">
                                         {log.SoLanRoiApp > 0 && <span className="px-1.5 py-0.5 bg-rose-50 text-rose-600 text-[8px] font-black rounded-full border border-rose-100">ĐT: {log.SoLanRoiApp} l</span>}
