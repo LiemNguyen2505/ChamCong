@@ -102,7 +102,7 @@ export const EmployeeHistory: React.FC<EmployeeHistoryProps> = ({
                 </div>
                 <div className="flex items-center gap-1 mt-0.5">
                   <Clock className="w-3.5 h-3.5 text-white/50" />
-                  <p className="text-xs font-bold text-white/60 uppercase tracking-widest">Tổng: <span className="text-emerald-300 font-black text-sm">{monthlyStats.totalHours.toFixed(1)}h</span></p>
+                  <p className="text-xs font-bold text-white/60 uppercase tracking-widest">Tổng: <span className="text-emerald-300 font-black text-sm">{monthlyStats.totalHours.toFixed(2)}h</span></p>
                 </div>
               </div>
 
@@ -206,7 +206,7 @@ export const EmployeeHistory: React.FC<EmployeeHistoryProps> = ({
                                     <div className="flex flex-col items-end border-l border-stone-100 pl-2">
                                       <span className="text-[10px] font-black text-stone-400 uppercase leading-none mb-0.5">Tổng</span>
                                       <span className={`text-[13px] font-black ${theme.text} leading-none whitespace-nowrap`}>
-                                        {outTimeStr ? computedTotalHours.toFixed(1) + 'h' : '---'}
+                                        {outTimeStr ? computedTotalHours.toFixed(2) + 'h' : '---'}
                                       </span>
                                     </div>
                                 </div>
