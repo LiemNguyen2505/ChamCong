@@ -431,25 +431,31 @@ export const EmployeeViolationTracker: React.FC<EmployeeViolationTrackerProps> =
                 <div className="space-y-4">
                   <div className="flex items-center gap-2 text-blue-600">
                     <Phone className="w-5 h-5 font-black" />
-                    <span className="text-sm font-black uppercase tracking-wider">Quy tắc Phạt Sử dụng Điện thoại</span>
+                    <span className="text-sm font-black uppercase tracking-wider">Quy tắc Sử dụng Điện thoại & Rời App</span>
                   </div>
                   <div className="space-y-3 bg-blue-50 p-4 rounded-2xl border border-blue-100">
                     <div className="flex gap-3">
                       <div className="w-1.5 h-1.5 rounded-full bg-blue-400 mt-1.5 shrink-0" />
                       <p className="text-xs font-bold text-slate-700 leading-relaxed">
-                        Mỗi ca nhân viên chỉ được sử dụng điện thoại <span className="text-blue-600">3 lần</span>, mỗi lần không hơn <span className="text-blue-600">2 phút</span>.
+                        Hệ thống tự động ghi nhận việc rời khỏi ứng dụng hoặc tắt màn hình trong giờ làm việc (tính theo ca).
                       </p>
                     </div>
                     <div className="flex gap-3">
                       <div className="w-1.5 h-1.5 rounded-full bg-blue-400 mt-1.5 shrink-0" />
                       <p className="text-xs font-bold text-slate-700 leading-relaxed">
-                        Nếu sử dụng <span className="text-blue-600">hơn 3 lần</span> sẽ bị tính 1 lỗi vi phạm xét thưởng trách nhiệm.
+                        Ca làm việc bị tính là <strong>VI PHẠM</strong> lỗi điện thoại nếu rời app <strong className="text-blue-600">quá 3 lần</strong> HOẶC có 1 lần rời app liên tục <strong className="text-blue-600">quá 3 phút</strong>.
                       </p>
                     </div>
                     <div className="flex gap-3">
                       <div className="w-1.5 h-1.5 rounded-full bg-blue-400 mt-1.5 shrink-0" />
                       <p className="text-xs font-bold text-slate-700 leading-relaxed">
-                        Nếu dùng <span className="text-blue-600">hơn 2 phút</span> sẽ bị tính là 1 lỗi vi phạm TTN và khấu trừ: <span className="text-blue-600">Tiền phạt ĐT = Tổng phút × 3 × (Lương giờ / 60)</span>.
+                        <strong>Trừ tiền:</strong> Khi vi phạm, hệ thống tự động quy đổi thành Tiền Phạt: <strong className="text-blue-600">Tiền phạt = Tổng số phút rời app × 3 × (Lương giờ / 60)</strong>.
+                      </p>
+                    </div>
+                    <div className="flex gap-3">
+                      <div className="w-1.5 h-1.5 rounded-full bg-blue-400 mt-1.5 shrink-0" />
+                      <p className="text-xs font-bold text-slate-700 leading-relaxed">
+                        <strong>Trừ TTN:</strong> Mỗi ca làm việc vi phạm lỗi điện thoại sẽ tự động bị tính <strong className="text-blue-600">1 gạch vi phạm</strong> (trừ 10% Thưởng Trách Nhiệm của tháng).
                       </p>
                     </div>
                   </div>
