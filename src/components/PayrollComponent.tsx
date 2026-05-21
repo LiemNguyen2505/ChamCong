@@ -252,6 +252,29 @@ export const PayrollComponent: React.FC<any> = ({
     isLoading
 }) => {
     const isAdminSuper = currentAdmin?.role === 'SuperAdmin';
+    const utilityMenuRef = useRef<HTMLDivElement>(null);
+
+    // Contextual menu click outside and scroll handling
+    useEffect(() => {
+        const handleClickOutside = (event: MouseEvent) => {
+            if (showMobileUtilities && utilityMenuRef.current && !utilityMenuRef.current.contains(event.target as Node)) {
+                setShowMobileUtilities(false);
+            }
+        };
+        const handleScroll = () => {
+            if (showMobileUtilities) {
+                setShowMobileUtilities(false);
+            }
+        };
+        document.addEventListener('mousedown', handleClickOutside);
+        window.addEventListener('scroll', handleScroll, { passive: true });
+        
+        return () => {
+            document.removeEventListener('mousedown', handleClickOutside);
+            window.removeEventListener('scroll', handleScroll);
+        };
+    }, [showMobileUtilities, setShowMobileUtilities]);
+
     // Add Cmd+S / Ctrl+S shortcut
     React.useEffect(() => {
         const handleKeyDown = (e: KeyboardEvent) => {
@@ -341,13 +364,44 @@ export const PayrollComponent: React.FC<any> = ({
                         onChange={(e) => setFilterMonth(e.target.value)}
                         className="bg-transparent border-none outline-none text-sm font-black uppercase text-slate-700"
                     />
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 relative" ref={utilityMenuRef}>
                         <button
                             onClick={() => setShowMobileUtilities(!showMobileUtilities)}
-                            className="p-2 bg-stone-50 text-stone-600 rounded-lg flex items-center justify-center border border-stone-200"
+                            className={`p-2 rounded-lg flex items-center justify-center border transition-all ${
+                                showMobileUtilities 
+                                ? 'bg-emerald-600 text-white border-emerald-600' 
+                                : 'bg-stone-50 text-stone-600 border-stone-200'
+                            }`}
                         >
                             <Settings2 className="w-4 h-4" />
                         </button>
+                        
+                        <AnimatePresence>
+                            {showMobileUtilities && (
+                                <motion.div
+                                    initial={{ opacity: 0, scale: 0.95, y: -10 }}
+                                    animate={{ opacity: 1, scale: 1, y: 0 }}
+                                    exit={{ opacity: 0, scale: 0.95, y: -10 }}
+                                    transition={{ duration: 0.2 }}
+                                    className="absolute top-full right-0 mt-2 w-56 bg-white rounded-xl shadow-lg ring-1 ring-black ring-opacity-5 z-50 overflow-hidden origin-top-right flex flex-col"
+                                >
+                                    <button 
+                                        onClick={() => { setShowHolidayConfig(true); setShowMobileUtilities(false); }} 
+                                        className="w-full flex items-center gap-3 p-4 hover:bg-stone-50 active:bg-amber-50 group transition-all text-left border-b border-stone-100 last:border-0"
+                                    >
+                                        <div className="p-2 bg-amber-100 rounded-lg group-active:bg-amber-200"><Calendar className="w-4 h-4 text-amber-600" /></div>
+                                        <span className="text-xs font-black text-stone-600 uppercase tracking-tight">Ngày lễ</span>
+                                    </button>
+                                    <button 
+                                        onClick={() => { setShowOtherDeductionsModal(true); setShowMobileUtilities(false); }} 
+                                        className="w-full flex items-center gap-3 p-4 hover:bg-stone-50 active:bg-indigo-50 group transition-all text-left border-b border-stone-100 last:border-0"
+                                    >
+                                        <div className="p-2 bg-indigo-100 rounded-lg group-active:bg-indigo-200"><Banknote className="w-4 h-4 text-indigo-600" /></div>
+                                        <span className="text-xs font-black text-stone-600 uppercase tracking-tight">Khấu trừ khác</span>
+                                    </button>
+                                </motion.div>
+                            )}
+                        </AnimatePresence>
                     </div>
                 </div>
             </div>
@@ -420,9 +474,8 @@ export const PayrollComponent: React.FC<any> = ({
                               holiday: 'Thưởng Lễ', 
                               latePenalty: 'Phạt đi trễ',
                               phonePenalty: 'Sử dụng ĐT',
-                              otherDeductions: 'Khấu trừ khác',
-                              materialLoss: 'Khấu trừ dụng cụ (Ly tách)',
-                              extraAdditions: 'Thu nhập bổ sung',
+                              otherDeductions: 'KHẤU TRỪ KHÁC',
+                              extraAdditions: 'Thu Nhập Bổ Sung',
                               actual: 'Tiền thực lãnh', note: 'Ghi chú'
                             }).map(([key, label]) => (
                               <label key={key} className="flex items-center gap-2 cursor-pointer hover:bg-slate-50 p-1 rounded transition-colors">
@@ -541,7 +594,7 @@ export const PayrollComponent: React.FC<any> = ({
                       )}
                       {visibleColumns.extraAdditions && (
                         <th style={{ width: Math.max(columnWidths.extraAdditions, 140) }} className="p-3 font-bold text-slate-500 border-r border-slate-300 text-right relative group">
-                          Thu nhập BS
+                          Thu Nhập Bổ Sung
                           <div onMouseDown={(e) => handleResize('extraAdditions', e)} className="absolute right-0 top-0 h-full w-1 cursor-col-resize bg-transparent group-hover:bg-sky-400 z-10" />
                         </th>
                       )}
@@ -618,7 +671,7 @@ export const PayrollComponent: React.FC<any> = ({
                               )}
                               {visibleColumns.bank && <td className="p-3 border-r border-slate-100 text-slate-500 text-sm font-medium text-left">{emp.bankAccount || '-'}</td>}
                               {visibleColumns.joinDate && <td className="p-3 border-r border-slate-100 text-slate-500 text-xs font-medium text-left">{emp.joinDate ? format(parseISO(emp.joinDate), 'dd/MM/yy') : '-'}</td>}
-                              {visibleColumns.hours && <td className="p-3 font-bold text-emerald-600 border-r border-slate-100 text-right text-sm">{stats.totalHours.toFixed(1)}</td>}
+                              {visibleColumns.hours && <td className="p-3 font-bold text-emerald-600 border-r border-slate-100 text-right text-sm">{stats.totalHours.toFixed(2)}</td>}
                               {visibleColumns.baseSalary && (
                                 <td className="p-3 border-r border-slate-100 text-right">
                                     <div className="flex items-center justify-end gap-1">
@@ -668,6 +721,7 @@ export const PayrollComponent: React.FC<any> = ({
                                   {stats.holidayBonusTotal > 0 ? formatCurrency(stats.holidayBonusTotal) : '-'}
                                 </td>
                               )}
+                              {/* Đi trễ */}
                               {visibleColumns.latePenalty && (
                                 <td className="p-3 border-r border-slate-100 text-right">
                                   <PenaltyPopover 
@@ -690,6 +744,7 @@ export const PayrollComponent: React.FC<any> = ({
                                   />
                                 </td>
                               )}
+                              {/* Sử dụng ĐT */}
                               {visibleColumns.phonePenalty && (
                                 <td className="p-3 border-r border-slate-100 text-right">
                                   <PenaltyPopover 
@@ -697,12 +752,12 @@ export const PayrollComponent: React.FC<any> = ({
                                     label="Sử dụng ĐT"
                                     amount={stats.phonePenaltyTotal}
                                     rawAmount={stats.rawPhonePenaltyTotal}
-                                    quantityLabel="lần"
+                                    quantityLabel="ca VP"
                                     quantityValue={stats.phonePenaltyCount}
                                     rawQuantityValue={stats.systemPhonePenaltyCount}
                                     onAmountChange={(val) => handlePayrollChange(emp.id, 'overridePhonePenalty', val)}
                                     onQuantityChange={(val) => handlePayrollChange(emp.id, 'overridePhoneCount', val)}
-                                    unitRate={stats.systemPhonePenaltyCount > 0 ? stats.rawPhonePenaltyTotal / stats.systemPhonePenaltyCount : undefined}
+                                    unitRate={stats.currentHourlyRate * 3} // Based on user request (1 session > 3p = 3 hours penalty per minute)
                                     isEdited={isEdited('overridePhonePenalty') || isEdited('overridePhoneCount')}
                                     textColor="text-rose-500"
                                     onReset={() => {
@@ -730,97 +785,38 @@ export const PayrollComponent: React.FC<any> = ({
                                         isOpen={showDeductionDetails === emp.id} 
                                         onClose={() => setShowDeductionDetails(null)}
                                         anchorId={`deduction-btn-${emp.id}`}
-                                        className="w-72"
+                                        align="right"
+                                        className="w-56"
                                       >
-                                          <div className="flex justify-between items-center mb-0 pb-2 border-b border-slate-100">
-                                            <h4 className="font-black text-slate-900 text-[10px] uppercase tracking-wider">Khấu Trừ Khác</h4>
+                                          <div className="flex justify-between items-center mb-2 pb-2 border-b border-slate-100">
+                                            <h4 className="font-black text-slate-900 text-[10px] uppercase tracking-wider">Chi Tiết Khấu Trừ</h4>
                                             <button onClick={() => setShowDeductionDetails(null)} className="text-slate-400 hover:text-rose-500 transition-colors">
                                               <X className="w-3.5 h-3.5" />
                                             </button>
                                           </div>
 
-                                          <div className="flex mt-2 mb-4 bg-slate-50 p-1 rounded-xl gap-1">
-                                            {['retained', 'material', 'advance'].map((tab) => (
-                                              <button
-                                                key={tab}
-                                                onClick={() => {
-                                                  const nextTab = tab as any;
-                                                  (window as any).activeDeductionSubTab = (window as any).activeDeductionSubTab || {};
-                                                  (window as any).activeDeductionSubTab[emp.id] = nextTab;
-                                                  setShowDeductionDetails(emp.id); // Triggers re-render
-                                                }}
-                                                className={`flex-1 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-tight transition-all ${
-                                                  ((window as any).activeDeductionSubTab?.[emp.id] || 'retained') === tab
-                                                  ? 'bg-white text-slate-900 shadow-sm border border-slate-200'
-                                                  : 'text-slate-400 hover:bg-slate-100'
-                                                }`}
-                                              >
-                                                {tab === 'retained' ? 'Giữ tạm' : tab === 'material' ? 'Hao hụt' : 'Ứng lương'}
-                                              </button>
-                                            ))}
-                                          </div>
-
-                                          <div className="space-y-4 min-h-[80px]">
-                                              {((window as any).activeDeductionSubTab?.[emp.id] || 'retained') === 'retained' && (
-                                                <div className="flex flex-col gap-1">
-                                                   <div className="flex justify-between items-center px-0.5">
-                                                      <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Tiền Giữ Tạm</label>
-                                                   </div>
-                                                   <div className="w-full p-2 bg-slate-50 border border-slate-200 rounded-lg text-sm text-rose-600 font-bold">
-                                                      {(stats.finalRetained === 0 || stats.finalRetained === null) ? '0 ₫' : `${formatCurrency(stats.finalRetained)} ₫`}
-                                                   </div>
-                                                   <p className="text-[9px] text-slate-400 italic mt-1 leading-tight">
-                                                     Số tiền này được nhập từ quản lý Giữ Tạm.
-                                                   </p>
+                                          <div className="space-y-3 py-1">
+                                              {stats.finalMaterialLoss > 0 && (
+                                                <div className="flex justify-between items-center px-1">
+                                                   <span className="text-[10px] font-bold text-slate-500 uppercase">Khấu Trừ Dụng Cụ</span>
+                                                   <span className="text-sm font-black text-rose-600">{formatCurrency(stats.finalMaterialLoss)} ₫</span>
                                                 </div>
                                               )}
-
-                                              {((window as any).activeDeductionSubTab?.[emp.id] || 'retained') === 'material' && (
-                                                <div className="flex flex-col gap-3">
-                                                  <div className="flex justify-between items-center px-0.5">
-                                                     <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Khấu Trừ Dụng Cụ</label>
-                                                     <span className="text-xs font-black text-rose-600">{(stats.finalMaterialLoss === 0 || stats.finalMaterialLoss === null) ? '0 ₫' : `${formatCurrency(stats.finalMaterialLoss)} ₫`}</span>
-                                                   </div>
-                                                   
-                                                   <div className="space-y-2">
-                                                     <div className="p-2 bg-blue-50 border border-blue-100 rounded-lg">
-                                                       <div className="flex justify-between items-center mb-1">
-                                                         <span className="text-[10px] font-bold text-blue-700 uppercase">Chia sẻ tập thể</span>
-                                                         <span className="text-xs font-black text-blue-800">{formatCurrency(stats.finalMaterialLossShared)} ₫</span>
-                                                       </div>
-                                                       <div className="w-full h-1 bg-blue-200 rounded-full overflow-hidden">
-                                                          <div className="h-full bg-blue-500" style={{ width: stats.finalMaterialLoss > 0 ? `${(stats.finalMaterialLossShared / stats.finalMaterialLoss) * 100}%` : '0%' }} />
-                                                       </div>
-                                                     </div>
-
-                                                     <div className="p-2 bg-orange-50 border border-orange-100 rounded-lg">
-                                                       <div className="flex justify-between items-center mb-1">
-                                                         <span className="text-[10px] font-bold text-orange-700 uppercase">Đền bù cá nhân</span>
-                                                         <span className="text-xs font-black text-orange-800">{formatCurrency(stats.finalMaterialLossIndividual)} ₫</span>
-                                                       </div>
-                                                       <div className="w-full h-1 bg-orange-200 rounded-full overflow-hidden">
-                                                          <div className="h-full bg-orange-500" style={{ width: stats.finalMaterialLoss > 0 ? `${(stats.finalMaterialLossIndividual / stats.finalMaterialLoss) * 100}%` : '0%' }} />
-                                                       </div>
-                                                     </div>
-                                                   </div>
-
-                                                   <p className="text-[9px] text-slate-400 italic mt-1 leading-tight">
-                                                     {stats.materialLossNote || 'Số tiền này được phân bổ từ quản lý Hao Hụt.'}
-                                                   </p>
+                                              {stats.finalAdvance > 0 && (
+                                                <div className="flex justify-between items-center px-1">
+                                                   <span className="text-[10px] font-bold text-slate-500 uppercase">Ứng Lương</span>
+                                                   <span className="text-sm font-black text-rose-600">{formatCurrency(stats.finalAdvance)} ₫</span>
                                                 </div>
                                               )}
-
-                                              {((window as any).activeDeductionSubTab?.[emp.id] || 'retained') === 'advance' && (
-                                                <div className="flex flex-col gap-1">
-                                                  <div className="flex justify-between items-center px-0.5">
-                                                     <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Ứng Lương</label>
-                                                  </div>
-                                                  <div className="w-full p-2 bg-amber-50 border border-amber-200 rounded-lg text-sm text-sky-600 font-bold">
-                                                    {(stats.finalAdvance === 0 || stats.finalAdvance === null) ? '0 ₫' : `${formatCurrency(stats.finalAdvance)} ₫`}
-                                                  </div>
-                                                  <p className="text-[9px] text-slate-400 italic mt-1 leading-tight">
-                                                    Nhân viên đã tạm ứng trong tháng.
-                                                  </p>
+                                              {stats.finalRetained > 0 && (
+                                                <div className="flex justify-between items-center px-1">
+                                                   <span className="text-[10px] font-bold text-slate-500 uppercase">Tạm Giữ Lương</span>
+                                                   <span className="text-sm font-black text-rose-600">{formatCurrency(stats.finalRetained)} ₫</span>
+                                                </div>
+                                              )}
+                                              {stats.otherDeductionsTotal === 0 && (
+                                                <div className="py-4 text-center text-[10px] font-bold text-slate-400 uppercase italic">
+                                                  Không có khoản khấu trừ nào
                                                 </div>
                                               )}
                                           </div>
@@ -828,31 +824,77 @@ export const PayrollComponent: React.FC<any> = ({
                                     </td>
                                   )}
                                   {visibleColumns.extraAdditions && (
-                                    <td className="p-3 border-r border-slate-100 text-right">
-                                      <div className="flex items-center justify-end gap-1 group/field">
-                                        {isEdited('extraAdditions') && (
-                                          <>
-                                            <div className="w-1.5 h-1.5 rounded-full bg-amber-500 shadow-sm" />
-                                            <button 
-                                              onClick={() => handlePayrollChange(emp.id, 'extraAdditions', undefined)}
-                                              className="absolute -left-6 p-0.5 opacity-0 group-hover/field:opacity-100 text-amber-600 hover:bg-amber-50 rounded transition-all z-10"
-                                              title="Hoàn tác"
-                                            >
-                                              <Undo2 className="w-3 h-3" />
-                                            </button>
-                                          </>
-                                        )}
-                                        <input 
-                                          type="text"
-                                          value={(stats.finalExtraAdditions === 0 || stats.finalExtraAdditions === null) ? '' : formatCurrency(stats.finalExtraAdditions)}
-                                          onChange={(e) => {
-                                            const val = parseInt(e.target.value.replace(/\D/g, '')) || 0;
-                                            handlePayrollChange(emp.id, 'extraAdditions', val);
-                                          }}
-                                          className="w-[90px] p-1 bg-transparent border-transparent border rounded text-sm font-bold text-right outline-none hover:bg-white hover:border-slate-200 focus:bg-white transition-all font-mono"
-                                          placeholder="0"
-                                        />
+                                    <td className="p-3 border-r border-slate-100 text-right relative group/extra">
+                                      <div className="flex flex-col items-end leading-tight">
+                                        <button 
+                                          id={`extra-addition-btn-${emp.id}`}
+                                          onClick={() => setShowDeductionDetails(showDeductionDetails === `extra-${emp.id}` ? null : `extra-${emp.id}`)}
+                                          className="text-right hover:text-emerald-600 transition-all font-bold text-sm text-emerald-600 flex flex-col items-end"
+                                        >
+                                          {formatCurrency(stats.extraAdditionsTotal)}
+                                          {stats.finalReturnRetained > 0 && (
+                                            <span className="text-[9px] text-sky-500 font-black tabular-nums">+{formatK(stats.finalReturnRetained)}</span>
+                                          )}
+                                        </button>
                                       </div>
+
+                                      <PopoverPortal 
+                                        isOpen={showDeductionDetails === `extra-${emp.id}`} 
+                                        onClose={() => setShowDeductionDetails(null)}
+                                        anchorId={`extra-addition-btn-${emp.id}`}
+                                        align="right"
+                                        className="w-64"
+                                      >
+                                        <div className="flex justify-between items-center mb-3 pb-2 border-b border-slate-100">
+                                          <h4 className="font-black text-slate-900 text-[10px] uppercase tracking-wider">Chi Tiết Thu Nhập Bổ Sung</h4>
+                                          <button onClick={() => setShowDeductionDetails(null)} className="text-slate-400 hover:text-rose-500 transition-colors">
+                                            <X className="w-3.5 h-3.5" />
+                                          </button>
+                                        </div>
+
+                                        <div className="space-y-4">
+                                          {stats.finalReturnRetained > 0 && (
+                                            <div className="p-3 bg-sky-50 rounded-xl border border-sky-100">
+                                              <div className="text-[9px] font-black text-sky-500 uppercase mb-2">Hệ thống (Hoàn trả giữ tạm)</div>
+                                              <div className="flex justify-between items-center">
+                                                <span className="text-xs font-bold text-sky-700 underline decoration-sky-200">Hoàn Trả Giữ Tạm</span>
+                                                <span className="text-sm font-black text-sky-600">+{formatCurrency(stats.finalReturnRetained)}đ</span>
+                                              </div>
+                                            </div>
+                                          )}
+
+                                          <div className="p-3 bg-emerald-50 rounded-xl border border-emerald-100">
+                                            <div className="text-[9px] font-black text-emerald-500 uppercase mb-2">Thưởng / Thu nhập khác</div>
+                                            <div className="flex items-center justify-between">
+                                              <span className="text-xs font-bold text-emerald-700 whitespace-nowrap">Số tiền:</span>
+                                              <input 
+                                                type="text"
+                                                autoFocus
+                                                value={(stats.finalExtraAdditions === 0 || stats.finalExtraAdditions === null) ? '' : formatCurrency(stats.finalExtraAdditions)}
+                                                onChange={(e) => {
+                                                  const val = parseInt(e.target.value.replace(/\D/g, '')) || 0;
+                                                  handlePayrollChange(emp.id, 'extraAdditions', val);
+                                                }}
+                                                className="w-28 p-1.5 bg-white border border-emerald-200 rounded text-sm font-bold text-emerald-600 text-center outline-none focus:border-emerald-400 transition-all font-mono"
+                                              />
+                                            </div>
+                                            <div className="mt-2">
+                                              <input 
+                                                type="text"
+                                                placeholder="Lý do..."
+                                                value={stats.extraAdditionsNote || ''}
+                                                onChange={(e) => handlePayrollChange(emp.id, 'extraAdditionsNote', e.target.value)}
+                                                className="w-full p-1.5 bg-white border border-emerald-100 rounded text-[10px] font-medium text-slate-600 outline-none focus:border-emerald-300 italic"
+                                              />
+                                            </div>
+                                          </div>
+                                          
+                                          <div className="flex justify-between items-center pt-2 border-t border-slate-50">
+                                            <span className="text-[10px] font-black text-slate-400 uppercase">Tổng cộng:</span>
+                                            <span className="text-base font-black text-emerald-600">{formatCurrency(stats.extraAdditionsTotal)}đ</span>
+                                          </div>
+                                        </div>
+                                      </PopoverPortal>
                                     </td>
                                   )}
                                   {visibleColumns.actual && (
@@ -952,7 +994,7 @@ export const PayrollComponent: React.FC<any> = ({
                               
                               <div className="flex items-center justify-between pt-1.5 border-t border-stone-100/60">
                                 <div className="text-[12px] text-stone-600 font-medium tracking-tight flex items-center gap-1.5">
-                                  <span className="text-emerald-700 font-black">{stats.totalHours.toFixed(1)}h</span>
+                                  <span className="text-emerald-700 font-black">{stats.totalHours.toFixed(2)}h</span>
                                   <span className="text-stone-300">•</span>
                                   Thưởng: <span className="text-emerald-700 font-black">{formatK(stats.holidayBonusTotal + stats.extraAdditionsTotal)}</span>
                                   <span className="text-stone-300">•</span>
@@ -979,44 +1021,6 @@ export const PayrollComponent: React.FC<any> = ({
 
             {/* MOBILE FLOATING ACTION BAR removed and moved to top toolbar */}
             {!isSalaryDetailOpen && null}
-
-            {/* UTILITIES OVERLAY */}
-            <AnimatePresence>
-                {showMobileUtilities && (
-                    <>
-                        <motion.div 
-                            initial={{ opacity: 0 }}
-                            animate={{ opacity: 1 }}
-                            exit={{ opacity: 0 }}
-                            onClick={() => setShowMobileUtilities(false)}
-                            className="fixed inset-0 bg-stone-900/40 backdrop-blur-sm z-[80] md:hidden"
-                        />
-                        <motion.div 
-                            initial={{ opacity: 0, y: 100 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            exit={{ opacity: 0, y: 100 }}
-                            className="fixed bottom-0 left-0 right-0 bg-white rounded-t-[32px] p-6 pb-12 z-[90] md:hidden shadow-2xl"
-                        >
-                            <div className="w-12 h-1 bg-stone-100 rounded-full mx-auto mb-6" />
-                            <h4 className="text-xs font-black text-stone-400 uppercase tracking-widest text-center mb-6">Tiện ích bảng lương</h4>
-                            <div className="grid grid-cols-2 gap-3">
-                                <button onClick={() => { setShowHolidayConfig(true); setShowMobileUtilities(false); }} className="flex flex-col items-center gap-2 p-4 bg-stone-50 rounded-2xl active:bg-amber-50 group transition-all">
-                                    <div className="p-3 bg-amber-100 rounded-xl group-active:bg-amber-200"><Calendar className="w-5 h-5 text-amber-600" /></div>
-                                    <span className="text-[10px] font-black text-stone-600 uppercase">Ngày lễ</span>
-                                </button>
-                                <button onClick={() => { setShowMaterialLossModal(true); setShowMobileUtilities(false); }} className="flex flex-col items-center gap-2 p-4 bg-stone-50 rounded-2xl active:bg-indigo-50 group transition-all">
-                                    <div className="p-3 bg-indigo-100 rounded-xl group-active:bg-indigo-200"><Banknote className="w-5 h-5 text-indigo-600" /></div>
-                                    <span className="text-[10px] font-black text-stone-600 uppercase">Khấu trừ</span>
-                                </button>
-                                <button onClick={() => { setShowFinancialModal(true); setShowMobileUtilities(false); }} className="flex flex-col items-center gap-2 p-4 bg-stone-50 rounded-2xl active:bg-emerald-50 group transition-all">
-                                    <div className="p-3 bg-emerald-100 rounded-xl group-active:bg-emerald-200"><Wallet className="w-5 h-5 text-emerald-600" /></div>
-                                    <span className="text-[10px] font-black text-stone-600 uppercase text-center">Lương giữ tạm</span>
-                                </button>
-                            </div>
-                        </motion.div>
-                    </>
-                )}
-            </AnimatePresence>
         </motion.div>
     );
 };
