@@ -681,6 +681,7 @@ export default function AdminView({
         onSubmit={handleManualAttendance}
         nhanViens={nhanViens}
         adminTheme={adminTheme}
+        filterBranch={filterBranch}
       />
 
       <EditAttendanceModal
