@@ -57,8 +57,8 @@ export const useAntiSlacking = (
               let minutesToCharge = 0;
               let hasViolation = currentLog.hasPhoneViolation || false;
               
-              // Rule: Penalty money if a single session > 3 minutes OR if usage count > 3 times
-              if (diffMinutesExact > 3 || newLan > 3) {
+              // Rule: Penalty money if a single session > 5 minutes OR if usage count > 3 times
+              if (diffMinutesExact > 5 || newLan > 3) {
                 minutesToCharge = Math.ceil(diffMinutesExact);
                 // Formula: minutes * 3 * (hourly_rate / 60)
                 currentPenalty = Math.round(minutesToCharge * 3 * (hourlyRate / 60));
@@ -76,14 +76,14 @@ export const useAntiSlacking = (
                 hasPhoneViolation: hasViolation
               });
 
-              if (newLan > 3 || diffMinutesExact > 3) {
+              if (newLan > 3 || diffMinutesExact > 5) {
                 await addDoc(collection(db, 'CanhBao'), {
                   empId: currentEmployee.empId,
                   fullName: currentEmployee.fullName,
                   locationId: kioskBranchRef.current || 'Unknown',
                   ThoiGian: new Date().toISOString(),
-                  NoiDung: diffMinutesExact > 3 
-                    ? `Cảnh báo: Sử dụng điện thoại ${Math.ceil(diffMinutesExact)} phút (> 3 phút). Phạt: ${new Intl.NumberFormat('vi-VN').format(currentPenalty)}đ`
+                  NoiDung: diffMinutesExact > 5 
+                    ? `Cảnh báo: Sử dụng điện thoại ${Math.ceil(diffMinutesExact)} phút (> 5 phút). Phạt: ${new Intl.NumberFormat('vi-VN').format(currentPenalty)}đ`
                     : `Cảnh báo: Sử dụng điện thoại lần thứ ${newLan} trong ca. Phạt: ${new Intl.NumberFormat('vi-VN').format(currentPenalty)}đ`
                 });
               }
