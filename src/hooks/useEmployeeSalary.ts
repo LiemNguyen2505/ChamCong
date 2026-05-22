@@ -10,36 +10,15 @@ export const useEmployeeSalary = (
   targetMonth?: string,
   violations: any[] = []
 ) => {
-  const [monthlyStats, setMonthlyStats] = useState({
+  const [monthlyStats, setMonthlyStats] = useState<any>({
     totalHours: 0,
     baseSalaryTotal: 0,
-    responsibilityBonusTotal: 0,
-    holidayBonusTotal: 0,
-    extraAdditionsTotal: 0,
     latePenaltyTotal: 0,
     phonePenaltyTotal: 0,
-    finalPenalty: 0,
-    otherDeductionsTotal: 0,
-    actualSalary: 0,
-    totalLatePenaltyMinutes: 0,
-    lateCount: 0,
-    totalLateMinutes: 0,
-    lateDetails: [] as any[],
-    ttnPenalty: { penaltyValue: 0, penaltyReason: '' },
-    finalTtnPercentage: 100,
-    currentHourlyRate: 0,
-    currentResponsibilityBonus: 0,
-    finalRetained: 0,
-    finalReturnRetained: 0,
-    finalAdvance: 0,
-    finalMaterialLoss: 0,
-    finalExtraAdditions: 0,
-    finalNote: '',
-    materialLossNote: '',
-    hoursForTtn: 0,
-    phonePenaltyCount: 0,
-    phonePenaltyMinutes: 0
+    actualSalary: 0
   });
+  const [branchStats, setBranchStats] = useState<Record<string, any>>({});
+  const [activeBranches, setActiveBranches] = useState<string[]>([]);
 
   useEffect(() => {
     const filterMonth = targetMonth || format(new Date(), 'yyyy-MM');
@@ -56,9 +35,25 @@ export const useEmployeeSalary = (
       v.monthYear === filterMonth
     );
     
+    // Overall stats
     const stats = calculateNetSalary(loggedInEmployee, filterMonth, empTimesheets, payrollAdjustments, holidays, {}, empViolations);
     setMonthlyStats(stats);
+    
+    // Determine branches
+    const branches = Array.from(new Set(empTimesheets.map((cc: any) => cc.locationId).filter(Boolean))) as string[];
+    setActiveBranches(branches);
+    
+    // Stats per branch
+    const bStats: Record<string, any> = {};
+    branches.forEach(branch => {
+      const branchTimesheets = empTimesheets.filter((cc: any) => cc.locationId === branch);
+      const branchViolations = empViolations.filter((v: any) => v.locationId === branch);
+      bStats[branch] = calculateNetSalary(loggedInEmployee, filterMonth, branchTimesheets, payrollAdjustments, holidays, {}, branchViolations);
+    });
+    setBranchStats(bStats);
+    
   }, [monthTimesheets, loggedInEmployee, holidays, payrollAdjustments, targetMonth, violations]);
 
-  return { monthlyStats };
+  return { monthlyStats, branchStats, activeBranches };
 };
+
