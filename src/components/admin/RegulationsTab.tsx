@@ -39,7 +39,7 @@ export const RegulationsTab = ({ activeTab, adminTheme }: RegulationsTabProps) =
         'Hệ thống tự động ghi nhận việc rời khỏi ứng dụng hoặc tắt màn hình trong giờ làm việc (tính theo từng ca).',
         'Ca làm việc bị tính là VI PHẠM lỗi điện thoại nếu:',
         '  . Rời app quá 3 lần / ca.',
-        '  . HOẶC có 1 lần rời app liên tục quá 3 phút.',
+        '  . HOẶC có 1 lần rời app liên tục quá 5 phút.',
         '1. Trừ thẳng vào Lương (Phạt vi phạm):',
         '  . Khi phát sinh vi phạm trên, hệ thống sẽ phạt tiền với công thức: Tổng số phút rời app × 3 × (Lương cơ bản / 60 phút).',
         '2. Ảnh hưởng đến Thưởng Trách Nhiệm (TTN):',
