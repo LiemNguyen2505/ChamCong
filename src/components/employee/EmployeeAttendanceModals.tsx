@@ -237,7 +237,7 @@ export const OvertimeReasonModal: React.FC<OvertimeReasonModalProps> = ({
         />
         <div className="flex gap-4">
           <button
-            onClick={() => setCheckoutWarningStep(3)}
+            onClick={() => setCheckoutWarningStep(0)}
             className="flex-1 py-4 bg-stone-100 hover:bg-stone-200 text-stone-700 font-bold rounded-2xl transition-all"
           >
             Quay lại
@@ -245,6 +245,71 @@ export const OvertimeReasonModal: React.FC<OvertimeReasonModalProps> = ({
           <button
             onClick={onConfirm}
             className={`flex-1 py-4 ${theme.button} text-white font-bold rounded-2xl transition-all`}
+          >
+            Xác nhận
+          </button>
+        </div>
+      </motion.div>
+    </div>
+  );
+};
+
+interface CheckoutWarningModalProps {
+  checkoutWarningStep: number;
+  setCheckoutWarningStep: (step: number) => void;
+  selectedShiftTime: string;
+  scheduledShiftTime: string;
+  theme: any;
+  onConfirm: () => void;
+}
+
+export const CheckoutWarningModal: React.FC<CheckoutWarningModalProps> = ({
+  checkoutWarningStep,
+  setCheckoutWarningStep,
+  selectedShiftTime,
+  scheduledShiftTime,
+  theme,
+  onConfirm
+}) => {
+  if (checkoutWarningStep !== 1) return null;
+
+  return (
+    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-[110]">
+      <motion.div 
+        initial={{ scale: 0.9, opacity: 0 }}
+        animate={{ scale: 1, opacity: 1 }}
+        className="bg-white rounded-[2rem] p-8 w-full max-w-sm shadow-2xl text-center"
+      >
+        <div className={`w-20 h-20 bg-amber-100 text-amber-600 rounded-full flex items-center justify-center mx-auto mb-6`}>
+          <AlertTriangle className="w-10 h-10" strokeWidth={2} />
+        </div>
+        <h2 className="text-2xl font-black text-stone-900 mb-4">Xác nhận ra ca sớm</h2>
+        <p className="text-stone-600 mb-8 font-medium text-lg leading-relaxed">
+          {(() => {
+            const [selH, selM] = selectedShiftTime.split(':').map(Number);
+            const selTotal = selH * 60 + selM;
+            const [schH, schM] = (scheduledShiftTime || '00:00').split(':').map(Number);
+            const schTotal = schH * 60 + schM;
+            const diffMinutes = Math.abs(schTotal - selTotal);
+            const diffH = Math.floor(diffMinutes / 60);
+            const diffM = diffMinutes % 60;
+            const diffText = diffH > 0 
+              ? (diffM > 0 ? `${diffH}h${diffM}p` : `${diffH}h`)
+              : `${diffM}p`;
+              
+            return `Bạn đang ra ca lúc ${selectedShiftTime}, sớm hơn ${diffText} so với lịch làm việc là ${scheduledShiftTime}. Giờ công sẽ được tính đến ${selectedShiftTime}. Xác nhận ra ca?`;
+          })()}
+        </p>
+        <div className="flex gap-4">
+          <button
+            onClick={() => setCheckoutWarningStep(0)}
+            className="flex-1 py-4 bg-stone-100 hover:bg-stone-200 text-stone-700 font-bold rounded-2xl transition-all text-lg"
+          >
+            Quay lại
+          </button>
+          <button
+            onClick={onConfirm}
+            className={`flex-1 py-4 ${theme.button} text-white font-bold rounded-2xl transition-all text-lg`}
           >
             Xác nhận
           </button>
