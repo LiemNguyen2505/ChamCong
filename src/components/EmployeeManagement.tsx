@@ -66,15 +66,9 @@ export const EmployeeManagement: React.FC<EmployeeManagementProps> = ({
   const [isEditFormDirty, setIsEditFormDirty] = React.useState(false);
 
   const checkLeave = (isDirty: boolean, closeAction: () => void) => {
-    if (isDirty) {
-      if (window.confirm('Bạn có thay đổi chưa lưu. Bạn có chắc muốn đóng form?')) {
-        closeAction();
-        setIsAddFormDirty(false);
-        setIsEditFormDirty(false);
-      }
-    } else {
-      closeAction();
-    }
+    closeAction();
+    setIsAddFormDirty(false);
+    setIsEditFormDirty(false);
   };
 
   const getAllowedBranches = () => {
@@ -316,8 +310,8 @@ export const EmployeeManagement: React.FC<EmployeeManagementProps> = ({
       <div className="md:hidden space-y-4">
         {['QUẦY', 'PV'].map(pos => {
           const groupedEmps = nhanViens.filter(nv => {
-            const matchesAdminBranch = currentAdmin?.role === 'SuperAdmin' || (currentAdmin?.locationIds || []).includes(nv.locationId || '');
-            const matchesFilterBranch = filterBranch === 'All' || nv.locationId === filterBranch;
+            const matchesAdminBranch = currentAdmin?.role === 'SuperAdmin' || (currentAdmin?.locationIds || []).includes(nv.locationId || '') || (nv.locationIds && (currentAdmin?.locationIds || []).some(id => nv.locationIds?.includes(id)));
+            const matchesFilterBranch = filterBranch === 'All' || nv.locationId === filterBranch || (nv.locationIds && nv.locationIds.includes(filterBranch));
             const matchesSearch = !searchTerm || nv.fullName.toLowerCase().includes(searchTerm.toLowerCase()) || nv.phone.includes(searchTerm);
             const matchesPosition = (nv.defaultRole || 'PV') === pos;
             return matchesAdminBranch && matchesFilterBranch && matchesSearch && matchesPosition;
@@ -479,8 +473,8 @@ export const EmployeeManagement: React.FC<EmployeeManagementProps> = ({
           <tbody className="text-sm">
             {['QUẦY', 'PV'].map(pos => {
               const groupedEmployees = nhanViens.filter(nv => {
-                const matchesAdminBranch = currentAdmin?.role === 'SuperAdmin' || (currentAdmin?.locationIds || []).includes(nv.locationId || '');
-                const matchesFilterBranch = filterBranch === 'All' || nv.locationId === filterBranch;
+                const matchesAdminBranch = currentAdmin?.role === 'SuperAdmin' || (currentAdmin?.locationIds || []).includes(nv.locationId || '') || (nv.locationIds && (currentAdmin?.locationIds || []).some(id => nv.locationIds?.includes(id)));
+                const matchesFilterBranch = filterBranch === 'All' || nv.locationId === filterBranch || (nv.locationIds && nv.locationIds.includes(filterBranch));
                 const matchesSearch = !searchTerm || nv.fullName.toLowerCase().includes(searchTerm.toLowerCase()) || nv.phone.includes(searchTerm);
                 const matchesPosition = (nv.defaultRole || 'PV') === pos;
                 return matchesAdminBranch && matchesFilterBranch && matchesSearch && matchesPosition;
