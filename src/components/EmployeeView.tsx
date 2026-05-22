@@ -126,14 +126,7 @@ export default function EmployeeView({
     handleConfirmAction
   } = useEmployeeAttendance(loggedInEmployee, kioskBranch, globalData.lichLamViecs, latestLog, fetchInitialData, admins);
 
-  useEffect(() => {
-    if (loggedInEmployee && loggedInEmployee.locationId) {
-      if (loggedInEmployee.locationId !== kioskBranch) {
-        setKioskBranch(loggedInEmployee.locationId);
-        localStorage.setItem('kioskBranch', loggedInEmployee.locationId);
-      }
-    }
-  }, [loggedInEmployee, kioskBranch]);
+
 
   const {
     showWeeklySchedule, setShowWeeklySchedule,
