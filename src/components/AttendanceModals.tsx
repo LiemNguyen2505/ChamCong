@@ -16,6 +16,7 @@ interface ManualAttendanceModalProps {
   };
   setManualAttendance: (data: any) => void;
   adminTheme: any;
+  filterBranch?: string;
 }
 
 export const ManualAttendanceModal: React.FC<ManualAttendanceModalProps> = ({
@@ -26,16 +27,15 @@ export const ManualAttendanceModal: React.FC<ManualAttendanceModalProps> = ({
   manualAttendance,
   setManualAttendance,
   adminTheme,
+  filterBranch = 'All',
 }) => {
   const handleClose = () => {
-    if (manualAttendance.empId || manualAttendance.date || manualAttendance.checkInTime) {
-      if (window.confirm('Bạn có thay đổi chưa lưu. Bạn có chắc muốn đóng form?')) {
-        onClose();
-      }
-    } else {
-      onClose();
-    }
+    onClose();
   };
+
+  const filteredNhanViens = filterBranch === 'All' 
+    ? nhanViens 
+    : nhanViens.filter(nv => nv.locationId === filterBranch || (nv.locationIds && nv.locationIds.includes(filterBranch)));
 
   if (!show) return null;
 
@@ -56,44 +56,32 @@ export const ManualAttendanceModal: React.FC<ManualAttendanceModalProps> = ({
             <label className="block text-sm font-medium text-gray-700 mb-1">Chọn nhân viên</label>
             <select
               value={manualAttendance.empId}
-              onChange={e => setManualAttendance({ ...manualAttendance, empId: e.target.value })}
+              onChange={e => {
+                const selectedEmp = nhanViens.find(nv => nv.empId === e.target.value);
+                setManualAttendance({
+                  ...manualAttendance,
+                  empId: e.target.value,
+                  locationId: filterBranch !== 'All' ? filterBranch : (selectedEmp?.locationId || 'Góc Phố')
+                });
+              }}
               className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
               required
             >
               <option value="">-- Chọn nhân viên --</option>
-              {nhanViens.map(nv => (
-                <option key={nv.id} value={nv.empId}>{nv.fullName} ({nv.phone})</option>
+              {filteredNhanViens.map(nv => (
+                <option key={nv.id} value={nv.empId}>{nv.fullName}</option>
               ))}
             </select>
           </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Ngày</label>
-              <input
-                type="date"
-                required
-                value={manualAttendance.date}
-                onChange={e => setManualAttendance({ ...manualAttendance, date: e.target.value })}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Chi nhánh</label>
-              <div className="flex gap-4 p-2 border border-gray-300 rounded-lg">
-                {['Góc Phố', 'Phố Xanh'].map(branch => (
-                  <label key={branch} className="flex items-center gap-2 cursor-pointer">
-                    <input
-                      type="radio"
-                      name="manualAttendanceLocation"
-                      checked={manualAttendance.locationId === branch}
-                      onChange={() => setManualAttendance({ ...manualAttendance, locationId: branch })}
-                      className="w-4 h-4 text-amber-600 focus:ring-amber-500"
-                    />
-                    <span className="text-sm text-gray-700">{branch}</span>
-                  </label>
-                ))}
-              </div>
-            </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Ngày</label>
+            <input
+              type="date"
+              required
+              value={manualAttendance.date}
+              onChange={e => setManualAttendance({ ...manualAttendance, date: e.target.value })}
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+            />
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
@@ -166,14 +154,8 @@ export const EditAttendanceModal: React.FC<EditAttendanceModalProps> = ({
   const [isDirty, setIsDirty] = React.useState(false);
 
   const handleClose = () => {
-    if (isDirty) {
-      if (window.confirm('Bạn có thay đổi chưa lưu. Bạn có chắc muốn đóng form?')) {
-        onClose();
-        setIsDirty(false);
-      }
-    } else {
-      onClose();
-    }
+    onClose();
+    setIsDirty(false);
   };
 
   if (!show || !editingAttendance) return null;
