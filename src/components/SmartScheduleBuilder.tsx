@@ -650,7 +650,7 @@ export const SmartScheduleBuilder: React.FC<SmartScheduleBuilderProps> = (props)
               <p className="text-sm text-slate-500 mb-4">Chọn NV từ nhánh khác hỗ trợ {activeBranch}:</p>
               <div className="space-y-2">
                 {employees
-                  .filter(e => e.locationId !== activeBranch && !supportEmployees.find(se => se.empId === e.id))
+                  .filter(e => e.locationId !== activeBranch && !(e.locationIds && e.locationIds.includes(activeBranch)) && !supportEmployees.find(se => se.empId === e.id))
                   .map(emp => (
                     <div 
                       key={emp.id}
@@ -682,7 +682,7 @@ export const SmartScheduleBuilder: React.FC<SmartScheduleBuilderProps> = (props)
                       </div>
                     </div>
                   ))}
-                {employees.filter(e => e.locationId !== activeBranch && !supportEmployees.find(se => se.empId === e.id)).length === 0 && (
+                {employees.filter(e => e.locationId !== activeBranch && !(e.locationIds && e.locationIds.includes(activeBranch)) && !supportEmployees.find(se => se.empId === e.id)).length === 0 && (
                   <div className="text-center py-8 text-slate-400 italic">Không còn người nào khác.</div>
                 )}
               </div>
