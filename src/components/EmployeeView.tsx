@@ -156,7 +156,7 @@ export default function EmployeeView({
       .sort((a: any, b: any) => a.startTime.localeCompare(b.startTime));
   }, [globalData.lichLamViecs, loggedInEmployee, kioskBranch]);
 
-  const { monthlyStats } = useEmployeeSalary(loggedInEmployee, monthTimesheets, payrollAdjustments, holidays, selectedMonth, globalData.violations);
+  const { monthlyStats, branchStats, activeBranches } = useEmployeeSalary(loggedInEmployee, monthTimesheets, payrollAdjustments, holidays, selectedMonth, globalData.violations);
 
   useAntiSlacking(loggedInEmployee, latestLog, admins, kioskBranch);
 
@@ -465,6 +465,8 @@ export default function EmployeeView({
         loggedInEmployee={loggedInEmployee}
         theme={theme}
         monthlyStats={monthlyStats}
+        branchStats={branchStats}
+        activeBranches={activeBranches}
         monthTimesheets={monthTimesheets}
         payrollAdjustments={payrollAdjustments}
         holidays={holidays}
@@ -551,6 +553,8 @@ export default function EmployeeView({
         theme={theme}
         monthTimesheets={monthTimesheets}
         monthlyStats={monthlyStats}
+        branchStats={branchStats}
+        activeBranches={activeBranches}
         selectedMonth={selectedMonth}
         setSelectedMonth={setSelectedMonth}
         fetchInitialData={fetchInitialData}
