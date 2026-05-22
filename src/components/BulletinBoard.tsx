@@ -184,8 +184,8 @@ export default function BulletinBoard({ currentEmployee, locationId, isAdmin, th
 
     const now = new Date();
     const filteredNotes = globalData.bulletinNotes.filter((note: any) => {
-      // Filter by location
-      if (!isSuperAdmin && note.locationId !== locationId && note.locationId !== 'all') return false;
+      // Filter by location (Even Super Admins should only see notes for the current kiosk location they are logged into)
+      if (note.locationId !== locationId && note.locationId !== 'all') return false;
 
       // Auto-cleanup: non-pinned older than 24h
       if (!note.isPinned && note.createdAt) {
@@ -334,18 +334,11 @@ export default function BulletinBoard({ currentEmployee, locationId, isAdmin, th
   };
 
   const handleCloseAdd = () => {
-    if (newNoteContent.trim() || startDate || endDate) {
-      if (window.confirm('Bạn có thay đổi chưa lưu. Bạn có chắc muốn đóng?')) {
-        setNewNoteContent('');
-        setStartDate('');
-        setEndDate('');
-        setIsAddingInline(false);
-        setEditingNote(null);
-      }
-    } else {
-      setIsAddingInline(false);
-      setEditingNote(null);
-    }
+    setNewNoteContent('');
+    setStartDate('');
+    setEndDate('');
+    setIsAddingInline(false);
+    setEditingNote(null);
   };
 
   const canEdit = (note: BulletinNote) => {
