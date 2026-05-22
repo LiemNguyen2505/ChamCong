@@ -14,7 +14,7 @@ import { EmployeeRequests } from './employee/EmployeeRequests';
 import { EmployeeHistory } from './employee/EmployeeHistory';
 import { EmployeeSalaryDetails } from './employee/EmployeeSalaryDetails';
 import { ChangePinModal, ResetPinModal, DeviceSecurityModal } from './employee/EmployeeAuthModals';
-import { CheckinWarningModal, CheckoutSummaryModal, OvertimeReasonModal, EmergencyCheckInModal, ExtraSupportModal, OutsideScheduleModal } from './employee/EmployeeAttendanceModals';
+import { CheckinWarningModal, CheckoutSummaryModal, OvertimeReasonModal, EmergencyCheckInModal, ExtraSupportModal, OutsideScheduleModal, CheckoutWarningModal } from './employee/EmployeeAttendanceModals';
 import { BranchSelection } from './employee/BranchSelection';
 import { EmployeeHeader } from './employee/EmployeeHeader';
 import { EmployeeLoginForm } from './employee/EmployeeLoginForm';
@@ -641,6 +641,18 @@ export default function EmployeeView({
         onConfirm={() => {
           setShowOutsideScheduleModal(false);
           setShowEmergencyCheckInModal(true);
+        }}
+      />
+
+      <CheckoutWarningModal
+        checkoutWarningStep={checkoutWarningStep}
+        setCheckoutWarningStep={setCheckoutWarningStep}
+        selectedShiftTime={selectedShiftTime}
+        scheduledShiftTime={scheduledShiftTime}
+        theme={theme}
+        onConfirm={() => {
+          setCheckoutWarningStep(0);
+          cameraRef.current?.capturePhoto();
         }}
       />
 
