@@ -26,13 +26,7 @@ export const HolidayConfigModal: React.FC<HolidayConfigModalProps> = ({
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
 
   const handleClose = () => {
-    if (newDate || newName) {
-      if (window.confirm('Bạn có thay đổi chưa lưu. Bạn có chắc muốn đóng?')) {
-        onClose();
-      }
-    } else {
-      onClose();
-    }
+    onClose();
   };
 
   const handleEsc = (e: KeyboardEvent) => {
