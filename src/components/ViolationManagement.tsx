@@ -60,17 +60,11 @@ export const ViolationManagement: React.FC<ViolationManagementProps> = ({
     .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
   const handleCloseAdd = () => {
-    if (selectedEmpId || selectedViolationType || customViolation || customNote) {
-      if (window.confirm('Bạn có thay đổi chưa lưu. Bạn có chắc muốn đóng?')) {
-        setShowAddModal(false);
-        setSelectedEmpId('');
-        setSelectedViolationType('');
-        setCustomViolation('');
-        setCustomNote('');
-      }
-    } else {
-      setShowAddModal(false);
-    }
+    setShowAddModal(false);
+    setSelectedEmpId('');
+    setSelectedViolationType('');
+    setCustomViolation('');
+    setCustomNote('');
   };
 
   const handleSubmit = async () => {
