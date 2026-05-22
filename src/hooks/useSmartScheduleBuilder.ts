@@ -496,7 +496,7 @@ export function useSmartScheduleBuilder(props: SmartScheduleBuilderProps) {
   // Group employees by default role and branch
   const groupedEmployees = useMemo(() => {
     // 1. Get default employees for this branch (or all if 'All')
-    const defaultEmployees = employees.filter(e => activeBranch === 'All' || e.locationId === activeBranch);
+    const defaultEmployees = employees.filter(e => activeBranch === 'All' || e.locationId === activeBranch || (e.locationIds && e.locationIds.includes(activeBranch)));
     
     // 2. Get support employees added to this view
     const manuallyAddedSupportEmployees = employees.filter(e => supportEmployees.find(se => se.empId === e.id));
