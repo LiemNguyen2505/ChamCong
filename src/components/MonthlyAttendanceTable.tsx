@@ -31,7 +31,12 @@ export const MonthlyAttendanceTable: React.FC<MonthlyAttendanceTableProps> = ({
   const daysInMonth = new Date(year, month, 0).getDate();
   const days = Array.from({ length: daysInMonth }, (_, i) => i + 1);
 
-  const filteredEmployees = nhanViens.filter(nv => filterBranch === 'All' || nv.locationId === filterBranch);
+  const filteredEmployees = nhanViens.filter(nv => 
+    filterBranch === 'All' || 
+    nv.locationId === filterBranch || 
+    (nv.locationIds && nv.locationIds.includes(filterBranch)) ||
+    attendanceData.some(cc => cc.empId === nv.id || cc.empId === nv.empId)
+  );
 
   const dailyHeadCount = useMemo(() => {
     return days.map(day => {
