@@ -238,7 +238,7 @@ const PopoverPortal = ({ isOpen, onClose, anchorId, align = 'right', position = 
 };
 
 export const PayrollComponent: React.FC<any> = ({
-    nhanViens, filterMonth, setFilterMonth, payrollActiveBranch, calculateEmployeeSalaryStats,
+    nhanViens, chamCongs, filterMonth, setFilterMonth, payrollActiveBranch, calculateEmployeeSalaryStats,
     formatCurrency, localAdjustments, isSavingPayroll, handleSavePayroll, handleUndoPayroll,
     undoStack, BranchTabs, showMobileUtilities, setShowMobileUtilities, setShowHolidayConfig,
     setShowMaterialLossModal, setShowFinancialModal, showOtherDeductionsModal, setShowOtherDeductionsModal,
@@ -289,11 +289,19 @@ export const PayrollComponent: React.FC<any> = ({
         return () => window.removeEventListener('keydown', handleKeyDown);
     }, [localAdjustments, isSavingPayroll, handleSavePayroll]);
 
-    const branchEmployees = useMemo(() => nhanViens.filter((emp: any) => 
-        payrollActiveBranch === 'All' || 
-        emp.locationId === payrollActiveBranch || 
-        (Array.isArray(emp.locationIds) && emp.locationIds.includes(payrollActiveBranch))
-    ), [nhanViens, payrollActiveBranch]);
+    const branchEmployees = useMemo(() => nhanViens.filter((emp: any) => {
+        if (payrollActiveBranch === 'All') return true;
+        if (emp.locationId === payrollActiveBranch) return true;
+        if (Array.isArray(emp.locationIds) && emp.locationIds.includes(payrollActiveBranch)) return true;
+        
+        // Include if they have any timesheets in the current filterMonth at this branch
+        const hasTimesheetAtBranch = chamCongs && chamCongs.some((cc: any) => 
+            (cc.empId === emp.id || cc.empId === emp.empId) && 
+            cc.locationId === payrollActiveBranch && 
+            cc.date.startsWith(filterMonth)
+        );
+        return hasTimesheetAtBranch;
+    }), [nhanViens, payrollActiveBranch, chamCongs, filterMonth]);
     
     const roleOrders: Record<string, number> = {
       'QUẢN LÝ': 1,
