@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
 import { X, Calendar, Clock, History, CheckCircle2, RefreshCw, ArrowRight, ArrowLeft, ChevronLeft, ChevronRight, Smartphone } from 'lucide-react';
 import { format, parseISO, subMonths, addMonths } from 'date-fns';
@@ -11,6 +11,8 @@ interface EmployeeHistoryProps {
   theme: any;
   monthTimesheets: any[];
   monthlyStats: any;
+  branchStats?: Record<string, any>;
+  activeBranches?: string[];
   selectedMonth: string;
   setSelectedMonth: (month: string) => void;
   fetchInitialData: (monthYear?: string) => Promise<any>;
@@ -23,10 +25,22 @@ export const EmployeeHistory: React.FC<EmployeeHistoryProps> = ({
   theme,
   monthTimesheets,
   monthlyStats,
+  branchStats = {},
+  activeBranches = [],
   selectedMonth,
   setSelectedMonth,
   fetchInitialData
 }) => {
+  const branches = activeBranches.length > 0 ? activeBranches : [loggedInEmployee?.locationId || 'Góc Phố'];
+  const [activeTab, setActiveTab] = useState<string>(branches[0]);
+  
+  // React to changes in activeBranches
+  useEffect(() => {
+    if (activeBranches && activeBranches.length > 0 && !activeBranches.includes(activeTab)) {
+      setActiveTab(activeBranches[0]);
+    }
+  }, [activeBranches]);
+
   if (!showHistory || !loggedInEmployee) return null;
 
   const navigateMonth = async (direction: 'prev' | 'next') => {
@@ -37,11 +51,15 @@ export const EmployeeHistory: React.FC<EmployeeHistoryProps> = ({
     setSelectedMonth(targetStr);
     await fetchInitialData(targetStr);
   };
+  
+  const shouldUseTabs = branches.length > 1;
+  const currentStats = (shouldUseTabs && branchStats[activeTab]) ? branchStats[activeTab] : monthlyStats;
 
   const filteredItems = monthTimesheets
     .filter((cc: any) => 
       (cc.empId === loggedInEmployee.id || cc.empId === loggedInEmployee.empId) && 
-      cc.date.startsWith(selectedMonth)
+      cc.date.startsWith(selectedMonth) &&
+      (!shouldUseTabs || cc.locationId === activeTab)
     )
     .sort((a: any, b: any) => b.date.localeCompare(a.date) || (a.checkInTime || '').localeCompare(b.checkInTime || ''));
 
@@ -70,10 +88,10 @@ export const EmployeeHistory: React.FC<EmployeeHistoryProps> = ({
         animate={{ scale: 1, opacity: 1, y: 0 }}
         className="bg-white rounded-[2.5rem] w-full max-w-md shadow-2xl overflow-hidden flex flex-col max-h-[98vh] border border-slate-100"
       >
-        <div className={`p-6 ${theme.accent} flex justify-between items-center relative overflow-hidden flex-shrink-0`}>
+        <div className={`p-6 ${theme.accent} flex flex-col relative overflow-hidden flex-shrink-0`}>
           <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -mr-16 -mt-16 blur-3xl" />
           
-          <div className="relative z-10 w-full">
+          <div className="relative z-10 w-full mb-4">
             <div className="flex justify-between items-start mb-4">
               <h2 className="text-xl font-black text-white uppercase tracking-widest leading-none">Lịch sử chấm công</h2>
               <button 
@@ -102,7 +120,7 @@ export const EmployeeHistory: React.FC<EmployeeHistoryProps> = ({
                 </div>
                 <div className="flex items-center gap-1 mt-0.5">
                   <Clock className="w-3.5 h-3.5 text-white/50" />
-                  <p className="text-xs font-bold text-white/60 uppercase tracking-widest">Tổng: <span className="text-emerald-300 font-black text-sm">{monthlyStats.totalHours.toFixed(2)}h</span></p>
+                  <p className="text-xs font-bold text-white/60 uppercase tracking-widest">Tổng: <span className="text-emerald-300 font-black text-sm">{currentStats?.totalHours?.toFixed(2) || '0.00'}h</span></p>
                 </div>
               </div>
 
@@ -115,6 +133,24 @@ export const EmployeeHistory: React.FC<EmployeeHistoryProps> = ({
               </button>
             </div>
           </div>
+          
+          {shouldUseTabs && (
+            <div className="flex bg-white/20 rounded-xl p-1 relative z-10">
+              {branches.map(branch => (
+                <button
+                  key={branch}
+                  onClick={() => setActiveTab(branch)}
+                  className={`flex-1 py-1.5 px-3 rounded-lg text-sm font-bold transition-all ${
+                    activeTab === branch
+                      ? 'bg-white text-stone-900 shadow-sm'
+                      : 'text-white hover:bg-white/10'
+                  }`}
+                >
+                  {branch}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
 
         <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-stone-50 no-scrollbar">
