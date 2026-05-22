@@ -55,19 +55,7 @@ const MaterialLossModal: React.FC<MaterialLossModalProps> = ({
   const [isInputFocused, setIsInputFocused] = useState(false);
 
   const handleClose = () => {
-    if (itemType || (totalLossAmount && totalLossAmount !== '0') || originalPrice) {
-      if (openConfirmModal) {
-        openConfirmModal('Xác nhận', 'Bạn có thay đổi chưa lưu. Bạn có chắc muốn đóng form?', () => {
-          onClose();
-        });
-      } else {
-        if (window.confirm('Bạn có thay đổi chưa lưu. Bạn có chắc muốn đóng form?')) {
-          onClose();
-        }
-      }
-    } else {
-      onClose();
-    }
+    onClose();
   };
 
   const handleToggleLossType = (checked: boolean) => {
