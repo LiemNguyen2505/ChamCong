@@ -66,7 +66,7 @@ export const EmployeeAttendancePanel: React.FC<EmployeeAttendancePanelProps> = (
       {/* Bulletin Board */}
       <BulletinBoard 
         currentEmployee={loggedInEmployee} 
-        locationId={loggedInEmployee.locationId || kioskBranch || ''} 
+        locationId={kioskBranch || loggedInEmployee.locationId || ''} 
         isAdmin={loggedInEmployee.empId.toUpperCase() === 'ADMIN' || admins.some(a => a.email === loggedInEmployee.fullName)}
         theme={theme}
         employees={employees}
@@ -125,7 +125,7 @@ export const EmployeeAttendancePanel: React.FC<EmployeeAttendancePanelProps> = (
           <div className="flex gap-4">
             <div className="flex items-center gap-1.5">
               <p className="text-[9px] text-stone-400 uppercase font-bold tracking-tighter">Rời app:</p>
-              <p className="text-sm font-black text-red-500">{latestLog.SoLanRoiApp || 0}/5</p>
+              <p className="text-sm font-black text-red-500">{latestLog.SoLanRoiApp || 0}/3</p>
             </div>
             <div className="flex items-center gap-1.5">
               <p className="text-[9px] text-stone-400 uppercase font-bold tracking-tighter">Phạt:</p>
@@ -202,7 +202,7 @@ export const EmployeeAttendancePanel: React.FC<EmployeeAttendancePanelProps> = (
             </div>
             <div className="flex items-baseline gap-1">
               <span className={`text-xl font-semibold text-emerald-500 tracking-tighter leading-none transition-colors`}>
-                {monthlyStats.totalHours.toFixed(2)}
+                {(monthlyStats?.totalHours || 0).toFixed(2)}
               </span>
              {/* <span className={`text-[10px] font-black text-emerald-500 opacity-40  leading-none ml-0.5`}>h</span> */}
             </div>
@@ -231,14 +231,14 @@ export const EmployeeAttendancePanel: React.FC<EmployeeAttendancePanelProps> = (
       <div className="grid grid-cols-2 gap-3 pt-1">
         <button
           onClick={() => handleActionClick('check-in')}
-          disabled={latestLog && !latestLog.checkOutTime}
+          disabled={!!(latestLog && !latestLog.checkOutTime)}
           className={`w-full py-3 rounded-2xl shadow-lg flex flex-col items-center justify-center gap-2 transition-all active:scale-[0.95] ${
-            latestLog && !latestLog.checkOutTime
+            !!(latestLog && !latestLog.checkOutTime)
               ? 'bg-stone-100 text-stone-300 cursor-not-allowed shadow-none'
               : 'bg-emerald-500 hover:bg-emerald-600 text-white shadow-emerald-500/20'
           }`}
         >
-          <div className={`p-2.5 rounded-2xl ${latestLog && !latestLog.checkOutTime ? 'bg-stone-200' : 'bg-white/20'}`}>
+          <div className={`p-2.5 rounded-2xl ${!!(latestLog && !latestLog.checkOutTime) ? 'bg-stone-200' : 'bg-white/20'}`}>
             <div className="relative">
               <Clock strokeWidth={1.5} className="w-6 h-6" />
               <ArrowRight strokeWidth={2} className="w-3.5 h-3.5 absolute -right-1.5 -bottom-1.5 bg-emerald-500 rounded-full border-2 border-white" />
@@ -249,9 +249,9 @@ export const EmployeeAttendancePanel: React.FC<EmployeeAttendancePanelProps> = (
         
         <button
           onClick={() => handleActionClick('check-out')}
-          disabled={!latestLog || latestLog.checkOutTime}
+          disabled={!latestLog || !!latestLog.checkOutTime}
           className={`w-full py-3 rounded-2xl shadow-lg flex flex-col items-center justify-center gap-2 transition-all active:scale-[0.95] ${
-            !latestLog || latestLog.checkOutTime
+            !latestLog || !!latestLog.checkOutTime
               ? 'bg-stone-100 text-stone-300 cursor-not-allowed shadow-none'
               : 'bg-rose-500 hover:bg-rose-600 text-white shadow-rose-500/20'
           }`}
