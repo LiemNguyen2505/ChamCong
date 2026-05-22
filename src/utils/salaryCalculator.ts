@@ -257,7 +257,7 @@ export function calculateNetSalary(
     let penalty = Number(cc.phonePenalty) || 0;
     const mins = Number(cc.phoneMinutes) || Number(cc.PhutPhatRoiApp) || 0;
     const count = Number(cc.SoLanRoiApp) || 0;
-    if (penalty === 0 && (mins > 3 || count > 3)) {
+    if (penalty === 0 && (mins > 5 || count > 3)) {
       penalty = roundToUnit(mins * 3 * (hr / 60));
     }
     return sum + penalty;
@@ -297,8 +297,8 @@ export function calculateNetSalary(
   const totalEarnings = baseSalaryTotal + responsibilityBonusTotal + holidayBonusTotal + extraAdditionsTotal;
   const totalDeductions = latePenaltyTotal + phonePenaltyTotal + finalPenalty + otherDeductionsTotal;
 
-  let actualSalary = roundToUnit(totalEarnings - totalDeductions);
-  const deductionExceeded = actualSalary < 0;
+  let actualSalary = Math.max(0, roundToUnit(totalEarnings - totalDeductions));
+  const deductionExceeded = roundToUnit(totalEarnings - totalDeductions) < 0;
 
   return {
     totalHours,
@@ -313,6 +313,7 @@ export function calculateNetSalary(
     rawLatePenaltyTotal, // This is system reference
     rawPhonePenaltyTotal: systemPhonePenaltyTotal, // This is system reference
     systemLatePenaltyMinutes: totalLatePenaltyMinutes, // Original minutes
+    systemLateMinutes: totalLateMinutes, // Un-multiplied late minutes
     systemPhonePenaltyCount: systemPhonePenaltyCount, // Original count
     systemPhoneMinutes: systemPhoneMinutes,
     finalPenalty,
