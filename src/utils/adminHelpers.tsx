@@ -48,7 +48,7 @@ export const getPhonePenalty = (t: any, hourlyRate: number) => {
   const count = Number(t.SoLanRoiApp) || 0;
   const hr = Number(hourlyRate) || 0;
 
-  if (penalty === 0 && (mins > 3 || count > 3)) {
+  if (penalty === 0 && (mins > 5 || count > 3)) {
     penalty = Math.round(mins * 3 * (hr / 60));
   }
   
