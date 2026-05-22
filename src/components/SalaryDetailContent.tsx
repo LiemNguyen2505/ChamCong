@@ -402,13 +402,21 @@ export default function SalaryDetailContent({
               <div className="p-3 bg-white rounded-base shadow-[0_4px_12px_rgb(0,0,0,0.04)] border border-stone-100/50 space-y-2 group transition-all">
                 <div className="flex justify-between items-center text-sm">
                   <div className="flex flex-col gap-0.5">
-                    <button 
-                      onClick={() => setShowLateDetails(true)}
-                      className="text-stone-500 font-medium flex items-center gap-3 hover:text-stone-700 transition-colors"
-                    >
-                      <Clock className="w-4 h-4 text-stone-400 group-hover:text-stone-500 transition-colors"/> 
-                      <span className="border-b border-dotted border-stone-200">Đi Trễ</span>
-                    </button>
+                    <div className="flex items-center gap-2">
+                      <button 
+                        onClick={() => setShowLateDetails(true)}
+                        className="text-stone-500 font-medium flex items-center gap-3 hover:text-stone-700 transition-colors"
+                      >
+                        <Clock className="w-4 h-4 text-stone-400 group-hover:text-stone-500 transition-colors"/> 
+                        <span className="border-b border-dotted border-stone-200">Đi Trễ</span>
+                      </button>
+                      <div className="group/tooltip relative">
+                        <Info className="w-3 h-3 text-stone-300 cursor-help" />
+                        <div className="absolute left-0 bottom-full mb-2 w-48 p-2 bg-stone-900 text-white text-[9px] rounded-lg opacity-0 group-hover/tooltip:opacity-100 transition-opacity pointer-events-none z-50 shadow-xl font-bold uppercase tracking-wider leading-relaxed">
+                          Quy định: Đi trễ từ 10p trở lên, bị phạt số phút trễ x3 đơn giá lương. Dưới 10p không bị phạt.
+                        </div>
+                      </div>
+                    </div>
                     {currentStats.latePenaltyTotal < currentStats.rawLatePenaltyTotal && (
                       <span className="ml-7 text-[8px] font-black bg-emerald-50 text-emerald-700 px-1.5 py-0.5 rounded tracking-tighter w-fit uppercase">
                         Quản lý đã giảm
@@ -458,15 +466,19 @@ export default function SalaryDetailContent({
                       </div>
                     </div>
                   ) : (
-                    <div className="flex flex-col items-end">
+                    <div className="flex flex-col items-end gap-0.5">
                       {currentStats.totalLatePenaltyMinutes !== currentStats.systemLatePenaltyMinutes && (
-                        <span className="text-[10px] text-stone-300 line-through font-mono">
+                        <span className="text-[9px] text-stone-400 line-through font-mono">
                           HT: {currentStats.systemLateCount} lần | {currentStats.systemLatePenaltyMinutes}p | -{formatNumber(currentStats.rawLatePenaltyTotal)}
                         </span>
                       )}
-                      <span className="font-black text-rose-800 font-mono text-[10px] sm:text-xs">
-                        {currentStats.lateCount} lần | {currentStats.totalLatePenaltyMinutes}p | -{formatNumber(currentStats.latePenaltyTotal)}
-                      </span>
+                      <div className="flex items-center gap-1.5 font-mono text-[10px] sm:text-xs text-rose-800 font-bold">
+                        <span>{currentStats.lateCount} lần</span>
+                        <span className="text-stone-300">|</span>
+                        <span>{currentStats.systemLateMinutes}p trễ</span>
+                        <span className="text-stone-300">|</span>
+                        <span className="font-black">-{formatNumber(currentStats.latePenaltyTotal)}</span>
+                      </div>
                     </div>
                   )}
                 </div>
@@ -482,12 +494,10 @@ export default function SalaryDetailContent({
                       <span className="text-stone-500 font-medium flex items-center gap-3">
                         <Smartphone className="w-4 h-4 text-stone-400 group-hover:text-stone-500 transition-colors"/> Sử dụng ĐT
                       </span>
-                      <div className="group relative">
+                      <div className="group/phone relative">
                         <Info className="w-3 h-3 text-stone-300 cursor-help" />
-                        <div className="absolute left-0 bottom-full mb-2 w-48 p-2 bg-stone-900 text-white text-[9px] rounded-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50 shadow-xl font-bold uppercase tracking-wider leading-relaxed">
-                          Quy định: Tối đa 3 lần/ca & mỗi lần &lt; 3p. 
-                          Nếu &gt; 3p: phạt số phút x3 đơn giá lương. 
-                          Nếu &gt; 3 lần hoặc có lần &gt; 3p: Trừ 10% thưởng TN.
+                        <div className="absolute left-0 bottom-full mb-2 w-48 p-2 bg-stone-900 text-white text-[9px] rounded-lg opacity-0 group-hover/phone:opacity-100 transition-opacity pointer-events-none z-50 shadow-xl font-bold uppercase tracking-wider leading-relaxed">
+                          Quy định: Tối đa 3 lần/ca & mỗi lần &lt; 5p. Nếu rời app &gt; 5p: phạt số phút x3 đơn giá lương. Nếu &gt; 3 lần hoặc có lần &gt; 5p: Trừ 10% thưởng TN.
                         </div>
                       </div>
                     </div>
@@ -540,15 +550,19 @@ export default function SalaryDetailContent({
                       </div>
                     </div>
                   ) : (
-                    <div className="flex flex-col items-end">
+                    <div className="flex flex-col items-end gap-0.5">
                       {currentStats.phonePenaltyMinutes !== currentStats.systemPhoneMinutes && (
-                        <span className="text-[10px] text-stone-300 line-through font-mono">
+                        <span className="text-[9px] text-stone-400 line-through font-mono">
                           HT: {currentStats.systemPhonePenaltyCount} ca | {currentStats.systemPhoneMinutes}p | -{formatNumber(currentStats.rawPhonePenaltyTotal)}
                         </span>
                       )}
-                      <span className="font-black text-rose-800 font-mono text-[10px] sm:text-xs">
-                        {currentStats.phonePenaltyCount} ca vi phạm | {currentStats.phonePenaltyMinutes}p trễ | -{formatNumber(currentStats.phonePenaltyTotal)}
-                      </span>
+                      <div className="flex items-center gap-1.5 font-mono text-[10px] sm:text-xs text-rose-800 font-bold">
+                        <span>{currentStats.phonePenaltyCount} ca</span>
+                        <span className="text-stone-300">|</span>
+                        <span>{currentStats.phonePenaltyMinutes}p rời app</span>
+                        <span className="text-stone-300">|</span>
+                        <span className="font-black">-{formatNumber(currentStats.phonePenaltyTotal)}</span>
+                      </div>
                     </div>
                   )}
                 </div>
