@@ -270,7 +270,7 @@ export const AttendanceTab: React.FC<AttendanceTabProps> = ({
                   >
                     <option value="" className="text-slate-900 bg-white">TÊN NHÂN VIÊN</option>
                     {nhanViens
-                      .filter(nv => filterBranch === 'All' || nv.locationId === filterBranch)
+                      .filter(nv => filterBranch === 'All' || nv.locationId === filterBranch || (nv.locationIds && nv.locationIds.includes(filterBranch)) || filteredChamCongs.some(cc => cc.empId === nv.id || cc.empId === nv.empId))
                       .sort((a,b) => a.fullName.localeCompare(b.fullName))
                       .map(nv => (
                         <option key={nv.id} value={nv.id} className="text-slate-900 bg-white">
@@ -446,7 +446,7 @@ export const AttendanceTab: React.FC<AttendanceTabProps> = ({
                 className="w-full px-4 py-3 bg-white border border-slate-200 rounded-2xl outline-none text-[12px] font-black text-slate-800 shadow-sm transition-all uppercase tracking-tight"
               >
                 <option value="">DANH SÁCH NHÂN VIÊN</option>
-                {nhanViens.filter(nv => filterBranch === 'All' || nv.locationId === filterBranch).sort((a,b) => a.fullName.localeCompare(b.fullName)).map(nv => (
+                {nhanViens.filter(nv => filterBranch === 'All' || nv.locationId === filterBranch || (nv.locationIds && nv.locationIds.includes(filterBranch)) || filteredChamCongs.some(cc => cc.empId === nv.id || cc.empId === nv.empId)).sort((a,b) => a.fullName.localeCompare(b.fullName)).map(nv => (
                   <option key={nv.id} value={nv.id}>{nv.fullName.toUpperCase()}</option>
                 ))}
               </select>
