@@ -32,7 +32,7 @@ export interface SmartScheduleBuilderProps {
 
 export const SmartScheduleBuilder: React.FC<SmartScheduleBuilderProps> = (props) => {
   const hookState = useSmartScheduleBuilder(props);
-  const { theme, isReadOnly, managedBranches, onAddShift, onDeleteShift, exportToCSV } = props;
+  const { theme, isReadOnly, managedBranches, onAddShift, onDeleteShift, exportToCSV, employees } = props;
   const { schedules } = props; // for ContextMenu
 
   const {
