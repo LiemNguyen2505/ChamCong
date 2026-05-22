@@ -41,13 +41,7 @@ export const PayrollAdjustmentModal: React.FC<PayrollAdjustmentModalProps> = ({
   const [isDirty, setIsDirty] = useState(false);
 
   const handleClose = () => {
-    if (isDirty) {
-      if (window.confirm('Bạn có thay đổi chưa lưu. Bạn có chắc muốn đóng?')) {
-        onClose();
-      }
-    } else {
-      onClose();
-    }
+    onClose();
   };
 
   useEffect(() => {
