@@ -114,7 +114,6 @@ const PenaltyPopover = ({
             <Undo2 className="w-3.5 h-3.5" /> Khôi phục dữ liệu gốc
           </button>
         </div>
-        <div className="absolute top-full right-4 border-8 border-transparent border-t-white" />
       </PopoverPortal>
     </div>
   );
@@ -176,14 +175,13 @@ const FieldNote = ({
           className="w-full p-2 bg-slate-50 border border-slate-100 rounded-lg text-xs outline-none focus:ring-1 focus:ring-sky-500 min-h-[60px]"
           placeholder={placeholder}
         />
-        <div className="absolute top-full right-2 border-4 border-transparent border-t-white" />
       </PopoverPortal>
     </div>
   );
 };
 
 const PopoverPortal = ({ isOpen, onClose, anchorId, align = 'right', position = 'bottom', className = '', children }: any) => {
-  const [coords, setCoords] = useState({ top: 0, bottom: 0, left: 0, right: 0, width: 0 });
+  const [coords, setCoords] = useState({ top: 0, bottom: 0, left: 0, right: 0, width: 0, windowHeight: window.innerHeight, windowWidth: window.innerWidth });
 
   useEffect(() => {
     const updateCoords = () => {
@@ -196,7 +194,9 @@ const PopoverPortal = ({ isOpen, onClose, anchorId, align = 'right', position = 
             bottom: rect.bottom,
             left: rect.left,
             right: window.innerWidth - rect.right,
-            width: rect.width
+            width: rect.width,
+            windowHeight: window.innerHeight,
+            windowWidth: window.innerWidth
           });
         }
       }
@@ -214,17 +214,33 @@ const PopoverPortal = ({ isOpen, onClose, anchorId, align = 'right', position = 
 
   if (!isOpen) return null;
 
+  // Determine auto position to prevent cutoff
+  const spaceTop = coords.top;
+  const spaceBottom = coords.windowHeight - coords.bottom;
+  const preferredPosition = position === 'top' ? 
+    (spaceTop > 300 || spaceTop > spaceBottom ? 'top' : 'bottom') : 
+    (spaceBottom > 300 || spaceBottom > spaceTop ? 'bottom' : 'top');
+
   return createPortal(
     <>
       <div className="fixed inset-0 z-[110]" onClick={(e) => { e.stopPropagation(); onClose(); }} />
       <motion.div 
-        initial={{ opacity: 0, scale: 0.95, y: position === 'top' ? 5 : -5 }}
+        initial={{ opacity: 0, scale: 0.95, y: preferredPosition === 'top' ? 5 : -5 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
-        exit={{ opacity: 0, scale: 0.95, y: position === 'top' ? 5 : -5 }}
+        exit={{ opacity: 0, scale: 0.95, y: preferredPosition === 'top' ? 5 : -5 }}
         style={{
           position: 'fixed',
-          ...(position === 'bottom' ? { top: coords.bottom + 4 } : { top: coords.top - 8, transform: 'translateY(-100%)' }),
-          ...(align === 'right' ? { right: coords.right } : { left: coords.left }),
+          ...(preferredPosition === 'bottom' 
+            ? { 
+                top: Math.min(coords.bottom + 4, coords.windowHeight - 100),
+                maxHeight: Math.max(100, coords.windowHeight - Math.min(coords.bottom + 4, coords.windowHeight - 100) - 20)
+              } 
+            : { 
+                bottom: Math.max(coords.windowHeight - coords.top + 8, 20),
+                maxHeight: Math.max(100, coords.top - 28)
+              }),
+          ...(align === 'right' ? { right: Math.max(coords.right, 10) } : { left: Math.max(coords.left, 10) }),
+          overflowY: 'auto',
           zIndex: 120
         }}
         className={`bg-white rounded-xl shadow-2xl border border-slate-200 p-4 text-left ${className}`}
@@ -481,7 +497,6 @@ export const PayrollComponent: React.FC<any> = ({
                               responsibility: 'Thưởng TN (% / Đơn giá)',
                               holiday: 'Thưởng Lễ', 
                               latePenalty: 'Phạt đi trễ',
-                              phonePenalty: 'Sử dụng ĐT',
                               otherDeductions: 'KHẤU TRỪ KHÁC',
                               extraAdditions: 'Thu Nhập Bổ Sung',
                               actual: 'Tiền thực lãnh', note: 'Ghi chú'
@@ -586,12 +601,6 @@ export const PayrollComponent: React.FC<any> = ({
                         <th style={{ width: Math.max(columnWidths.latePenalty, 120) }} className="p-3 font-bold text-slate-500 border-r border-slate-300 text-right relative group">
                           Đi trễ
                           <div onMouseDown={(e) => handleResize('latePenalty', e)} className="absolute right-0 top-0 h-full w-1 cursor-col-resize bg-transparent group-hover:bg-sky-400 z-10" />
-                        </th>
-                      )}
-                      {visibleColumns.phonePenalty && (
-                        <th style={{ width: Math.max(columnWidths.phonePenalty, 120) }} className="p-3 font-bold text-slate-500 border-r border-slate-300 text-right relative group">
-                          Sử dụng ĐT
-                          <div onMouseDown={(e) => handleResize('phonePenalty', e)} className="absolute right-0 top-0 h-full w-1 cursor-col-resize bg-transparent group-hover:bg-sky-400 z-10" />
                         </th>
                       )}
                       {visibleColumns.otherDeductions && (
@@ -748,29 +757,6 @@ export const PayrollComponent: React.FC<any> = ({
                                     onReset={() => {
                                       handlePayrollChange(emp.id, 'overrideLatePenalty', undefined);
                                       handlePayrollChange(emp.id, 'overrideLateMinutes', undefined);
-                                    }}
-                                  />
-                                </td>
-                              )}
-                              {/* Sử dụng ĐT */}
-                              {visibleColumns.phonePenalty && (
-                                <td className="p-3 border-r border-slate-100 text-right">
-                                  <PenaltyPopover 
-                                    id={`phone-penalty-${emp.id}`}
-                                    label="Sử dụng ĐT"
-                                    amount={stats.phonePenaltyTotal}
-                                    rawAmount={stats.rawPhonePenaltyTotal}
-                                    quantityLabel="ca VP"
-                                    quantityValue={stats.phonePenaltyCount}
-                                    rawQuantityValue={stats.systemPhonePenaltyCount}
-                                    onAmountChange={(val) => handlePayrollChange(emp.id, 'overridePhonePenalty', val)}
-                                    onQuantityChange={(val) => handlePayrollChange(emp.id, 'overridePhoneCount', val)}
-                                    unitRate={stats.currentHourlyRate * 3} // Based on user request (1 session > 3p = 3 hours penalty per minute)
-                                    isEdited={isEdited('overridePhonePenalty') || isEdited('overridePhoneCount')}
-                                    textColor="text-rose-500"
-                                    onReset={() => {
-                                      handlePayrollChange(emp.id, 'overridePhonePenalty', undefined);
-                                      handlePayrollChange(emp.id, 'overridePhoneCount', undefined);
                                     }}
                                   />
                                 </td>
@@ -1008,7 +994,7 @@ export const PayrollComponent: React.FC<any> = ({
                                   <span className="text-stone-300">•</span>
                                   Phạt: 
                                   <span className={`font-black ${isReducedPenalty ? 'text-rose-500' : 'text-rose-600'}`}>
-                                    {formatK(stats.latePenaltyTotal + stats.phonePenaltyTotal + stats.finalPenalty)}
+                                    {formatK(stats.latePenaltyTotal + stats.finalPenalty)}
                                   </span>
                                   {isReducedPenalty && (
                                     <span className="ml-1 text-[9px] font-bold text-emerald-600 bg-emerald-100 px-1.5 py-0.5 rounded-full whitespace-nowrap">
