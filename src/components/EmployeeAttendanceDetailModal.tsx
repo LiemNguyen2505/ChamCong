@@ -197,14 +197,6 @@ export const EmployeeAttendanceDetailModal: React.FC<EmployeeAttendanceDetailMod
                                 ) : (
                                   <span className="text-xs text-slate-400 px-2 py-1">Không đi trễ</span>
                                 )}
-                                {shift.phonePenalty > 0 ? (
-                                  <span className="inline-flex items-center gap-1 text-xs font-medium text-rose-600 bg-rose-50 px-2 py-1 rounded">
-                                    <AlertTriangle className="w-3.5 h-3.5" />
-                                    Phạt ĐT {shift.phonePenalty.toLocaleString('vi-VN')}đ
-                                  </span>
-                                ) : (
-                                  <span className="text-xs text-slate-400 px-2 py-1">Không dùng ĐT</span>
-                                )}
                               </div>
                             </div>
                           </div>
