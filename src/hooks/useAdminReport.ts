@@ -60,7 +60,6 @@ export const useAdminReport = ({
         currentHourlyRate: employee?.hourlyRate || 0,
         responsibilityBonus: 0,
         latePenaltyTotal: 0,
-        phonePenaltyTotal: 0,
         actualSalary: 0
       };
       
@@ -74,7 +73,7 @@ export const useAdminReport = ({
         cc.totalHours ? cc.totalHours.toFixed(2) : '0',
         stats.currentHourlyRate,
         stats.responsibilityBonus, // Monthly context
-        (cc.PhutPhatRoiApp || 0), // Shift specific violation
+        (cc.latePenaltyMinutes || 0), // Shift specific violation
         cc.totalPay ? Math.round(cc.totalPay) : 0
       ].map(val => `"${val}"`).join(',');
     });
@@ -217,7 +216,7 @@ export const useAdminReport = ({
           escapeCSV(cc.locationId),
           escapeCSV(cc.totalHours ? cc.totalHours.toFixed(2) : '0'),
           escapeCSV(employee?.hourlyRate || 0),
-          escapeCSV(cc.PhutPhatRoiApp || 0),
+          escapeCSV(cc.latePenaltyMinutes || 0),
           escapeCSV(cc.totalPay ? Math.round(cc.totalPay) : 0)
         ].join(',');
       });
