@@ -116,6 +116,7 @@ export const EmployeeAttendancePanel: React.FC<EmployeeAttendancePanelProps> = (
       </div>
 
       {/* Leaving App Warning */}
+      {/* TẠM NGƯNG TÍNH NĂNG NÀY THEO YÊU CẦU:
       {latestLog && !latestLog.checkOutTime && (!loggedInEmployee || !(loggedInEmployee.empId.toUpperCase() === 'ADMIN' || admins.some(a => a.email === loggedInEmployee.fullName))) && (
         <div className={`${theme.bg} border ${theme.border} p-3 rounded-2xl animate-pulse flex items-center justify-between shadow-sm`}>
           <p className={`text-[10px] ${theme.text} font-black flex items-center gap-1.5 uppercase tracking-widest`}>
@@ -134,6 +135,7 @@ export const EmployeeAttendancePanel: React.FC<EmployeeAttendancePanelProps> = (
           </div>
         </div>
       )}
+      */}
 
       {/* Tasks in Shift (if active) */}
       {latestLog && !latestLog.checkOutTime && workSchedules.find(s => s.date === format(new Date(), 'yyyy-MM-dd') && s.startTime === latestLog.selectedShiftTime)?.tasks && workSchedules.find(s => s.date === format(new Date(), 'yyyy-MM-dd') && s.startTime === latestLog.selectedShiftTime)!.tasks!.length > 0 && (
