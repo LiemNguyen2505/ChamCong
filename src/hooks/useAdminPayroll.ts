@@ -69,7 +69,7 @@ export const useAdminPayroll = ({
         'extraAdditions', 'extraAdditionsNote', 'advanceSalary', 'advanceSalaryNote',
         'materialLoss', 'materialLossNote', 'ttnPercentage', 'ttnPercentageNote',
         'overrideTtnPercentage', 'note',
-        'overrideLatePenalty', 'overridePhonePenalty', 'overrideLateMinutes', 'overridePhoneCount'
+        'overrideLatePenalty', 'overrideLateMinutes'
       ];
 
       for (const keyId of targetKeys) {
