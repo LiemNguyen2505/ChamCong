@@ -198,7 +198,6 @@ export const EmployeeHistory: React.FC<EmployeeHistoryProps> = ({
                       }
 
                       const isLate = lateVal > 0;
-                      const hasPhone = (cc.SoLanRoiApp || 0) > 0;
 
                       return (
                          <div key={idx} className={`flex flex-col gap-1.5 ${idx > 0 ? 'pt-2' : ''}`}>
@@ -259,18 +258,11 @@ export const EmployeeHistory: React.FC<EmployeeHistoryProps> = ({
                                 </div>
                             </div>
 
-                            {(isLate || hasPhone) && (
+                            {isLate && (
                                 <div className="flex items-center gap-2 pt-1">
-                                    {hasPhone && (
-                                        <span className="px-1.5 py-0.5 bg-rose-50 border border-rose-100 text-rose-600 text-[9px] font-black uppercase rounded-sm flex items-center gap-1 shadow-sm">
-                                            <Smartphone className="w-2.5 h-2.5" /> ĐT: {cc.SoLanRoiApp}
-                                        </span>
-                                    )}
-                                    {isLate && (
-                                        <span className="px-1.5 py-0.5 bg-orange-50 border border-orange-100 text-orange-600 text-[9px] font-black uppercase rounded-sm flex items-center gap-1 shadow-sm">
-                                            <Clock className="w-2.5 h-2.5" /> Trễ {lateVal < 60 ? `${lateVal}p` : `${Math.floor(lateVal / 60)}h${lateVal % 60 > 0 ? `${lateVal % 60}p` : ''}`}
-                                        </span>
-                                    )}
+                                    <span className="px-1.5 py-0.5 bg-orange-50 border border-orange-100 text-orange-600 text-[9px] font-black uppercase rounded-sm flex items-center gap-1 shadow-sm">
+                                        <Clock className="w-2.5 h-2.5" /> Trễ {lateVal < 60 ? `${lateVal}p` : `${Math.floor(lateVal / 60)}h${lateVal % 60 > 0 ? `${lateVal % 60}p` : ''}`}
+                                    </span>
                                 </div>
                             )}
                          </div>
