@@ -43,6 +43,9 @@ export const getLatePenaltyMinutes = (t: any) => {
 };
 
 export const getPhonePenalty = (t: any, hourlyRate: number) => {
+  // SUSPENDED: Tạm ngưng tính phạt điện thoại
+  return 0;
+  /*
   let penalty = Number(t.phonePenalty) || 0;
   const mins = Number(t.phoneMinutes) || Number(t.PhutPhatRoiApp) || 0;
   const count = Number(t.SoLanRoiApp) || 0;
@@ -53,6 +56,7 @@ export const getPhonePenalty = (t: any, hourlyRate: number) => {
   }
   
   return penalty;
+  */
 };
 
 export const getTotalHours = (t: any) => {
