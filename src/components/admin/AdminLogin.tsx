@@ -36,22 +36,27 @@ export const AdminLogin: React.FC<AdminLoginProps> = ({
         <div className="absolute inset-0 pointer-events-none opacity-[0.05] bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-emerald-900 to-transparent z-1" />
       )}
 
-      <div className={`bg-white/95 backdrop-blur-2xl rounded-[2.5rem] shadow-[0_20px_50px_rgba(0,0,0,0.3)] ${adminTheme.shadow.replace('/10', '/30')} p-10 w-full max-w-[420px] border border-white/60 relative z-10 flex flex-col items-center transition-all duration-500`}>
+      <div className={`bg-white/95 backdrop-blur-2xl rounded-[1.5rem] shadow-[0_20px_50px_rgba(0,0,0,0.3)] ${adminTheme.shadow.replace('/10', '/30')} p-7 md:p-8 w-full max-w-[420px] border border-white/60 relative z-10 flex flex-col items-center transition-all duration-500 -translate-y-12 md:-translate-y-4`}>
         
         <button 
           onClick={() => navigate(-1)}
-          className={`absolute top-4 right-4 p-2 rounded-full bg-white/20 text-white shadow-lg hover:bg-white/30 transition-all active:scale-95 z-30 backdrop-blur-md border border-white/30`}
+          className={`absolute top-3.5 right-4 p-1.5 rounded-full bg-white/20 text-white shadow-sm hover:bg-white/30 transition-all active:scale-95 z-30 backdrop-blur-md border border-white/20`}
         >
-          <X className="w-5 h-5" />
+          <X className="w-4 h-4" />
         </button>
 
-        <div className={`w-[calc(100%+80px)] -mt-10 -mx-10 mb-10 py-12 px-10 ${adminTheme.accent} rounded-t-[2.5rem] flex flex-col items-center text-center shadow-lg relative`}>
-          <h2 className="text-[24px] font-black text-white leading-tight uppercase tracking-wider">
-            Hệ thống quản trị<br/>nhân sự
+        <div className={`w-[calc(100%+56px)] md:w-[calc(100%+64px)] -mt-7 md:-mt-8 -mx-7 md:-mx-8 mb-9 md:mb-8 py-6 md:py-8 ${adminTheme.accent} rounded-t-[1.5rem] flex flex-col items-center justify-center gap-1 shadow-sm relative text-center`}>
+         
+          <h2 className="text-[18px] md:text-[20px] font-bold text-white/90 uppercase tracking-widest leading-tight">
+           Hệ Thống
           </h2>
+          <h2 className="text-[18px] md:text-[20px] font-black text-white uppercase tracking-widest leading-tight">
+           Quản Trị Nhân Sự
+          </h2>
+        
         </div>
 
-        <form onSubmit={handleLogin} className="w-full space-y-6" noValidate>
+        <form onSubmit={handleLogin} className="w-full space-y-5 md:space-y-6" noValidate>
           <div>
             <p className={`text-[13px] font-black ${adminTheme.text} opacity-70 uppercase tracking-[0.2em] mb-2 px-4`}>Số điện thoại / Họ tên</p>
             <div className="relative group">
