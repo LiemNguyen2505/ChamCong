@@ -25,11 +25,13 @@ export function calculateTtnPenalty(timesheets: any[], violations: any[] = []) {
   const lateCountForTtn = timesheets.filter(t => getLateMinutes(t) > 0 && !t.isLateExcused).length;
   const skipShiftForTtn = timesheets.find(t => getLateMinutes(t) >= 300 && !t.isLateExcused);
   const violationCount = violations.length;
-  const phoneViolationCount = timesheets.filter(t => t.hasPhoneViolation).length;
+  // SUSPENDED: const phoneViolationCount = timesheets.filter(t => t.hasPhoneViolation).length;
   
   let ttnPenaltyValue = 0;
   let ttnPenaltyReason = "";
 
+  // SUSPENDED: Tạm ngưng tính phạt điện thoại theo yêu cầu
+  const phoneViolationCount = 0; // timesheets.filter(t => t.hasPhoneViolation).length;
   // 1. Check skip shift first (immediate 100% loss)
   if (skipShiftForTtn) {
     ttnPenaltyValue = 100;
@@ -253,7 +255,9 @@ export function calculateNetSalary(
 
   const hr = Number(currentHourlyRate) || 0;
 
-  const systemPhonePenaltyTotal = roundToUnit(approvedTimesheets.reduce((sum, cc) => {
+  const systemPhonePenaltyTotal = 0; // Tạm ngưng tính phạt
+  /* SUSPENDED:
+  roundToUnit(approvedTimesheets.reduce((sum, cc) => {
     let penalty = Number(cc.phonePenalty) || 0;
     const mins = Number(cc.phoneMinutes) || Number(cc.PhutPhatRoiApp) || 0;
     const count = Number(cc.SoLanRoiApp) || 0;
@@ -262,6 +266,7 @@ export function calculateNetSalary(
     }
     return sum + penalty;
   }, 0));
+  */
   // Count shifts with at least one phone use session, not total session count across all shifts
   const systemPhonePenaltyCount = approvedTimesheets.filter(cc => (Number(cc.SoLanRoiApp) || 0) > 0).length;
   // Total sessions across all shifts
