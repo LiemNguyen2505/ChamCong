@@ -497,7 +497,7 @@ export default function SalaryDetailContent({
                       <div className="group/phone relative">
                         <Info className="w-3 h-3 text-stone-300 cursor-help" />
                         <div className="absolute left-0 bottom-full mb-2 w-48 p-2 bg-stone-900 text-white text-[9px] rounded-lg opacity-0 group-hover/phone:opacity-100 transition-opacity pointer-events-none z-50 shadow-xl font-bold uppercase tracking-wider leading-relaxed">
-                          Quy định: Tối đa 3 lần/ca & mỗi lần &lt; 5p. Nếu rời app &gt; 5p: phạt số phút x3 đơn giá lương. Nếu &gt; 3 lần hoặc có lần &gt; 5p: Trừ 10% thưởng TN.
+                          Quy định: Tối đa 3 lần/ca & mỗi lần &lt; 5p. Nếu rời app &gt; 5p: phạt số phút x3 đơn giá lương. Nếu &gt; 3 lần hoặc có lần &gt; 5p: Trừ 10% thưởng TN. (TẠM NGƯNG ÁP DỤNG)
                         </div>
                       </div>
                     </div>
