@@ -443,7 +443,7 @@ export const EmployeeViolationTracker: React.FC<EmployeeViolationTrackerProps> =
                     <div className="flex gap-3">
                       <div className="w-1.5 h-1.5 rounded-full bg-blue-400 mt-1.5 shrink-0" />
                       <p className="text-xs font-bold text-slate-700 leading-relaxed">
-                        Ca làm việc bị tính là <strong>VI PHẠM</strong> lỗi điện thoại nếu rời app <strong className="text-blue-600">quá 3 lần</strong> HOẶC có 1 lần rời app liên tục <strong className="text-blue-600">quá 5 phút</strong>.
+                        Ca làm việc bị tính là <strong>VI PHẠM</strong> lỗi điện thoại nếu rời app <strong className="text-blue-600">quá 3 lần</strong> HOẶC có 1 lần rời app liên tục <strong className="text-blue-600">quá 5 phút</strong>. <span className="text-red-500 font-black">(TẠM NGƯNG ÁP DỤNG)</span>
                       </p>
                     </div>
                     <div className="flex gap-3">
