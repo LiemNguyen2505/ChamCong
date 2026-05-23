@@ -37,7 +37,7 @@ export const RegulationsTab = ({ activeTab, adminTheme }: RegulationsTabProps) =
       borderColor: 'border-blue-100',
       rules: [
         'Hệ thống tự động ghi nhận việc rời khỏi ứng dụng hoặc tắt màn hình trong giờ làm việc (tính theo từng ca).',
-        'Ca làm việc bị tính là VI PHẠM lỗi điện thoại nếu:',
+        'Ca làm việc bị tính là VI PHẠM lỗi điện thoại nếu: (TẠM NGƯNG ÁP DỤNG DO HỆ THỐNG ĐANG NÂNG CẤP)',
         '  . Rời app quá 3 lần / ca.',
         '  . HOẶC có 1 lần rời app liên tục quá 5 phút.',
         '1. Trừ thẳng vào Lương (Phạt vi phạm):',
