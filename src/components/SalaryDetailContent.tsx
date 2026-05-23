@@ -28,6 +28,7 @@ export default function SalaryDetailContent({
   timesheets = [], adjustments = [], holidays = [], violations = []
 }: SalaryDetailContentProps) {
   const [showLateDetails, setShowLateDetails] = useState(false);
+  const [showLateTooltip, setShowLateTooltip] = useState(false);
   const [showViolationDetails, setShowViolationDetails] = useState(false);
   const [showMaterialLossDetails, setShowMaterialLossDetails] = useState(false);
   const [showNoteFields, setShowNoteFields] = useState<{[key: string]: boolean}>({});
@@ -410,12 +411,17 @@ export default function SalaryDetailContent({
                         <Clock className="w-4 h-4 text-stone-400 group-hover:text-stone-500 transition-colors"/> 
                         <span className="border-b border-dotted border-stone-200">Đi Trễ</span>
                       </button>
-                      <div className="group/tooltip relative">
+                      <button 
+                        type="button" 
+                        onClick={() => setShowLateTooltip(!showLateTooltip)}
+                        onBlur={() => setShowLateTooltip(false)}
+                        className="group/tooltip relative focus:outline-none"
+                      >
                         <Info className="w-3 h-3 text-stone-300 cursor-help" />
-                        <div className="absolute left-0 bottom-full mb-2 w-48 p-2 bg-stone-900 text-white text-[9px] rounded-lg opacity-0 group-hover/tooltip:opacity-100 transition-opacity pointer-events-none z-50 shadow-xl font-bold uppercase tracking-wider leading-relaxed">
+                        <div className={`absolute left-0 bottom-full mb-2 w-48 p-2 bg-stone-900 text-white text-[9px] rounded-lg transition-opacity z-50 shadow-xl font-bold uppercase tracking-wider leading-relaxed ${showLateTooltip ? 'opacity-100' : 'opacity-0 pointer-events-none group-hover/tooltip:opacity-100 sm:pointer-events-none'}`}>
                           Quy định: Đi trễ từ 10p trở lên, bị phạt số phút trễ x3 đơn giá lương. Dưới 10p không bị phạt.
                         </div>
-                      </div>
+                      </button>
                     </div>
                     {currentStats.latePenaltyTotal < currentStats.rawLatePenaltyTotal && (
                       <span className="ml-7 text-[8px] font-black bg-emerald-50 text-emerald-700 px-1.5 py-0.5 rounded tracking-tighter w-fit uppercase">
@@ -485,90 +491,6 @@ export default function SalaryDetailContent({
               </div>
             )}
             
-            {/* Sử dụng ĐT */}
-            {(isAdmin || currentStats.phonePenaltyTotal !== 0) && (
-              <div className="p-3 bg-white rounded-base shadow-[0_4px_12px_rgb(0,0,0,0.04)] border border-stone-100/50 space-y-2 group transition-all">
-                <div className="flex justify-between items-center text-sm">
-                  <div className="flex flex-col gap-0.5">
-                    <div className="flex items-center gap-2">
-                      <span className="text-stone-500 font-medium flex items-center gap-3">
-                        <Smartphone className="w-4 h-4 text-stone-400 group-hover:text-stone-500 transition-colors"/> Sử dụng ĐT
-                      </span>
-                      <div className="group/phone relative">
-                        <Info className="w-3 h-3 text-stone-300 cursor-help" />
-                        <div className="absolute left-0 bottom-full mb-2 w-48 p-2 bg-stone-900 text-white text-[9px] rounded-lg opacity-0 group-hover/phone:opacity-100 transition-opacity pointer-events-none z-50 shadow-xl font-bold uppercase tracking-wider leading-relaxed">
-                          Quy định: Tối đa 3 lần/ca & mỗi lần &lt; 5p. Nếu rời app &gt; 5p: phạt số phút x3 đơn giá lương. Nếu &gt; 3 lần hoặc có lần &gt; 5p: Trừ 10% thưởng TN. (TẠM NGƯNG ÁP DỤNG)
-                        </div>
-                      </div>
-                    </div>
-                    {currentStats.phonePenaltyTotal < currentStats.rawPhonePenaltyTotal && (
-                      <span className="ml-7 text-[8px] font-black bg-emerald-50 text-emerald-700 px-1.5 py-0.5 rounded tracking-tighter w-fit uppercase">
-                        Quản lý đã giảm
-                      </span>
-                    )}
-                  </div>
-                  {isAdmin ? (
-                    <div className="flex items-center gap-2">
-                      {(internalAdj.overridePhoneMinutes !== undefined || internalAdj.overridePhonePenalty !== undefined || internalAdj.overridePhoneCount !== undefined ||
-                        persistedAdj.overridePhoneMinutes !== undefined || persistedAdj.overridePhonePenalty !== undefined || persistedAdj.overridePhoneCount !== undefined) && (
-                         <button 
-                           onClick={() => setInternalAdj(prev => { 
-                             const n = {...prev}; 
-                             // Set to null to explicitly override persisted values with system values
-                             n.overridePhoneMinutes = null;
-                             n.overridePhonePenalty = null;
-                             n.overridePhoneCount = null;
-                             return n; 
-                           })}
-                           className="w-6 h-6 flex items-center justify-center bg-stone-50 text-stone-400 hover:text-amber-600 rounded-full transition-colors"
-                           title="Reset về hệ thống"
-                         >
-                           <History className="w-3.5 h-3.5" />
-                         </button>
-                      )}
-                      <div className="flex flex-col gap-1 items-end">
-                         <div className="flex items-center gap-1.5">
-                            <span className="text-stone-400 text-xs font-mono" title="Số ca vi phạm">{currentStats.phonePenaltyCount} ca</span>
-                            <span className="text-stone-200 text-[10px]">|</span>
-                            
-                            <div className="relative flex items-center bg-stone-50 rounded-lg border border-stone-200 px-2 py-1 focus-within:ring-1 focus-within:ring-stone-200 transition-all">
-                              <input 
-                                type="number" 
-                                value={currentStats.phonePenaltyMinutes} 
-                                onFocus={handleFocus} 
-                                onChange={(e) => handleInputChange('overridePhoneMinutes', e.target.value)} 
-                                className="w-8 bg-transparent text-right font-black text-amber-700 outline-none text-xs font-mono" 
-                              />
-                              <span className="text-stone-400 text-[10px] ml-0.5 font-bold">p</span>
-                            </div>
-
-                            <span className="text-stone-200 text-[10px]">|</span>
-                            <span className="text-rose-800 font-black font-mono text-xs">
-                              -{formatNumber(currentStats.phonePenaltyTotal)}
-                            </span>
-                         </div>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="flex flex-col items-end gap-0.5">
-                      {currentStats.phonePenaltyMinutes !== currentStats.systemPhoneMinutes && (
-                        <span className="text-[9px] text-stone-400 line-through font-mono">
-                          HT: {currentStats.systemPhonePenaltyCount} ca | {currentStats.systemPhoneMinutes}p | -{formatNumber(currentStats.rawPhonePenaltyTotal)}
-                        </span>
-                      )}
-                      <div className="flex items-center gap-1.5 font-mono text-[10px] sm:text-xs text-rose-800 font-bold">
-                        <span>{currentStats.phonePenaltyCount} ca</span>
-                        <span className="text-stone-300">|</span>
-                        <span>{currentStats.phonePenaltyMinutes}p rời app</span>
-                        <span className="text-stone-300">|</span>
-                        <span className="font-black">-{formatNumber(currentStats.phonePenaltyTotal)}</span>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </div>
-            )}
-
             {/* Tạm ứng lương */}
             {(isAdmin || currentStats.finalAdvance !== 0) && (
               <div className="p-3 bg-white rounded-xl shadow-[0_4px_12px_rgb(0,0,0,0.04)] border border-stone-100 transition-all group">
