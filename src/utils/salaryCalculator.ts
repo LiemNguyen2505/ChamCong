@@ -57,7 +57,6 @@ export function calculateTtnPenalty(timesheets: any[], violations: any[] = []) {
     
     const reasons = [];
     if (lateCountForTtn > 0) reasons.push(`Trễ ${lateCountForTtn} lần`);
-    if (phoneViolationCount > 0) reasons.push(`Sử dụng ĐT ${phoneViolationCount} lần`);
     if (violationCount > 0) reasons.push(`Vi phạm ${violationCount} lần`);
 
     ttnPenaltyReason = reasons.join(', ');
@@ -255,52 +254,13 @@ export function calculateNetSalary(
 
   const hr = Number(currentHourlyRate) || 0;
 
-  const systemPhonePenaltyTotal = 0; // Tạm ngưng tính phạt
-  /* SUSPENDED:
-  roundToUnit(approvedTimesheets.reduce((sum, cc) => {
-    let penalty = Number(cc.phonePenalty) || 0;
-    const mins = Number(cc.phoneMinutes) || Number(cc.PhutPhatRoiApp) || 0;
-    const count = Number(cc.SoLanRoiApp) || 0;
-    if (penalty === 0 && (mins > 5 || count > 3)) {
-      penalty = roundToUnit(mins * 3 * (hr / 60));
-    }
-    return sum + penalty;
-  }, 0));
-  */
-  // Count shifts with at least one phone use session, not total session count across all shifts
-  const systemPhonePenaltyCount = approvedTimesheets.filter(cc => (Number(cc.SoLanRoiApp) || 0) > 0).length;
-  // Total sessions across all shifts
-  const totalPhoneSessions = approvedTimesheets.reduce((sum, cc) => sum + (Number(cc.SoLanRoiApp) || 0), 0);
-  const systemPhoneMinutes = approvedTimesheets.reduce((sum, cc) => sum + (Number(cc.phoneMinutes) || Number(cc.PhutPhatRoiApp) || 0), 0);
-  
-  const finalPhoneCountRaw = (localAdj.overridePhoneCount !== undefined ? localAdj.overridePhoneCount : adjustment.overridePhoneCount);
-  const resolvedPhonePenaltyCount = (finalPhoneCountRaw === null || finalPhoneCountRaw === undefined) ? systemPhonePenaltyCount : Number(finalPhoneCountRaw);
-
-  const finalPhoneMinutesRaw = (localAdj.overridePhoneMinutes !== undefined ? localAdj.overridePhoneMinutes : adjustment.overridePhoneMinutes);
-  const resolvedPhoneMinutes = (finalPhoneMinutesRaw === null || finalPhoneMinutesRaw === undefined) ? systemPhoneMinutes : Number(finalPhoneMinutesRaw);
-
-  const phonePenaltyTotalRaw = (localAdj.overridePhonePenalty !== undefined ? localAdj.overridePhonePenalty : adjustment.overridePhonePenalty);
-  
-  let phonePenaltyTotal;
-  if (phonePenaltyTotalRaw !== undefined && phonePenaltyTotalRaw !== null) {
-    phonePenaltyTotal = Number(phonePenaltyTotalRaw);
-  } else if (finalPhoneMinutesRaw !== undefined && finalPhoneMinutesRaw !== null || finalPhoneCountRaw !== undefined && finalPhoneCountRaw !== null) {
-    // Calculate from phone minutes/count if overridden
-    if (resolvedPhoneMinutes > 0) {
-      phonePenaltyTotal = roundToUnit(resolvedPhoneMinutes * 3 * (hr / 60));
-    } else {
-      phonePenaltyTotal = 0;
-    }
-  } else {
-    // System default
-    phonePenaltyTotal = systemPhonePenaltyTotal;
-  }
+  const phonePenaltyTotal = 0;
 
   const extraAdditionsTotal = finalExtraAdditions + finalReturnRetained;
   const otherDeductionsTotal = finalRetained + finalAdvance + finalMaterialLoss;
 
   const totalEarnings = baseSalaryTotal + responsibilityBonusTotal + holidayBonusTotal + extraAdditionsTotal;
-  const totalDeductions = latePenaltyTotal + phonePenaltyTotal + finalPenalty + otherDeductionsTotal;
+  const totalDeductions = latePenaltyTotal + finalPenalty + otherDeductionsTotal;
 
   let actualSalary = Math.max(0, roundToUnit(totalEarnings - totalDeductions));
   const deductionExceeded = roundToUnit(totalEarnings - totalDeductions) < 0;
@@ -312,15 +272,15 @@ export function calculateNetSalary(
     holidayBonusTotal,
     extraAdditionsTotal,
     latePenaltyTotal,
-    phonePenaltyTotal,
-    phonePenaltyCount: resolvedPhonePenaltyCount,
-    phonePenaltyMinutes: resolvedPhoneMinutes,
+    phonePenaltyTotal: 0,
+    phonePenaltyCount: 0,
+    phonePenaltyMinutes: 0,
     rawLatePenaltyTotal, // This is system reference
-    rawPhonePenaltyTotal: systemPhonePenaltyTotal, // This is system reference
+    rawPhonePenaltyTotal: 0, // This is system reference
     systemLatePenaltyMinutes: totalLatePenaltyMinutes, // Original minutes
     systemLateMinutes: totalLateMinutes, // Un-multiplied late minutes
-    systemPhonePenaltyCount: systemPhonePenaltyCount, // Original count
-    systemPhoneMinutes: systemPhoneMinutes,
+    systemPhonePenaltyCount: 0, // Original count
+    systemPhoneMinutes: 0,
     finalPenalty,
     penaltyNote,
     otherDeductionsTotal,
