@@ -28,6 +28,9 @@ export const useAntiSlacking = (
 
       if (!currentLog || currentLog.checkOutTime || !currentEmployee) return;
 
+      // SUSPENDED: Tạm ngưng do không phân biệt được tắt màn hình và thoát app
+      return;
+
       // Logic immune roles
       const isAdmin = currentEmployee.empId.toUpperCase() === 'ADMIN' || 
                       currentAdmins.some(a => a.email === currentEmployee.fullName);
