@@ -36,7 +36,7 @@ export const AdminLogin: React.FC<AdminLoginProps> = ({
         <div className="absolute inset-0 pointer-events-none opacity-[0.05] bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-emerald-900 to-transparent z-1" />
       )}
 
-      <div className={`bg-white/95 backdrop-blur-2xl rounded-[1.5rem] shadow-[0_20px_50px_rgba(0,0,0,0.3)] ${adminTheme.shadow.replace('/10', '/30')} p-7 md:p-8 w-full max-w-[420px] border border-white/60 relative z-10 flex flex-col items-center transition-all duration-500 -translate-y-12 md:-translate-y-4`}>
+      <div className={`bg-white/95 backdrop-blur-2xl rounded-[1.5rem] shadow-[0_20px_50px_rgba(0,0,0,0.3)] ${adminTheme.shadow.replace('/10', '/30')} p-7 md:p-8 w-full max-w-[420px] border border-white/60 relative z-10 flex flex-col items-center transition-all duration-500 -translate-y-24 md:-translate-y-12`}>
         
         <button 
           onClick={() => navigate(-1)}
@@ -45,13 +45,11 @@ export const AdminLogin: React.FC<AdminLoginProps> = ({
           <X className="w-4 h-4" />
         </button>
 
-        <div className={`w-[calc(100%+56px)] md:w-[calc(100%+64px)] -mt-7 md:-mt-8 -mx-7 md:-mx-8 mb-9 md:mb-8 py-6 md:py-8 ${adminTheme.accent} rounded-t-[1.5rem] flex flex-col items-center justify-center gap-1 shadow-sm relative text-center`}>
+        <div className={`w-[calc(100%+56px)] md:w-[calc(100%+64px)] -mt-7 md:-mt-8 -mx-7 md:-mx-8 mb-8 md:mb-10 py-10 md:py-12 ${adminTheme.accent} rounded-t-[1.5rem] flex flex-col items-center justify-center gap-1 shadow-sm relative text-center`}>
          
-          <h2 className="text-[18px] md:text-[20px] font-bold text-white/90 uppercase tracking-widest leading-tight">
-           Hệ Thống
-          </h2>
-          <h2 className="text-[18px] md:text-[20px] font-black text-white uppercase tracking-widest leading-tight">
-           Quản Trị Nhân Sự
+          <h2 className="text-[16px] md:text-[18px] font-medium text-white/90 uppercase tracking-[0.1em] leading-tight flex flex-col items-center">
+            <span>Hệ Thống</span>
+            <span className="font-black text-[20px] md:text-[22px] text-white tracking-widest mt-1">Quản Trị Nhân Sự</span>
           </h2>
         
         </div>
