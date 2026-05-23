@@ -177,7 +177,7 @@ export const MonthlyAttendanceTable: React.FC<MonthlyAttendanceTableProps> = ({
                     
                     if (isWorked) {
                       const hasAbandoned = dayLogs.some(log => log.isAbandonedShift);
-                      const hasViolations = dayLogs.some(log => getLateMinutes(log) > 0 || (log.SoLanRoiApp || 0) > 0 || log.status === 'pending_approval');
+                      const hasViolations = dayLogs.some(log => getLateMinutes(log) > 0 || log.status === 'pending_approval');
                       
                       if (hasAbandoned) {
                         statusColor = "bg-rose-500";
