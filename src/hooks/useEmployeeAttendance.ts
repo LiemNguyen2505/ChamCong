@@ -30,8 +30,8 @@ export const useEmployeeAttendance = (
   const [showOutsideScheduleModal, setShowOutsideScheduleModal] = useState(false);
   const [showExtraSupportModal, setShowExtraSupportModal] = useState(false);
   const [checkinWarningModalStep, setCheckinWarningModalStep] = useState(0);
-  
   const cameraRef = useRef<CameraCaptureRef>(null);
+  const [gpsError, setGpsError] = useState<string | null>(null);
 
   const BRANCHES = [
     { id: 'Góc Phố', name: 'Góc Phố', lat: 9.934713233832424, lng: 106.33866680984944 },
@@ -46,6 +46,7 @@ export const useEmployeeAttendance = (
     setNote('');
     setEmergencyManager('');
     setCoords(null);
+    setGpsError(null);
 
     const todayStr = format(new Date(), 'yyyy-MM-dd');
     const todayShifts = workSchedules
@@ -200,7 +201,7 @@ export const useEmployeeAttendance = (
     }
 
     if (navigator.geolocation) {
-      const watchId = navigator.geolocation.watchPosition((position) => {
+      navigator.geolocation.getCurrentPosition((position) => {
         const { latitude, longitude } = position.coords;
         setCoords({ lat: latitude, lng: longitude });
         const branch = BRANCHES.find(b => b.id === kioskBranch);
@@ -215,10 +216,13 @@ export const useEmployeeAttendance = (
         }
       }, (error) => {
         console.error('GPS Error:', error);
-        // Don't toast every time on error if it's already toast once
-      }, { enableHighAccuracy: true });
-
-      return () => navigator.geolocation.clearWatch(watchId);
+        const errMsg = 'Không thể lấy vị trí. Vui lòng bật định vị hoặc cấp quyền cho trình duyệt!';
+        toast.error(errMsg);
+        setGpsError(errMsg);
+        
+        // Cố gắng reset distance để tắt trạng thái loading nếu nó đã được định nghĩa là null 
+        // Thay vào đó, ui đã tự tắt loading ở AttendanceActionForm nhờ gpsError
+      }, { enableHighAccuracy: true, timeout: 7000, maximumAge: 0 });
     }
   }, [actionType, kioskBranch, loggedInEmployee, admins]);
 
@@ -239,6 +243,7 @@ export const useEmployeeAttendance = (
     showExtraSupportModal, setShowExtraSupportModal,
     checkinWarningModalStep, setCheckinWarningModalStep,
     cameraRef,
+    gpsError,
     handleActionClick,
     handlePhotoCapture,
     handleConfirmAction
