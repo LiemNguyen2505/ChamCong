@@ -36,6 +36,7 @@ interface AttendanceTabProps {
   checkEmployeeReview: (empId: string) => boolean;
   BranchTabs: React.FC<any>;
   isLoading?: boolean;
+  admins: AdminAccount[];
 }
 
 const formatCurrency = (val: number) => new Intl.NumberFormat('vi-VN').format(val);
@@ -70,8 +71,15 @@ export const AttendanceTab: React.FC<AttendanceTabProps> = ({
   checkEmployeeReview,
   BranchTabs,
   isLoading,
+  admins
 }) => {
   if (activeTab !== 'bangcongthang') return null;
+
+  const isSubjectAdmin = (empId: string) => {
+    if (empId.toUpperCase() === 'ADMIN') return true;
+    const emp = nhanViens.find(e => e.empId === empId || e.id === empId);
+    return emp ? admins.some((a: any) => a.email === emp.fullName) : false;
+  };
 
   const [yyyy, mm] = filterMonth.split('-');
   const displayMonthYear = `${mm}-${yyyy}`;
@@ -490,10 +498,10 @@ export const AttendanceTab: React.FC<AttendanceTabProps> = ({
               return nameA.localeCompare(nameB);
             });
 
-            const totalLate = dayLogs.reduce((sum, log) => sum + getLateMinutes(log), 0);
+            const totalLate = dayLogs.reduce((sum, log) => sum + getLateMinutes(log, isSubjectAdmin(log.empId || '')), 0);
             const totalPenalty = dayLogs.reduce((sum, log) => {
               const emp = nhanViens.find(nv => nv.empId === log.empId);
-              const penaltyMins = getLatePenaltyMinutes(log);
+              const penaltyMins = getLatePenaltyMinutes(log, isSubjectAdmin(log.empId || ''));
               const penalty = penaltyMins > 0 ? roundToUnit(penaltyMins * ((emp?.hourlyRate || 0) / 60)) : 0;
               return sum + penalty;
             }, 0);
@@ -548,6 +556,7 @@ export const AttendanceTab: React.FC<AttendanceTabProps> = ({
                       {sortedLogs.map((log, index) => {
                         const employee = nhanViens.find(nv => nv.empId === log.empId);
                         const canDelete = currentAdmin?.role === 'SuperAdmin' || (log.createdByAdminId && log.createdByAdminId === currentAdmin?.id);
+                        const canEdit = ['SuperAdmin', 'BranchAdmin'].includes(currentAdmin?.role);
                         const showEmployeeName = index === 0 || sortedLogs[index - 1].empId !== log.empId;
 
                         return (
@@ -638,18 +647,18 @@ export const AttendanceTab: React.FC<AttendanceTabProps> = ({
                               </td>
                             )}
                             <td className="border border-[#e0e0e0] p-[8px_12px] text-xs text-center font-mono" style={{ width: `${TABLE_COL_WIDTHS.DI_TRE}px` }}>
-                              {getLateMinutes(log) > 0 ? (
+                              {getLateMinutes(log, isSubjectAdmin(log.empId || '')) > 0 ? (
                                 <span className="text-rose-600 font-bold tabular-nums">
-                                  {formatMinutes(getLateMinutes(log))}
+                                  {formatMinutes(getLateMinutes(log, isSubjectAdmin(log.empId || '')))}
                                 </span>
                               ) : (
                                 <span className="text-slate-200">-</span>
                               )}
                             </td>
                             <td className="border border-[#e0e0e0] p-[8px_12px] text-xs text-center font-mono" style={{ width: `${TABLE_COL_WIDTHS.PHAT_TRE}px` }}>
-                              {getLatePenaltyMinutes(log) > 0 ? (
+                              {getLatePenaltyMinutes(log, isSubjectAdmin(log.empId || '')) > 0 ? (
                                 <span className="text-rose-600 font-bold tabular-nums">
-                                  {formatCurrency(roundToUnit(getLatePenaltyMinutes(log) * ((employee?.hourlyRate || 0) / 60)))}
+                                  {formatCurrency(roundToUnit(getLatePenaltyMinutes(log, isSubjectAdmin(log.empId || '')) * ((employee?.hourlyRate || 0) / 60)))}
                                 </span>
                               ) : (
                                 <span className="text-slate-200">-</span>
@@ -668,13 +677,14 @@ export const AttendanceTab: React.FC<AttendanceTabProps> = ({
                                     <CheckCircle2 className="w-3.5 h-3.5" />
                                   </button>
                                 )}
-                                {canDelete && (
-                                  <>
+                                {canEdit && (
                                     <button
                                       onClick={(e) => {
                                         e.stopPropagation();
                                         setEditingAttendance({
                                           ...log,
+                                          totalHours: undefined,
+                                          lateMinutes: undefined,
                                           checkInTime: log.checkInTime ? safeFormat(log.checkInTime, 'HH:mm', '', log.date) : '',
                                           checkOutTime: log.checkOutTime ? safeFormat(log.checkOutTime, 'HH:mm', '', log.date) : ''
                                         });
@@ -684,13 +694,14 @@ export const AttendanceTab: React.FC<AttendanceTabProps> = ({
                                     >
                                       <Edit2 className="w-3.5 h-3.5" />
                                     </button>
+                                )}
+                                {canDelete && (
                                     <button
                                       onClick={(e) => { e.stopPropagation(); handleDeleteAttendance(log); }}
                                       className="p-1 text-rose-600 hover:bg-rose-50 rounded-lg transition-colors border border-rose-100"
                                     >
                                       <Trash2 className="w-3.5 h-3.5" />
                                     </button>
-                                  </>
                                 )}
                               </div>
                             </td>
@@ -716,12 +727,12 @@ export const AttendanceTab: React.FC<AttendanceTabProps> = ({
               
               const approvedHrs = dayLogs.filter(log => log.status !== 'pending_approval').reduce((sum, log) => sum + getTotalHours(log), 0);
               const pendingHrs = dayLogs.filter(log => log.status === 'pending_approval').reduce((sum, log) => sum + getTotalHours(log), 0);
-              const lateMins = dayLogs.reduce((sum, log) => sum + getLateMinutes(log), 0);
-              const lateLogsCount = dayLogs.filter(log => getLateMinutes(log) > 0).length;
+              const lateMins = dayLogs.reduce((sum, log) => sum + getLateMinutes(log, isSubjectAdmin(log.empId || '')), 0);
+              const lateLogsCount = dayLogs.filter(log => getLateMinutes(log, isSubjectAdmin(log.empId || '')) > 0).length;
               const totalLatePenalty = dayLogs.reduce((sum, log) => {
                 const employee = nhanViens.find(nv => nv.empId === log.empId);
                 const hourlyRate = employee?.hourlyRate || 0;
-                const penaltyMins = getLatePenaltyMinutes(log);
+                const penaltyMins = getLatePenaltyMinutes(log, isSubjectAdmin(log.empId || ''));
                 const penalty = penaltyMins > 0 ? roundToUnit(penaltyMins * (hourlyRate / 60)) : 0;
                 return sum + penalty;
               }, 0);
@@ -845,11 +856,11 @@ export const AttendanceTab: React.FC<AttendanceTabProps> = ({
                                     <span className={`text-xs font-black ${adminTheme.text} tabular-nums whitespace-nowrap bg-white px-2 py-1 rounded-lg border border-slate-100 shadow-sm`}>{getTotalHours(log) > 0 ? getTotalHours(log).toFixed(2) : '---'}h</span>
                                   </div>
                                   <div className="flex flex-wrap gap-2 pt-2 border-t border-slate-50">
-                                    {getLateMinutes(log) > 0 && (
+                                    {getLateMinutes(log, isSubjectAdmin(log.empId || '')) > 0 && (
                                       <div className="flex items-center gap-1 px-2 py-0.5 bg-orange-50 border border-orange-100 rounded-full">
                                         <Clock className="w-3 h-3 text-orange-500" />
                                         <span className="text-[12px] font-black text-orange-600 uppercase tracking-tighter">
-                                          TRỄ {formatMinutes(getLateMinutes(log))}
+                                          TRỄ {formatMinutes(getLateMinutes(log, isSubjectAdmin(log.empId || '')))}
                                         </span>
                                       </div>
                                     )}
@@ -1003,18 +1014,18 @@ export const AttendanceTab: React.FC<AttendanceTabProps> = ({
                               </td>
                             )}
                             <td className="border border-[#e0e0e0] p-[8px_12px] text-center" style={{ width: `${TABLE_COL_WIDTHS.DI_TRE}px` }}>
-                              {getLateMinutes(log) > 0 ? (
+                              {getLateMinutes(log, isSubjectAdmin(log.empId || '')) > 0 ? (
                                 <span className="text-rose-600 font-bold font-mono whitespace-nowrap tabular-nums">
-                                  {formatMinutes(getLateMinutes(log))}
+                                  {formatMinutes(getLateMinutes(log, isSubjectAdmin(log.empId || '')))}
                                 </span>
                               ) : (
                                 <span className="text-slate-200 font-mono">-</span>
                               )}
                             </td>
                             <td className="border border-[#e0e0e0] p-[8px_12px] text-center font-mono" style={{ width: `${TABLE_COL_WIDTHS.PHAT_TRE}px` }}>
-                              {getLatePenaltyMinutes(log) > 0 ? (
+                              {getLatePenaltyMinutes(log, isSubjectAdmin(log.empId || '')) > 0 ? (
                                 <span className="text-rose-600 font-bold tabular-nums">
-                                  {formatCurrency(roundToUnit(getLatePenaltyMinutes(log) * ((historyEmployee.hourlyRate || 0) / 60)))}
+                                  {formatCurrency(roundToUnit(getLatePenaltyMinutes(log, isSubjectAdmin(log.empId || '')) * ((historyEmployee.hourlyRate || 0) / 60)))}
                                 </span>
                               ) : (
                                 <span className="text-slate-200 font-light">-</span>
@@ -1123,7 +1134,7 @@ export const AttendanceTab: React.FC<AttendanceTabProps> = ({
                                       <span className={`text-[11px] font-black ${adminTheme.text} whitespace-nowrap bg-white px-1.5 py-0.5 rounded shadow-sm border border-slate-100`}>{getTotalHours(log) > 0 ? getTotalHours(log).toFixed(2) : '---'}h</span>
                                     </div>
                                       <div className="flex flex-wrap gap-1">
-                                        {getLateMinutes(log) > 0 && <span className="px-1.5 py-0.5 bg-orange-50 text-orange-600 text-[8px] font-black rounded-full border border-orange-100">TRỄ: {formatMinutes(getLateMinutes(log))}</span>}
+                                        {getLateMinutes(log, isSubjectAdmin(log.empId || '')) > 0 && <span className="px-1.5 py-0.5 bg-orange-50 text-orange-600 text-[8px] font-black rounded-full border border-orange-100">TRỄ: {formatMinutes(getLateMinutes(log, isSubjectAdmin(log.empId || '')))}</span>}
                                       </div>
                                     </div>
                                   ))}
