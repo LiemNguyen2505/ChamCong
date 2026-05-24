@@ -121,6 +121,7 @@ export default function EmployeeView({
     showOutsideScheduleModal, setShowOutsideScheduleModal,
     showExtraSupportModal, setShowExtraSupportModal,
     cameraRef,
+    gpsError,
     handleActionClick,
     handlePhotoCapture,
     handleConfirmAction
@@ -344,6 +345,7 @@ export default function EmployeeView({
               setSelectedShiftTime={setSelectedShiftTime}
               note={note}
               setNote={setNote}
+              gpsError={gpsError}
               onCancel={() => setActionType(null)}
               onConfirm={() => {
                 const isAdmin = loggedInEmployee?.empId?.toUpperCase() === 'ADMIN' || 
