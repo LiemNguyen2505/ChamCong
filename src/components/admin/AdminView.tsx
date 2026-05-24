@@ -473,6 +473,7 @@ export default function AdminView({
             filterBranch={filterBranch}
             filterMonth={filterMonth}
             nhanViens={nhanViens}
+            admins={admins}
             filteredChamCongs={filteredChamCongs}
             currentAdmin={currentAdmin}
             adminTheme={adminTheme}
@@ -696,6 +697,7 @@ export default function AdminView({
         nhanViens={nhanViens}
         getAllowedBranches={getAllowedBranches}
         adminTheme={adminTheme}
+        currentAdmin={currentAdmin}
       />
 
       <ConfirmModal
@@ -757,6 +759,7 @@ export default function AdminView({
           holidays={holidays}
           onClose={() => setSelectedEmployeeForSalaryDetails(null)}
           theme={{ isAdmin: ['SuperAdmin', 'BranchAdmin'].includes(currentAdmin?.role || '') }}
+          isSubjectAdmin={selectedEmployeeForSalaryDetails.empId?.toUpperCase() === 'ADMIN' || admins.some((a: any) => a.email === selectedEmployeeForSalaryDetails.fullName)}
           adminTheme={adminTheme}
           localAdj={localAdjustments[selectedEmployeeForSalaryDetails.id] || {}}
           onAdjustmentChange={handlePayrollChange}
