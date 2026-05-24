@@ -134,10 +134,20 @@ export const useAdminAttendance = ({
         }
       }
 
+      if (editingAttendance.lateMinutes !== undefined && editingAttendance.lateMinutes !== null) {
+        lateMinutes = editingAttendance.lateMinutes;
+        latePenaltyMinutes = lateMinutes >= 10 ? lateMinutes * 3 : 0;
+      }
+
       if (editingAttendance.checkOutTime) {
         checkOutISO = new Date(`${editingAttendance.date}T${editingAttendance.checkOutTime}`).toISOString();
         const diffMs = new Date(checkOutISO).getTime() - new Date(checkInISO).getTime();
         totalHours = Math.max(0, diffMs / (1000 * 60 * 60));
+        totalPay = totalHours * employee.hourlyRate;
+      }
+      
+      if (editingAttendance.totalHours !== undefined && editingAttendance.totalHours !== null) {
+        totalHours = editingAttendance.totalHours;
         totalPay = totalHours * employee.hourlyRate;
       }
 
