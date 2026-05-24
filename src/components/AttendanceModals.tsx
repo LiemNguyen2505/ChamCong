@@ -139,6 +139,7 @@ interface EditAttendanceModalProps {
   setEditingAttendance: (data: any) => void;
   getAllowedBranches: () => string[];
   adminTheme: any;
+  currentAdmin?: any;
 }
 
 export const EditAttendanceModal: React.FC<EditAttendanceModalProps> = ({
@@ -150,6 +151,7 @@ export const EditAttendanceModal: React.FC<EditAttendanceModalProps> = ({
   setEditingAttendance,
   getAllowedBranches,
   adminTheme,
+  currentAdmin,
 }) => {
   const [isDirty, setIsDirty] = React.useState(false);
 
@@ -227,6 +229,44 @@ export const EditAttendanceModal: React.FC<EditAttendanceModalProps> = ({
               />
             </div>
           </div>
+          {currentAdmin?.role && ['SuperAdmin', 'BranchAdmin'].includes(currentAdmin.role) && (
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-4">
+              {currentAdmin.role === 'SuperAdmin' && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Giờ công (Tùy chỉnh)</label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    value={editingAttendance.totalHours !== undefined && editingAttendance.totalHours !== null ? editingAttendance.totalHours : ''}
+                    onChange={e => { 
+                      const val = e.target.value;
+                      setEditingAttendance({ ...editingAttendance, totalHours: val === '' ? null : parseFloat(val) }); 
+                      setIsDirty(true); 
+                    }}
+                    placeholder="Tự động tính"
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none bg-emerald-50/50"
+                  />
+                </div>
+              )}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Số phút trễ (Tùy chỉnh)</label>
+                <input
+                  type="number"
+                  step="1"
+                  min="0"
+                  value={editingAttendance.lateMinutes !== undefined && editingAttendance.lateMinutes !== null ? editingAttendance.lateMinutes : ''}
+                  onChange={e => { 
+                    const val = e.target.value;
+                    setEditingAttendance({ ...editingAttendance, lateMinutes: val === '' ? null : parseInt(val) }); 
+                    setIsDirty(true); 
+                  }}
+                  placeholder="Tự động tính"
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none bg-rose-50/50"
+                />
+              </div>
+            </div>
+          )}
           <div className="flex justify-end gap-3 pt-4">
             <button
               type="button"
