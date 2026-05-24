@@ -27,6 +27,7 @@ interface AttendanceActionFormProps {
   workSchedules: any[];
   format: (date: Date, str: string) => string;
   scheduledShiftTime: string;
+  gpsError?: string | null;
 }
 
 export const AttendanceActionForm: React.FC<AttendanceActionFormProps> = ({
@@ -51,7 +52,8 @@ export const AttendanceActionForm: React.FC<AttendanceActionFormProps> = ({
   latestLog,
   workSchedules,
   format,
-  scheduledShiftTime
+  scheduledShiftTime,
+  gpsError
 }) => {
   useEffect(() => {
     if (actionType === 'check-in') {
@@ -78,7 +80,7 @@ export const AttendanceActionForm: React.FC<AttendanceActionFormProps> = ({
         </button>
       </div>
 
-      {actionType === 'check-out' && latestLog && workSchedules.find(s => s.date === format(new Date(), 'yyyy-MM-dd') && s.startTime === latestLog.selectedShiftTime)?.tasks?.some((t: any) => !t.isCompleted) && (
+      {actionType === 'check-out' && latestLog && workSchedules.find(s => s.date === format(new Date(), 'yyyy-MM-dd') && s.id === latestLog.selectedShiftId)?.tasks?.some((t: any) => !t.isCompleted) && (
         <div className={`${theme.bg} ${theme.text} p-3 rounded-xl text-sm font-medium border ${theme.border} flex items-start gap-2`}>
           <AlertCircle className="w-5 h-5 flex-shrink-0 mt-0.5" />
           <div className="text-left">
@@ -87,7 +89,16 @@ export const AttendanceActionForm: React.FC<AttendanceActionFormProps> = ({
         </div>
       )}
 
-      {distance !== null && (
+      {gpsError && (
+        <div className={`p-3 rounded-xl text-sm font-medium border bg-red-50 text-red-700 border-red-200 flex items-start gap-2`}>
+          <AlertCircle className="w-5 h-5 flex-shrink-0 mt-0.5" />
+          <div className="text-left">
+            <p className="font-bold">{gpsError}</p>
+          </div>
+        </div>
+      )}
+
+      {distance !== null && !gpsError && (
         <div className={`p-3 rounded-xl text-sm font-medium border ${
           distance <= MAX_DISTANCE_METERS 
             ? 'bg-emerald-50 text-emerald-700 border-emerald-200' 
@@ -222,6 +233,10 @@ export const AttendanceActionForm: React.FC<AttendanceActionFormProps> = ({
         <button 
           type="button"
           onClick={() => {
+            if (gpsError) {
+              toast.error(gpsError);
+              return;
+            }
             if (distance === null) {
               toast.error('Đang xác định vị trí của bạn. Vui lòng đợi trong giây lát...');
               return;
@@ -232,11 +247,11 @@ export const AttendanceActionForm: React.FC<AttendanceActionFormProps> = ({
             }
             onConfirm();
           }}
-          disabled={isSubmitting || (distance !== null && distance > MAX_DISTANCE_METERS) || (distance === null)}
-          className={`flex-[2] ${distance === null ? 'bg-stone-200' : (distance > MAX_DISTANCE_METERS ? 'bg-stone-300' : (actionType === 'check-in' ? 'bg-emerald-600' : 'bg-red-600'))} text-white py-4 rounded-2xl font-bold text-lg disabled:opacity-50 shadow-lg active:scale-[0.98] transition-all flex items-center justify-center gap-2`}
+          disabled={isSubmitting || (distance !== null && distance > MAX_DISTANCE_METERS) || distance === null}
+          className={`flex-[2] ${(distance === null && !gpsError) ? 'bg-stone-200' : ((distance !== null && distance > MAX_DISTANCE_METERS) || gpsError ? 'bg-stone-300' : (actionType === 'check-in' ? 'bg-emerald-600' : 'bg-red-600'))} text-white py-4 rounded-2xl font-bold text-lg disabled:opacity-50 shadow-lg active:scale-[0.98] transition-all flex items-center justify-center gap-2`}
         >
-          {distance === null && <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />}
-          {distance === null ? 'Đang tải vị trí...' : (actionType === 'check-in' ? 'Vào ca' : 'Ra ca')}
+          {distance === null && !gpsError && <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />}
+          {distance === null && !gpsError ? 'Đang tải vị trí...' : (actionType === 'check-in' ? 'Vào ca' : 'Ra ca')}
         </button>
       </div>
 
