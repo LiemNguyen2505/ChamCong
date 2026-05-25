@@ -280,9 +280,12 @@ export const SmartScheduleBuilder: React.FC<SmartScheduleBuilderProps> = (props)
       if (role === 'BOTH') roleLabel = 'PV & Q';
 
       let locLabel = '';
-      if (shiftLocId && empLocId && shiftLocId !== empLocId && shiftLocId !== 'All') {
-         // Create abbr: "Phố Xanh" -> "PX"
+      if (shiftLocId && activeBranch !== 'All' && shiftLocId !== activeBranch) {
+         // Emphasize shifts happening at another branch (if not hiding them)
          locLabel = shiftLocId.split(' ').map(w => w[0]).join('').toUpperCase();
+      } else if (shiftLocId && empLocId && shiftLocId !== empLocId && shiftLocId !== 'All') {
+         // Create abbr: "Góc Phố" -> "GP"
+         locLabel = empLocId.split(' ').map(w => w[0]).join('').toUpperCase();
       }
 
       if (locLabel && roleLabel) return `${locLabel}-${roleLabel}`;
@@ -296,15 +299,9 @@ export const SmartScheduleBuilder: React.FC<SmartScheduleBuilderProps> = (props)
           const shiftId = getShiftDeterministicId(emp.id, dateStr, preset.id);
           const shift = localSchedules.find(s => s.id === shiftId);
           
-          let isShiftVisible = !!shift;
-          if (shift && activeBranch !== 'All') {
-            if (emp.locationId !== activeBranch) {
-              // Viewing a support branch: only show shifts assigned to this support branch
-              isShiftVisible = shift.locationId === activeBranch;
-            } else {
-              // Viewing default branch: show all shifts (support shifts will have labels)
-              isShiftVisible = true;
-            }
+          let isShiftVisible = false;
+          if (shift) {
+             isShiftVisible = activeBranch === 'All' || shift.locationId === activeBranch;
           }
 
           const isActive = isShiftVisible;
