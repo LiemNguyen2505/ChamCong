@@ -683,8 +683,8 @@ export const AttendanceTab: React.FC<AttendanceTabProps> = ({
                                         e.stopPropagation();
                                         setEditingAttendance({
                                           ...log,
-                                          totalHours: undefined,
-                                          lateMinutes: undefined,
+                                          totalHours: log.totalHours,
+                                          lateMinutes: log.lateMinutes,
                                           checkInTime: log.checkInTime ? safeFormat(log.checkInTime, 'HH:mm', '', log.date) : '',
                                           checkOutTime: log.checkOutTime ? safeFormat(log.checkOutTime, 'HH:mm', '', log.date) : ''
                                         });
@@ -737,18 +737,44 @@ export const AttendanceTab: React.FC<AttendanceTabProps> = ({
                 return sum + penalty;
               }, 0);
 
-              const getShiftType = (timeStr: string | null) => {
-                if (!timeStr) return 'Ca Khác';
-                const hour = new Date(timeStr).getHours();
-                if (hour >= 5 && hour < 12) return 'Ca Sáng';
-                if (hour >= 12 && hour < 18) return 'Ca Trưa';
-                return 'Ca Tối';
+              const getShiftTypes = (log: any) => {
+                const types = new Set<string>();
+                if (!log.checkInTime) return ['Ca Khác'];
+                const dIn = safeParseDate(log.checkInTime, log.date);
+                if (!dIn) return ['Ca Khác'];
+                
+                const timeIn = dIn.getHours() + dIn.getMinutes() / 60;
+                const dOut = log.checkOutTime ? safeParseDate(log.checkOutTime, log.date) : null;
+                let timeOut = dOut ? (dOut.getHours() + dOut.getMinutes() / 60) : timeIn;
+                
+                // If check-out is before check-in, assume it's on the next day
+                if (timeOut < timeIn && dOut) timeOut += 24;
+
+                // Base shift from check-in time
+                if (timeIn >= 5 && timeIn < 12) types.add('Ca Sáng');
+                else if (timeIn >= 12 && timeIn < 17) types.add('Ca Trưa');
+                else types.add('Ca Tối');
+
+                // Check overlap with Ca Trưa (12 to 17)
+                const overlapTrua = Math.max(0, Math.min(timeOut, 17) - Math.max(timeIn, 12));
+                if (overlapTrua >= 1) types.add('Ca Trưa');
+
+                // Check overlap with Ca Tối (17 to 24)
+                const overlapToi = Math.max(0, Math.min(timeOut, 24) - Math.max(timeIn, 17));
+                if (overlapToi >= 1) types.add('Ca Tối');
+
+                // Check overlap with next day's Ca Sáng (29 to 36)
+                const overlapSangNext = Math.max(0, Math.min(timeOut, 36) - Math.max(timeIn, 29));
+                if (overlapSangNext >= 1) types.add('Ca Sáng');
+
+                return Array.from(types);
               };
+              
               const shifts = {
-                'Ca Sáng': dayLogs.filter(log => getShiftType(log.checkInTime) === 'Ca Sáng'),
-                'Ca Trưa': dayLogs.filter(log => getShiftType(log.checkInTime) === 'Ca Trưa'),
-                'Ca Tối': dayLogs.filter(log => getShiftType(log.checkInTime) === 'Ca Tối'),
-                'Ca Khác': dayLogs.filter(log => !['Ca Sáng', 'Ca Trưa', 'Ca Tối'].includes(getShiftType(log.checkInTime)))
+                'Ca Sáng': dayLogs.filter(log => getShiftTypes(log).includes('Ca Sáng')),
+                'Ca Trưa': dayLogs.filter(log => getShiftTypes(log).includes('Ca Trưa')),
+                'Ca Tối': dayLogs.filter(log => getShiftTypes(log).includes('Ca Tối')),
+                'Ca Khác': dayLogs.filter(log => getShiftTypes(log).includes('Ca Khác'))
               };
               if (dayLogs.length === 0) return (
                 <div className="p-12 text-center bg-white rounded-3xl border-2 border-dashed border-slate-200 text-slate-400 italic">
@@ -758,121 +784,154 @@ export const AttendanceTab: React.FC<AttendanceTabProps> = ({
               return (
                 <>
                   {/* Summary Row - Compact & Right-Aligned Total per Request 9 */}
-                  <div className="bg-slate-100/90 px-2.5 py-1.5 rounded-xl border border-slate-200 mx-1 mb-3 flex flex-col gap-1 text-[9px] font-black shadow-sm animate-in fade-in slide-in-from-top-1">
-                    <div className="flex flex-wrap gap-x-3 gap-y-0.5 min-w-0">
-                       <div className="flex items-center gap-0.5">
-                          <span className="text-slate-400 uppercase tracking-tighter">Trễ:</span>
-                          <span className="text-rose-600 tabular-nums">{lateLogsCount} lần</span>
-                       </div>
-                       <div className="flex items-center gap-0.5">
-                          <span className="text-slate-400 uppercase tracking-tighter">Phạt trễ:</span>
-                          <span className="text-rose-600 tabular-nums">{formatCurrency(totalLatePenalty)}</span>
-                       </div>
+                  <div className="bg-slate-100/90 px-2.5 py-2 rounded-xl border border-slate-200 mx-1 mb-3 flex flex-col gap-1 text-[9px] font-black shadow-sm animate-in fade-in slide-in-from-top-1">
+                    <div className="flex flex-wrap items-center gap-1.5 min-w-0">
+                       {Object.entries(shifts).map(([shiftName, logs]) => {
+                         if (logs.length === 0) return null;
+                         const shortName = shiftName.replace('Ca ', '');
+                         return (
+                           <div key={shiftName} className="flex items-center gap-1 bg-white px-1.5 py-0.5 rounded border border-slate-200 shadow-sm">
+                             <span className="text-slate-500 uppercase">{shortName}:</span>
+                             <span className="text-slate-900">{new Set(logs.map((l: any) => l.empId)).size} NV</span>
+                           </div>
+                         );
+                       })}
                     </div>
-                    <div className="flex justify-end items-center gap-1 pt-1 border-t border-slate-200/50">
-                       <span className="text-slate-500 uppercase tracking-tighter">Tổng giờ công:</span>
-                       <span className="text-[12px] text-slate-800 tabular-nums">{approvedHrs.toFixed(2)}h</span>
-                       {pendingHrs > 0 && <span className="text-amber-500 text-[10px] font-bold">(+{pendingHrs.toFixed(2)})</span>}
+                    
+                    <div className="flex flex-wrap items-center justify-between gap-2 pt-1 border-t border-slate-200/50">
+                       <div className="flex items-center gap-2">
+                          <div className="flex items-center gap-0.5">
+                             <span className="text-slate-400 uppercase tracking-tighter">Trễ:</span>
+                             <span className="text-rose-600 tabular-nums">{lateLogsCount} lần</span>
+                          </div>
+                          <div className="flex items-center gap-0.5">
+                             <span className="text-slate-400 uppercase tracking-tighter">Phạt:</span>
+                             <span className="text-rose-600 tabular-nums">{formatCurrency(totalLatePenalty)}</span>
+                          </div>
+                       </div>
+                       <div className="flex items-center gap-1">
+                          <span className="text-slate-500 uppercase tracking-tighter">Tổng giờ:</span>
+                          <span className="text-[12px] text-slate-800 tabular-nums">{approvedHrs.toFixed(2)}h</span>
+                          {pendingHrs > 0 && <span className="text-amber-500 text-[10px] font-bold">(+{pendingHrs.toFixed(2)})</span>}
+                       </div>
                     </div>
                   </div>
 
-                  {Object.entries(shifts).map(([shiftName, logs]) => {
-                    if (logs.length === 0) return null;
-                    return (
-                      <div key={shiftName} className="space-y-4">
-                        <div className="flex items-center gap-3 px-2">
-                          <div className={`w-2 h-6 rounded-full ${shiftName === 'Ca Sáng' ? 'bg-amber-400' : shiftName === 'Ca Trưa' ? 'bg-orange-500' : shiftName === 'Ca Tối' ? 'bg-indigo-600' : 'bg-slate-400'}`} />
-                          <h3 className="text-sm font-black text-slate-900 uppercase tracking-widest">{shiftName}</h3>
-                          <span className="text-[10px] bg-slate-100 text-slate-500 px-2 py-0.5 rounded-full font-bold">{logs.length} NV</span>
-                        </div>
-                        <div className="space-y-4">
-                          {logs.sort((a,b) => {
-                            const nameA = nhanViens.find(nv => nv.empId === a.empId)?.fullName || '';
-                            const nameB = nhanViens.find(nv => nv.empId === b.empId)?.fullName || '';
-                            return nameA.localeCompare(nameB);
-                          }).map((log, logIdx) => {
-                            const employee = nhanViens.find(nv => nv.empId === log.empId);
-                            return (
-                              <div key={log.id} className="attendance-card bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden animate-in fade-in slide-in-from-right-4" style={{ animationDelay: `${logIdx * 50}ms` }}>
-                                <div className="p-2.5">
-                                  <div className="flex justify-between items-center mb-2">
-                                    <div onClick={() => {
-                                      if (employee) {
-                                        setHistoryEmployee(employee);
-                                        setHistoryDay(null);
-                                        setMobileHistoryMode('employee');
-                                      }
-                                    }}>
-                                      <h4 className={`font-black ${adminTheme.text} text-sm uppercase leading-tight`}>{employee?.fullName || 'Không rõ'}</h4>
-                                      <div className="flex flex-wrap gap-1 mt-1">
-                                        {log.status === 'pending_approval' && <span className="px-1.5 py-0.5 bg-amber-100 text-amber-700 text-[8px] font-black rounded uppercase tracking-wider">Duyệt</span>}
-                                        {log.isAbandonedShift && <span className="px-1.5 py-0.5 bg-rose-100 text-rose-700 text-[8px] font-black rounded uppercase tracking-wider">Bỏ</span>}
-                                      </div>
-                                    </div>
-                                    <div className="text-right">
-                                      <span className={`text-sm font-black ${adminTheme.text} tabular-nums`}>{getTotalHours(log) > 0 ? getTotalHours(log).toFixed(2) : '---'}</span>
-                                      <span className="text-[8px] text-slate-400 font-black uppercase tracking-tighter block -mt-1">Giờ</span>
-                                    </div>
-                                  </div>
-                                  <div className="flex items-center justify-between gap-2 mb-2 p-1.5 bg-slate-50/80 rounded-2xl border border-slate-100">
-                                    <div className="flex items-center gap-3 flex-1">
-                                      <div className="flex items-center gap-1.5 border-r border-slate-200 pr-3">
-                                        <span className="text-[9px] font-black text-slate-400 uppercase">Vào</span>
-                                        <span className="text-xs font-bold text-slate-700">{log.checkInTime ? safeFormat(log.checkInTime, 'HH:mm', '00:00', log.date) : '--:--'}</span>
-                                        {isAdminOrSuperAdmin && (log.photoCheckIn || log.AnhVaoCa) && (
-                                          <button 
-                                            onClick={() => setPreviewPhoto({
-                                              url: log.photoCheckIn || log.AnhVaoCa!,
-                                              employeeName: employee?.fullName || 'Không rõ',
-                                              time: `Vào ca: ${log.checkInTime || '-'}`,
-                                              location: log.locationId,
-                                              gps: log.gpsIn
-                                            })}
-                                            className="active:scale-95 transition-all flex-shrink-0"
-                                          >
-                                            <img src={log.photoCheckIn || log.AnhVaoCa!} className="w-6 h-6 rounded-full object-cover border border-slate-200 ring-2 ring-white" alt="In" />
-                                          </button>
-                                        )}
-                                      </div>
-                                      <div className="flex items-center gap-1.5 pl-1">
-                                        <span className="text-[9px] font-black text-slate-400 uppercase">Ra</span>
-                                        <span className="text-xs font-bold text-slate-700">{log.checkOutTime ? safeFormat(log.checkOutTime, 'HH:mm', '00:00', log.date) : '--:--'}</span>
-                                        {isAdminOrSuperAdmin && (log.photoCheckOut || log.AnhRaCa) && (
-                                          <button 
-                                            onClick={() => setPreviewPhoto({
-                                              url: log.photoCheckOut || log.AnhRaCa!,
-                                              employeeName: employee?.fullName || 'Không rõ',
-                                              time: `Ra ca: ${log.checkOutTime || '-'}`,
-                                              location: log.locationId,
-                                              gps: log.gpsOut
-                                            })}
-                                            className="active:scale-95 transition-all flex-shrink-0"
-                                          >
-                                            <img src={log.photoCheckOut || log.AnhRaCa!} className="w-6 h-6 rounded-full object-cover border border-slate-200 ring-2 ring-white" alt="Out" />
-                                          </button>
-                                        )}
-                                      </div>
-                                    </div>
-                                    <span className={`text-xs font-black ${adminTheme.text} tabular-nums whitespace-nowrap bg-white px-2 py-1 rounded-lg border border-slate-100 shadow-sm`}>{getTotalHours(log) > 0 ? getTotalHours(log).toFixed(2) : '---'}h</span>
-                                  </div>
-                                  <div className="flex flex-wrap gap-2 pt-2 border-t border-slate-50">
-                                    {getLateMinutes(log, isSubjectAdmin(log.empId || '')) > 0 && (
-                                      <div className="flex items-center gap-1 px-2 py-0.5 bg-orange-50 border border-orange-100 rounded-full">
-                                        <Clock className="w-3 h-3 text-orange-500" />
-                                        <span className="text-[12px] font-black text-orange-600 uppercase tracking-tighter">
-                                          TRỄ {formatMinutes(getLateMinutes(log, isSubjectAdmin(log.empId || '')))}
-                                        </span>
-                                      </div>
-                                    )}
-                                  </div>
+                  <div className="space-y-4">
+                    {sortedLogs.map((log, logIdx) => {
+                      const employee = nhanViens.find(nv => nv.empId === log.empId);
+                      const canDelete = currentAdmin?.role === 'SuperAdmin' || (log.createdByAdminId && log.createdByAdminId === currentAdmin?.id);
+                      const canEdit = ['SuperAdmin', 'BranchAdmin'].includes(currentAdmin?.role || '');
+                      return (
+                        <div key={log.id} className="attendance-card bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden animate-in fade-in slide-in-from-right-4" style={{ animationDelay: `${logIdx * 50}ms` }}>
+                          <div className="p-2.5">
+                            <div className="flex justify-between items-center mb-2">
+                              <div className="cursor-pointer" onClick={() => {
+                                if (employee) {
+                                  setHistoryEmployee(employee);
+                                  setHistoryDay(null);
+                                  setMobileHistoryMode('employee');
+                                }
+                              }}>
+                                <h4 className={`font-black ${adminTheme.text} text-sm uppercase leading-tight`}>{employee?.fullName || 'Không rõ'}</h4>
+                                <div className="flex flex-wrap gap-1 mt-1">
+                                  {log.status === 'pending_approval' && <span className="px-1.5 py-0.5 bg-amber-100 text-amber-700 text-[8px] font-black rounded uppercase tracking-wider">Duyệt</span>}
+                                  {log.isAbandonedShift && <span className="px-1.5 py-0.5 bg-rose-100 text-rose-700 text-[8px] font-black rounded uppercase tracking-wider">Bỏ</span>}
                                 </div>
                               </div>
-                            );
-                          })}
+                              <div className="text-right flex flex-col items-end">
+                                <span className={`text-sm font-black ${adminTheme.text} tabular-nums mb-1`}>{getTotalHours(log) > 0 ? getTotalHours(log).toFixed(2) : '---'} <span className="text-[8px] text-slate-400 font-black uppercase tracking-tighter">Giờ</span></span>
+                                <div className="flex items-center gap-1">
+                                  {getLateMinutes(log, isSubjectAdmin(log.empId || '')) > 0 && (
+                                    <div className="flex items-center gap-1 px-1.5 py-0.5 bg-orange-50 border border-orange-100 rounded">
+                                      <span className="text-[9px] font-black text-orange-600 uppercase tracking-tighter">Trễ: {formatMinutes(getLateMinutes(log, isSubjectAdmin(log.empId || '')))}</span>
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                            
+                            <div className="flex items-center justify-between gap-1 p-1.5 bg-slate-50/80 rounded-xl border border-slate-100">
+                              <div className="flex items-center gap-4 flex-1 overflow-hidden">
+                                <div className="flex items-center gap-2 border-r border-slate-200 pr-3 min-w-0">
+                                  <span className="text-[9px] text-slate-400 font-black uppercase tracking-tighter">Vào</span>
+                                  <span className="text-xs font-bold text-slate-700">{log.checkInTime ? safeFormat(log.checkInTime, 'HH:mm', '--:--', log.date) : '--:--'}</span>
+                                  {isAdminOrSuperAdmin && (log.photoCheckIn || log.AnhVaoCa) && (
+                                    <button 
+                                      onClick={() => setPreviewPhoto({
+                                        url: log.photoCheckIn || log.AnhVaoCa!,
+                                        employeeName: employee?.fullName || 'Không rõ',
+                                        time: `Vào ca: ${log.checkInTime || '-'}`,
+                                        location: log.locationId,
+                                        gps: log.gpsIn
+                                      })}
+                                      className="active:scale-95 transition-all flex-shrink-0 ml-1"
+                                    >
+                                      <img src={log.photoCheckIn || log.AnhVaoCa!} className="w-6 h-6 rounded-full object-cover border border-slate-200 ring-2 ring-white" alt="In" />
+                                    </button>
+                                  )}
+                                </div>
+                                <div className="flex items-center gap-2 min-w-0">
+                                  <span className="text-[9px] text-slate-400 font-black uppercase tracking-tighter">Ra</span>
+                                  <span className="text-xs font-bold text-slate-700">{log.checkOutTime ? safeFormat(log.checkOutTime, 'HH:mm', '--:--', log.date) : '--:--'}</span>
+                                  {isAdminOrSuperAdmin && (log.photoCheckOut || log.AnhRaCa) && (
+                                    <button 
+                                      onClick={() => setPreviewPhoto({
+                                        url: log.photoCheckOut || log.AnhRaCa!,
+                                        employeeName: employee?.fullName || 'Không rõ',
+                                        time: `Ra ca: ${log.checkOutTime || '-'}`,
+                                        location: log.locationId,
+                                        gps: log.gpsOut
+                                      })}
+                                      className="active:scale-95 transition-all flex-shrink-0 ml-1"
+                                    >
+                                      <img src={log.photoCheckOut || log.AnhRaCa!} className="w-6 h-6 rounded-full object-cover border border-slate-200 ring-2 ring-white" alt="Out" />
+                                    </button>
+                                  )}
+                                </div>
+                              </div>
+                              <div className="flex justify-end gap-1 shrink-0">
+                                {log.status === 'pending_approval' && (
+                                  <button
+                                    onClick={(e) => { e.stopPropagation(); handleApproveAttendance(log); }}
+                                    className="p-1 text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors border border-emerald-100"
+                                  >
+                                    <CheckCircle2 className="w-5 h-5" />
+                                  </button>
+                                )}
+                                {canEdit && (
+                                    <button
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        setEditingAttendance({
+                                          ...log,
+                                          totalHours: log.totalHours,
+                                          lateMinutes: log.lateMinutes,
+                                          checkInTime: log.checkInTime ? safeFormat(log.checkInTime, 'HH:mm', '', log.date) : '',
+                                          checkOutTime: log.checkOutTime ? safeFormat(log.checkOutTime, 'HH:mm', '', log.date) : ''
+                                        });
+                                        setShowEditAttendanceModal(true);
+                                      }}
+                                      className="p-1 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors border border-blue-100"
+                                    >
+                                      <Edit2 className="w-4 h-4" />
+                                    </button>
+                                )}
+                                {canDelete && (
+                                    <button
+                                      onClick={(e) => { e.stopPropagation(); handleDeleteAttendance(log); }}
+                                      className="p-1 text-rose-600 hover:bg-rose-50 rounded-lg transition-colors border border-rose-100"
+                                    >
+                                      <Trash2 className="w-4 h-4" />
+                                    </button>
+                                )}
+                              </div>
+                            </div>
+                          </div>
                         </div>
-                      </div>
-                    );
-                  })}
+                      );
+                    })}
+                  </div>
                 </>
               );
             })()}
@@ -902,7 +961,7 @@ export const AttendanceTab: React.FC<AttendanceTabProps> = ({
                 <div className="hidden md:block overflow-x-auto custom-scrollbar overflow-y-visible">
                   <table 
                     className="w-full text-left border-collapse border border-[#e0e0e0] table-fixed"
-                    style={{ width: `${TABLE_COL_WIDTHS.NGAY + (TABLE_COL_WIDTHS.GIO * 2) + (isAdminOrSuperAdmin ? TABLE_COL_WIDTHS.PHOTO : 0) + TABLE_COL_WIDTHS.SD_DT + TABLE_COL_WIDTHS.PHAT_DT + TABLE_COL_WIDTHS.DI_TRE + TABLE_COL_WIDTHS.PHAT_TRE + TABLE_COL_WIDTHS.GIO_CONG}px` }}
+                    style={{ width: `${TABLE_COL_WIDTHS.NGAY + (TABLE_COL_WIDTHS.GIO * 2) + (isAdminOrSuperAdmin ? TABLE_COL_WIDTHS.PHOTO : 0) + TABLE_COL_WIDTHS.SD_DT + TABLE_COL_WIDTHS.PHAT_DT + TABLE_COL_WIDTHS.DI_TRE + TABLE_COL_WIDTHS.PHAT_TRE + TABLE_COL_WIDTHS.GIO_CONG + TABLE_COL_WIDTHS.ACTIONS}px` }}
                   >
                     <thead className="sticky top-0 z-[60]">
                        <tr className="bg-[#8B4513] shadow-md">
@@ -925,6 +984,7 @@ export const AttendanceTab: React.FC<AttendanceTabProps> = ({
                              )}
                            </div>
                         </th>
+                        <th className="p-[8px_12px] bg-[#8B4513]"></th>
                       </tr>
                       <tr className="bg-white border-b border-[#e0e0e0] text-[9px] uppercase tracking-widest text-slate-400">
                         <th className="border border-[#e0e0e0] p-[8px_12px] font-black text-center" style={{ width: `${TABLE_COL_WIDTHS.NGAY}px` }}>Ngày</th>
@@ -936,11 +996,15 @@ export const AttendanceTab: React.FC<AttendanceTabProps> = ({
                         <th className="border border-[#e0e0e0] p-[8px_12px] font-black text-center" style={{ width: `${TABLE_COL_WIDTHS.DI_TRE}px` }}>Đi trễ</th>
                         <th className="border border-[#e0e0e0] p-[8px_12px] font-black text-center" style={{ width: `${TABLE_COL_WIDTHS.PHAT_TRE}px` }}>Phạt trễ</th>
                         <th className="border border-[#e0e0e0] p-[8px_12px] font-black text-center text-slate-600" style={{ width: `${TABLE_COL_WIDTHS.GIO_CONG}px` }}>Giờ công</th>
+                        <th className="border border-[#e0e0e0] p-[8px_12px] font-black text-right text-slate-600" style={{ width: `${TABLE_COL_WIDTHS.ACTIONS}px` }}></th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-[#e0e0e0]">
                       {sortedLogs.map((log: any, index: number) => {
                         const showDate = index === 0 || sortedLogs[index - 1].date !== log.date;
+                        const canDelete = currentAdmin?.role === 'SuperAdmin' || (log.createdByAdminId && log.createdByAdminId === currentAdmin?.id);
+                        const canEdit = ['SuperAdmin', 'BranchAdmin'].includes(currentAdmin?.role || '');
+                        
                         return (
                           <tr key={log.id} className="hover:bg-yellow-50 transition-colors even:bg-[#fdfcfb] h-auto text-[11px]">
                             <td className="border border-[#e0e0e0] p-[8px_12px] text-slate-900 font-bold text-center" style={{ width: `${TABLE_COL_WIDTHS.NGAY}px` }}>
@@ -1033,6 +1097,44 @@ export const AttendanceTab: React.FC<AttendanceTabProps> = ({
                             </td>
                             <td className="border border-[#e0e0e0] p-[8px_12px] text-center text-sm font-black tabular-nums text-emerald-700" style={{ width: `${TABLE_COL_WIDTHS.GIO_CONG}px` }}>
                               {getTotalHours(log) > 0 ? formatDecimalHours(getTotalHours(log)) : '0p'}
+                            </td>
+                            <td className="border border-[#e0e0e0] p-[8px_12px] text-right" style={{ width: `${TABLE_COL_WIDTHS.ACTIONS}px` }}>
+                              <div className="flex justify-end gap-1">
+                                {log.status === 'pending_approval' && (
+                                  <button
+                                    onClick={(e) => { e.stopPropagation(); handleApproveAttendance(log); }}
+                                    className="p-1 text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors border border-emerald-100"
+                                  >
+                                    <CheckCircle2 className="w-3.5 h-3.5" />
+                                  </button>
+                                )}
+                                {canEdit && (
+                                    <button
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        setEditingAttendance({
+                                          ...log,
+                                          totalHours: log.totalHours,
+                                          lateMinutes: log.lateMinutes,
+                                          checkInTime: log.checkInTime ? safeFormat(log.checkInTime, 'HH:mm', '', log.date) : '',
+                                          checkOutTime: log.checkOutTime ? safeFormat(log.checkOutTime, 'HH:mm', '', log.date) : ''
+                                        });
+                                        setShowEditAttendanceModal(true);
+                                      }}
+                                      className="p-1 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors border border-blue-100"
+                                    >
+                                      <Edit2 className="w-3.5 h-3.5" />
+                                    </button>
+                                )}
+                                {canDelete && (
+                                    <button
+                                      onClick={(e) => { e.stopPropagation(); handleDeleteAttendance(log); }}
+                                      className="p-1 text-rose-600 hover:bg-rose-50 rounded-lg transition-colors border border-rose-100"
+                                    >
+                                      <Trash2 className="w-3.5 h-3.5" />
+                                    </button>
+                                )}
+                              </div>
                             </td>
                           </tr>
                         );
@@ -1133,8 +1235,46 @@ export const AttendanceTab: React.FC<AttendanceTabProps> = ({
                                       </div>
                                       <span className={`text-[11px] font-black ${adminTheme.text} whitespace-nowrap bg-white px-1.5 py-0.5 rounded shadow-sm border border-slate-100`}>{getTotalHours(log) > 0 ? getTotalHours(log).toFixed(2) : '---'}h</span>
                                     </div>
-                                      <div className="flex flex-wrap gap-1">
-                                        {getLateMinutes(log, isSubjectAdmin(log.empId || '')) > 0 && <span className="px-1.5 py-0.5 bg-orange-50 text-orange-600 text-[8px] font-black rounded-full border border-orange-100">TRỄ: {formatMinutes(getLateMinutes(log, isSubjectAdmin(log.empId || '')))}</span>}
+                                      <div className="flex flex-wrap items-center justify-between gap-1 mt-1 pt-1 border-t border-slate-100/50">
+                                        <div className="flex items-center gap-1">
+                                          {getLateMinutes(log, isSubjectAdmin(log.empId || '')) > 0 && <span className="px-1.5 py-0.5 bg-orange-50 text-orange-600 text-[8px] font-black rounded-full border border-orange-100">TRỄ: {formatMinutes(getLateMinutes(log, isSubjectAdmin(log.empId || '')))}</span>}
+                                        </div>
+                                        <div className="flex justify-end gap-1">
+                                          {log.status === 'pending_approval' && (
+                                            <button
+                                              onClick={(e) => { e.stopPropagation(); handleApproveAttendance(log); }}
+                                              className="p-1 text-emerald-600 hover:bg-emerald-50 rounded transition-colors border border-emerald-100"
+                                            >
+                                              <CheckCircle2 className="w-3.5 h-3.5" />
+                                            </button>
+                                          )}
+                                          {['SuperAdmin', 'BranchAdmin'].includes(currentAdmin?.role || '') && (
+                                              <button
+                                                onClick={(e) => {
+                                                  e.stopPropagation();
+                                                  setEditingAttendance({
+                                                    ...log,
+                                                    totalHours: log.totalHours,
+                                                    lateMinutes: log.lateMinutes,
+                                                    checkInTime: log.checkInTime ? safeFormat(log.checkInTime, 'HH:mm', '', log.date) : '',
+                                                    checkOutTime: log.checkOutTime ? safeFormat(log.checkOutTime, 'HH:mm', '', log.date) : ''
+                                                  });
+                                                  setShowEditAttendanceModal(true);
+                                                }}
+                                                className="p-1 text-blue-600 hover:bg-blue-50 rounded transition-colors border border-blue-100"
+                                              >
+                                                <Edit2 className="w-3.5 h-3.5" />
+                                              </button>
+                                          )}
+                                          {(currentAdmin?.role === 'SuperAdmin' || (log.createdByAdminId && log.createdByAdminId === currentAdmin?.id)) && (
+                                              <button
+                                                onClick={(e) => { e.stopPropagation(); handleDeleteAttendance(log); }}
+                                                className="p-1 text-rose-600 hover:bg-rose-50 rounded transition-colors border border-rose-100"
+                                              >
+                                                <Trash2 className="w-3.5 h-3.5" />
+                                              </button>
+                                          )}
+                                        </div>
                                       </div>
                                     </div>
                                   ))}
