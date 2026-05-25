@@ -509,7 +509,7 @@ export function useSmartScheduleBuilder(props: SmartScheduleBuilderProps) {
     
     const scheduledEmployees = employees.filter(e => {
       return localSchedules.some(s => 
-        s.empId === e.id && 
+        (s.empId === e.id || s.empId === e.empId) && 
         (activeBranch === 'All' || s.locationId === activeBranch) && 
         s.date >= weekStartStr && 
         s.date <= weekEndStr
