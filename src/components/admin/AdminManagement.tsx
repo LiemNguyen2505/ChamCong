@@ -11,6 +11,7 @@ interface AdminManagementProps {
   adminTheme: any;
   admins: AdminAccount[];
   SUPER_ADMIN: AdminAccount;
+  nhanViens?: any[];
   fetchInitialData: (month?: string, skipLoading?: boolean) => Promise<any>;
   logAction: (action: string, target: string, details: string) => Promise<void>;
   getAllowedBranches: () => string[];
@@ -23,6 +24,7 @@ export const AdminManagement: React.FC<AdminManagementProps> = ({
   adminTheme,
   admins,
   SUPER_ADMIN,
+  nhanViens = [],
   fetchInitialData,
   logAction,
   getAllowedBranches,
@@ -176,14 +178,22 @@ export const AdminManagement: React.FC<AdminManagementProps> = ({
             <form onSubmit={handleAddAdmin} className="p-6 space-y-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Tên quản lý (Dùng để đăng nhập)</label>
-                <input
-                  type="text"
+                <select
                   required
                   value={newAdmin.email}
                   onChange={e => setNewAdmin({ ...newAdmin, email: e.target.value })}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
-                  placeholder="Ví dụ: QuanLyA, Khoa..."
-                />
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none bg-white"
+                >
+                  <option value="" disabled>--- Chọn nhân viên ---</option>
+                  {nhanViens
+                    .filter(nv => !admins.some(ad => ad.email === nv.fullName))
+                    .sort((a, b) => a.fullName.localeCompare(b.fullName))
+                    .map(nv => (
+                    <option key={nv.id} value={nv.fullName}>
+                      {nv.fullName} - {nv.empId}
+                    </option>
+                  ))}
+                </select>
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Mã PIN Đăng nhập</label>
@@ -292,13 +302,27 @@ export const AdminManagement: React.FC<AdminManagementProps> = ({
             <form onSubmit={handleUpdateAdmin} className="p-6 space-y-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Tên quản lý</label>
-                <input
-                  type="text"
+                <select
                   required
                   value={editingAdmin.email || ''}
                   onChange={e => setEditingAdmin({ ...editingAdmin, email: e.target.value })}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
-                />
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none bg-white"
+                >
+                  <option value="" disabled>--- Chọn nhân viên ---</option>
+                  {/* Bao gồm cả những người chưa là admin và chính admin đang được sửa */}
+                  {nhanViens
+                    .filter(nv => nv.fullName === editingAdmin.email || !admins.some(ad => ad.email === nv.fullName))
+                    .sort((a, b) => a.fullName.localeCompare(b.fullName))
+                    .map(nv => (
+                    <option key={nv.id} value={nv.fullName}>
+                      {nv.fullName} - {nv.empId}
+                    </option>
+                  ))}
+                  {/* Nếu admin cũ không có trong danh sách nhân viên hiện tại, vẫn giữ lại option để tránh lỗi */}
+                  {!nhanViens.some(nv => nv.fullName === editingAdmin.email) && (
+                    <option value={editingAdmin.email}>{editingAdmin.email} (Không tìm thấy trong DS Nhân viên)</option>
+                  )}
+                </select>
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Mã PIN Đăng nhập</label>
