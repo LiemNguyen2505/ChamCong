@@ -241,30 +241,29 @@ export const Dashboard: React.FC<DashboardProps> = ({
   }, [monthlyTargetHours, filterBranch]);
 
   const branchEmployees = React.useMemo(() => 
-    nhanViens.filter(emp => filterBranch === 'All' ? true : emp.locationId === filterBranch),
+    nhanViens.filter(emp => filterBranch === 'All' ? true : emp.locationId === filterBranch || (emp.locationIds && emp.locationIds.includes(filterBranch))),
     [nhanViens, filterBranch]
   );
 
   const personnelOverview = React.useMemo(() => {
-    const branchEmpIds = new Set(branchEmployees.map(e => e.id));
     const todayStr = format(new Date(), 'yyyy-MM-dd');
     
     // Real-time status
     const activeEmps = filteredChamCongs
-      .filter(cc => (cc.date === todayStr && !cc.checkOutTime) && branchEmpIds.has(cc.empId))
-      .map(cc => nhanViens.find(e => e.id === cc.empId || e.empId === cc.empId)?.fullName?.split(' ').pop())
+      .filter(cc => (cc.date === todayStr && !cc.checkOutTime))
+      .map(cc => nhanViens.find(e => e.id === cc.empId || e.empId === cc.empId)?.fullName?.split(' ').pop() || cc.fullName?.split(' ').pop())
       .filter(Boolean);
 
     const lateEmpsToday = filteredChamCongs
-      .filter(cc => (cc.date === todayStr && (cc.lateMinutes || 0) > 0) && branchEmpIds.has(cc.empId))
-      .map(cc => nhanViens.find(e => e.id === cc.empId || e.empId === cc.empId)?.fullName?.split(' ').pop())
+      .filter(cc => (cc.date === todayStr && (cc.lateMinutes || 0) > 0))
+      .map(cc => nhanViens.find(e => e.id === cc.empId || e.empId === cc.empId)?.fullName?.split(' ').pop() || cc.fullName?.split(' ').pop())
       .filter(Boolean);
 
     // Aggregate stats for discipline progress
     const stats: Record<string, { lates: number, onTime: number, phoneViolations: number, total: number, name: string }> = {};
     
     filteredChamCongs
-      .filter(cc => cc.date.startsWith(filterMonth) && branchEmpIds.has(cc.empId) && cc.status !== 'pending_approval')
+      .filter(cc => cc.date.startsWith(filterMonth) && cc.status !== 'pending_approval')
       .forEach(cc => {
         const id = cc.empId;
         if (!stats[id]) {
