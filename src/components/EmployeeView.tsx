@@ -146,7 +146,7 @@ export default function EmployeeView({
     selectedCalendarDate, setSelectedCalendarDate,
     scheduleViewMode, setScheduleViewMode,
     teamScheduleBranch, setTeamScheduleBranch
-  } = useEmployeeUI(kioskBranch);
+  } = useEmployeeUI(kioskBranch, loggedInEmployee);
 
   const [selectedMonth, setSelectedMonth] = useState(format(new Date(), 'yyyy-MM'));
 
@@ -157,7 +157,10 @@ export default function EmployeeView({
       .sort((a: any, b: any) => a.startTime.localeCompare(b.startTime));
   }, [globalData.lichLamViecs, loggedInEmployee, kioskBranch]);
 
-  const { monthlyStats, branchStats, activeBranches } = useEmployeeSalary(loggedInEmployee, monthTimesheets, payrollAdjustments, holidays, selectedMonth, globalData.violations);
+  const isSubjectAdmin = loggedInEmployee?.empId?.toUpperCase() === 'ADMIN' || 
+                         admins.some((a: any) => a.email === loggedInEmployee?.fullName);
+                         
+  const { monthlyStats, branchStats, activeBranches } = useEmployeeSalary(loggedInEmployee, monthTimesheets, payrollAdjustments, holidays, selectedMonth, globalData.violations, isSubjectAdmin);
 
   useAntiSlacking(loggedInEmployee, latestLog, admins, kioskBranch);
 
@@ -560,6 +563,7 @@ export default function EmployeeView({
         selectedMonth={selectedMonth}
         setSelectedMonth={setSelectedMonth}
         fetchInitialData={fetchInitialData}
+        isSubjectAdmin={isSubjectAdmin}
       />
 
       <NotificationModal 
