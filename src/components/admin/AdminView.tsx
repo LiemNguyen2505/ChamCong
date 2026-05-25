@@ -605,6 +605,7 @@ export default function AdminView({
             adminTheme={adminTheme}
             admins={admins}
             SUPER_ADMIN={SUPER_ADMIN}
+            nhanViens={nhanViens}
             fetchInitialData={fetchInitialData}
             logAction={logAction}
             getAllowedBranches={getAllowedBranches}
