@@ -104,7 +104,10 @@ export const useEmployeeAttendance = (
       if (actionType === 'check-in') {
         let lateMinutes = 0;
         let latePenaltyMinutes = 0;
-        if (scheduledShiftTime) {
+        const isAdmin = loggedInEmployee.empId.toUpperCase() === 'ADMIN' || 
+                        admins.some(a => a.email === loggedInEmployee.fullName);
+                        
+        if (scheduledShiftTime && !isAdmin) {
           const [schH, schM] = scheduledShiftTime.split(':').map(Number);
           const [selH, selM] = selectedShiftTime.split(':').map(Number);
           const selTotal = selH * 60 + selM;
@@ -117,6 +120,8 @@ export const useEmployeeAttendance = (
           }
         }
 
+        const isExtraShift = !scheduledShiftTime && !isAdmin;
+        
         const checkInDoc = {
           empId: loggedInEmployee.empId,
           fullName: loggedInEmployee.fullName,
@@ -124,7 +129,7 @@ export const useEmployeeAttendance = (
           checkInTime: selectedShiftTime,
           checkOutTime: null,
           locationId: kioskBranch,
-          status: 'Present',
+          status: isExtraShift ? 'pending_approval' : 'Present',
           note: note,
           photoCheckIn: capturedPhoto,
           gpsIn: coords, // Save GPS coords
@@ -138,8 +143,24 @@ export const useEmployeeAttendance = (
           lateMinutes: lateMinutes,
           latePenaltyMinutes: latePenaltyMinutes
         };
-        await addDoc(collection(db, 'timesheets'), checkInDoc);
-        toast.success('Vào ca thành công!');
+        const newDocRef = await addDoc(collection(db, 'timesheets'), checkInDoc);
+        
+        if (isExtraShift) {
+          await addDoc(collection(db, 'Notifications'), {
+            recipientId: 'admin',
+            locationId: kioskBranch,
+            title: 'Ca phát sinh (Ngoài lịch)',
+            message: `Nhân viên ${loggedInEmployee.fullName} đã vào ca không có trong lịch làm việc. Vui lòng kiểm tra và duyệt giờ công.`,
+            type: 'approval',
+            priority: 'high',
+            isRead: false,
+            createdAt: serverTimestamp(),
+            senderId: loggedInEmployee.emId || loggedInEmployee.id,
+            relatedId: newDocRef.id
+          });
+        }
+        
+        toast.success(isExtraShift ? 'Vào ca thành công! (Ca ngoài lịch, chờ duyệt)' : 'Vào ca thành công!');
       } else {
         if (!latestLog) return;
         
