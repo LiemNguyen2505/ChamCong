@@ -391,10 +391,21 @@ export default function EmployeeView({
                     return;
                   }
 
+                  const now = new Date();
                   const [selH, selM] = selectedShiftTime.split(':').map(Number);
-                  const selTotal = selH * 60 + selM;
+                  let selTotal = selH * 60 + selM;
                   const [schH, schM] = (scheduledShiftTime || '00:00').split(':').map(Number);
                   const schTotal = schH * 60 + schM;
+
+                  const inDateStr = latestLog?.date || format(now, 'yyyy-MM-dd');
+                  if (inDateStr !== format(now, 'yyyy-MM-dd')) {
+                    // Check out is on a different day than check in
+                    const inDateObj = new Date(inDateStr);
+                    const diffDays = Math.floor((now.getTime() - inDateObj.getTime()) / (1000 * 60 * 60 * 24));
+                    if (diffDays >= 0) {
+                      selTotal += (diffDays || 1) * 24 * 60;
+                    }
+                  }
 
                   if (selTotal < schTotal) {
                     setCheckoutWarningStep(1); // Ra ca sớm
