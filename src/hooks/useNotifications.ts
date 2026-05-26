@@ -67,7 +67,14 @@ export const useNotifications = (
       } as AppNotification));
 
       // Filter for Admin/SuperAdmin to only show notifications meant for them
-      if (role === 'Admin' || role === 'BranchAdmin') {
+      if (role === 'SuperAdmin') {
+        fetched = fetched.filter(n => 
+          n.recipientId === 'SuperAdmin' ||
+          n.recipientId === 'all_admins' ||
+          n.recipientId === 'all' ||
+          n.recipientId === userId
+        );
+      } else if (role === 'Admin' || role === 'BranchAdmin') {
         fetched = fetched.filter(n => 
           n.recipientId === 'admin' || 
           n.recipientId === 'all_admins' ||
@@ -75,7 +82,6 @@ export const useNotifications = (
           n.recipientId === userId
         );
       }
-      // If role === 'SuperAdmin', they see ALL notifications (including those to employees) without filtering
 
       const processedNotifications = fetched.map(n => ({
         ...n,
