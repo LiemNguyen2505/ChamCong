@@ -488,10 +488,15 @@ export const AttendanceTab: React.FC<AttendanceTabProps> = ({
         )}
       </div>
 
-      {historyDay && !historyEmployee && (
-        <div className="animate-in fade-in slide-in-from-bottom-2 space-y-4">
+      {(() => {
+        const todayStr = format(new Date(), 'yyyy-MM-dd');
+        const defaultMobileDay = filterMonth === format(new Date(), 'yyyy-MM') ? todayStr : `${filterMonth}-01`;
+        const effectiveHistoryDay = historyDay || defaultMobileDay;
+        
+        return (!historyEmployee) ? (
+        <div className={`animate-in fade-in slide-in-from-bottom-2 space-y-4 ${!historyDay ? 'block md:hidden' : ''}`}>
           {(() => {
-            const dayLogs = filteredChamCongs.filter(cc => cc.date === historyDay);
+            const dayLogs = filteredChamCongs.filter(cc => cc.date === effectiveHistoryDay);
             const sortedLogs = [...dayLogs].sort((a, b) => {
               const nameA = nhanViens.find(nv => nv.empId === a.empId)?.fullName || '';
               const nameB = nhanViens.find(nv => nv.empId === b.empId)?.fullName || '';
@@ -509,7 +514,7 @@ export const AttendanceTab: React.FC<AttendanceTabProps> = ({
             const pendingHours = dayLogs.filter(log => log.status === 'pending_approval').reduce((sum, log) => sum + getTotalHours(log), 0);
 
             return (
-              <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden relative max-w-[1200px] mx-auto attendance-interactive">
+              <div className={`bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden relative max-w-[1200px] mx-auto attendance-interactive ${!historyDay ? 'hidden md:block' : ''}`}>
                 {/* Desktop Table View */}
                 <div className="hidden md:block overflow-x-auto custom-scrollbar overflow-y-visible">
                   <table 
@@ -520,7 +525,7 @@ export const AttendanceTab: React.FC<AttendanceTabProps> = ({
                       <tr className="bg-[#8B4513] shadow-md">
                         <th colSpan={isAdminOrSuperAdmin ? 4 : 3} className="p-[8px_16px] bg-[#8B4513] sticky left-0 z-30 border-r border-white/10">
                           <span className="font-black text-amber-50 text-[12px] uppercase truncate leading-none tracking-wider">
-                            {safeFormat(historyDay, 'dd/MM/yyyy')}
+                            {safeFormat(effectiveHistoryDay, 'dd/MM/yyyy')}
                           </span>
                         </th>
                         <th className="p-[8px_12px] text-center border-l border-white/10">
@@ -723,7 +728,13 @@ export const AttendanceTab: React.FC<AttendanceTabProps> = ({
           {/* Mobile Card List View */}
           <div className="md:hidden space-y-8 px-3">
             {(() => {
-              const dayLogs = filteredChamCongs.filter(cc => cc.date === historyDay);
+              const dayLogs = filteredChamCongs.filter(cc => cc.date === effectiveHistoryDay);
+              
+              const sortedLogs = [...dayLogs].sort((a, b) => {
+                const nameA = nhanViens.find(nv => nv.empId === a.empId)?.fullName || '';
+                const nameB = nhanViens.find(nv => nv.empId === b.empId)?.fullName || '';
+                return nameA.localeCompare(nameB);
+              });
               
               const approvedHrs = dayLogs.filter(log => log.status !== 'pending_approval').reduce((sum, log) => sum + getTotalHours(log), 0);
               const pendingHrs = dayLogs.filter(log => log.status === 'pending_approval').reduce((sum, log) => sum + getTotalHours(log), 0);
@@ -750,22 +761,28 @@ export const AttendanceTab: React.FC<AttendanceTabProps> = ({
                 // If check-out is before check-in, assume it's on the next day
                 if (timeOut < timeIn && dOut) timeOut += 24;
 
-                // Base shift from check-in time
-                if (timeIn >= 5 && timeIn < 12) types.add('Ca Sáng');
-                else if (timeIn >= 12 && timeIn < 17) types.add('Ca Trưa');
+                let baseHour = timeIn;
+                if (log.scheduledStartTime) {
+                   const [h, m] = log.scheduledStartTime.split(':').map(Number);
+                   baseHour = h + m / 60;
+                }
+
+                // Base shift from check-in time / scheduled time
+                if (baseHour >= 4 && baseHour < 11.5) types.add('Ca Sáng');
+                else if (baseHour >= 11.5 && baseHour < 17) types.add('Ca Trưa');
                 else types.add('Ca Tối');
 
                 // Check overlap with Ca Trưa (12 to 17)
                 const overlapTrua = Math.max(0, Math.min(timeOut, 17) - Math.max(timeIn, 12));
-                if (overlapTrua >= 1) types.add('Ca Trưa');
+                if (overlapTrua >= 2) types.add('Ca Trưa');
 
                 // Check overlap with Ca Tối (17 to 24)
                 const overlapToi = Math.max(0, Math.min(timeOut, 24) - Math.max(timeIn, 17));
-                if (overlapToi >= 1) types.add('Ca Tối');
+                if (overlapToi >= 2) types.add('Ca Tối');
 
                 // Check overlap with next day's Ca Sáng (29 to 36)
                 const overlapSangNext = Math.max(0, Math.min(timeOut, 36) - Math.max(timeIn, 29));
-                if (overlapSangNext >= 1) types.add('Ca Sáng');
+                if (overlapSangNext >= 2) types.add('Ca Sáng');
 
                 return Array.from(types);
               };
@@ -937,7 +954,7 @@ export const AttendanceTab: React.FC<AttendanceTabProps> = ({
             })()}
           </div>
         </div>
-      )}
+      ) : null; })()}
 
       {historyEmployee && (
         <div className="animate-in fade-in slide-in-from-bottom-2 space-y-4 px-1 md:px-3">
