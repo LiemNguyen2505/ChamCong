@@ -106,27 +106,36 @@ export const useEmployeeAttendance = (
         let latePenaltyMinutes = 0;
         const isAdmin = loggedInEmployee.empId.toUpperCase() === 'ADMIN' || 
                         admins.some(a => a.email === loggedInEmployee.fullName);
+        
+        let isExtraShift = !scheduledShiftTime && !isAdmin;
+        let finalCheckInTime = selectedShiftTime;
                         
-        if (scheduledShiftTime && !isAdmin) {
+        if (scheduledShiftTime) {
           const [schH, schM] = scheduledShiftTime.split(':').map(Number);
           const [selH, selM] = selectedShiftTime.split(':').map(Number);
           const selTotal = selH * 60 + selM;
           const schTotal = schH * 60 + schM;
           if (selTotal > schTotal) {
             lateMinutes = selTotal - schTotal;
-            if (lateMinutes >= 10) {
+            if (lateMinutes >= 10 && !isAdmin) {
                 latePenaltyMinutes = lateMinutes * 3;
+            }
+          } else if (selTotal < schTotal) {
+            const earlyMinutes = schTotal - selTotal;
+            if (earlyMinutes <= 30) {
+              finalCheckInTime = scheduledShiftTime; // Clamp to scheduled time
+            } else {
+              if (!isAdmin) isExtraShift = true; // Early more than 30 mins
             }
           }
         }
-
-        const isExtraShift = !scheduledShiftTime && !isAdmin;
         
         const checkInDoc = {
           empId: loggedInEmployee.empId,
           fullName: loggedInEmployee.fullName,
           date: format(new Date(), 'yyyy-MM-dd'),
-          checkInTime: selectedShiftTime,
+          checkInTime: finalCheckInTime,
+          actualCheckInTime: selectedShiftTime, // Preserve real time just in case
           checkOutTime: null,
           locationId: kioskBranch,
           status: isExtraShift ? 'pending_approval' : 'Present',
@@ -167,27 +176,49 @@ export const useEmployeeAttendance = (
         let totalHours = 0;
         let totalPay = 0;
         const checkInTimeStr = latestLog.checkInTime || scheduledShiftTime;
-        if (checkInTimeStr) {
-          const checkInISO = new Date(`${latestLog.date}T${checkInTimeStr}`).getTime();
-          const checkOutISO = new Date(`${latestLog.date}T${selectedShiftTime}`).getTime();
-          const diffMs = checkOutISO - checkInISO;
-          if (diffMs > 0) {
-            totalHours = diffMs / (1000 * 60 * 60);
-            totalPay = totalHours * (loggedInEmployee.hourlyRate || 0);
-          }
-        }
-
-        await updateDoc(doc(db, 'timesheets', latestLog.id), {
-          checkOutTime: selectedShiftTime,
+        let updateData: any = {
           photoCheckOut: capturedPhoto,
           gpsOut: coords, // Save GPS coords
           noteCheckOut: note,
           scheduledEndTime: scheduledShiftTime,
-          totalHours: totalHours,
-          totalPay: totalPay,
           updatedAt: serverTimestamp()
-        });
-        toast.success('Ra ca thành công!');
+        };
+
+        if (checkInTimeStr) {
+          const checkInDate = new Date(`${latestLog.date}T${checkInTimeStr}`);
+          const todayStr = format(new Date(), 'yyyy-MM-dd');
+          const checkOutDate = new Date(`${todayStr}T${selectedShiftTime}`);
+          
+          let diffMs = checkOutDate.getTime() - checkInDate.getTime();
+          
+          // Allow up to 16 hours for a single shift (e.g., night shift)
+          if (diffMs > 0 && diffMs <= 16 * 60 * 60 * 1000) {
+            totalHours = diffMs / (1000 * 60 * 60);
+            totalPay = totalHours * (loggedInEmployee.hourlyRate || 0);
+            updateData.checkOutTime = selectedShiftTime;
+            updateData.totalHours = totalHours;
+            updateData.totalPay = totalPay;
+          } else {
+            // Quên bấm RA CA và để giờ trôi
+            updateData.checkOutTime = selectedShiftTime;
+            updateData.totalHours = 0;
+            updateData.totalPay = 0;
+            updateData.isAbandonedShift = false; // We can keep this false, user just gets 0 hours
+            // They will do a request to correct this.
+          }
+        } else {
+            updateData.checkOutTime = selectedShiftTime;
+            updateData.totalHours = 0;
+            updateData.totalPay = 0;
+        }
+
+        await updateDoc(doc(db, 'timesheets', latestLog.id), updateData);
+        
+        if (latestLog?.checkInTime && updateData.totalHours === 0) {
+          toast.error('Không được ghi nhận giờ công do quên bấm RA CA! Vui lòng làm YÊU CẦU QUÊN CHẤM CÔNG gửi Quản lý.', { duration: 8000 });
+        } else {
+          toast.success('Ra ca thành công!');
+        }
       }
       setActionType(null);
       setPhotoData(null);
