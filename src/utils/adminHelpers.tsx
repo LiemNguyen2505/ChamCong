@@ -39,12 +39,37 @@ export const getLateMinutes = (t: any, isAdmin: boolean = false) => {
   return 0;
 };
 
-export const getLatePenaltyMinutes = (t: any, isAdmin: boolean = false) => {
+export const getLatePenaltyMinutes = (t: any, isAdmin: boolean = false, allMonthLogs: any[] = []) => {
   if (isAdmin) return 0;
   if (t.isLateExcused) return 0;
-  if (t.latePenaltyMinutes !== undefined && t.latePenaltyMinutes > 0) return t.latePenaltyMinutes;
+  
   const lateMins = getLateMinutes(t, isAdmin);
   if (lateMins >= 10) return lateMins * 3;
+  
+  if (lateMins > 0 && lateMins < 10 && allMonthLogs.length > 0) {
+    // Sort all month logs chronologically
+    const sortedLogs = [...allMonthLogs].sort((a, b) => {
+      const timeA = a.date + 'T' + (a.checkInTime || '00:00');
+      const timeB = b.date + 'T' + (b.checkInTime || '00:00');
+      return timeA.localeCompare(timeB);
+    });
+    
+    // Find index of current log among minor lates
+    let minorLateCount = 0;
+    for (const log of sortedLogs) {
+      if (log.status === 'pending_approval') continue;
+      const m = getLateMinutes(log, isAdmin);
+      if (m > 0 && m < 10 && !log.isLateExcused) {
+        minorLateCount++;
+        if (log.id === t.id) {
+          if (minorLateCount > 5) return lateMins * 3;
+          return 0;
+        }
+      }
+    }
+  }
+  
+  if (t.latePenaltyMinutes !== undefined && t.latePenaltyMinutes > 0) return t.latePenaltyMinutes;
   return 0;
 };
 
