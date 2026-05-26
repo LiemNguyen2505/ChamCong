@@ -34,7 +34,7 @@ const PersonnelOverview = React.memo(({ personnelOverview, branchEmployees, admi
   const { activeEmps, lateEmpsToday, top3 } = personnelOverview;
   
   return (
-    <div className="bg-white rounded-xl md:rounded-3xl border border-stone-100 shadow-sm p-4 md:p-8 hover:shadow-md transition-shadow group md:flex-[2] flex flex-col min-h-[160px] max-h-[180px] md:max-h-none overflow-hidden">
+    <div className="bg-white rounded-xl md:rounded-3xl border border-stone-100 shadow-sm p-4 md:p-8 hover:shadow-md transition-shadow group md:flex-[2] flex flex-col min-h-[160px]">
       <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-3">
           <div className={`p-2 ${adminTheme.accent.replace('bg-', 'bg-')}/10 ${adminTheme.text} rounded-lg`}>
