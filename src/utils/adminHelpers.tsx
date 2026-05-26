@@ -15,13 +15,13 @@ export const TABLE_COL_WIDTHS = {
   ACTIONS: 120
 };
 
-export const getLateMinutes = (t: any) => {
-  if (t.lateMinutes !== undefined) return t.lateMinutes;
-  if (t.latePenaltyMinutes !== undefined) return t.latePenaltyMinutes / 3;
-  const extractTimeStr = (tm: string | undefined | null) => {
-      if (!tm) return null;
-      return tm.includes('T') ? tm.split('T')[1].substring(0, 5) : (tm.includes(' ') ? tm.split(' ')[1].substring(0, 5) : tm.substring(0, 5));
-  };
+export const extractTimeStr = (tm: string | undefined | null) => {
+    if (!tm || tm === '--:--') return null;
+    return tm.includes('T') ? tm.split('T')[1].substring(0, 5) : (tm.includes(' ') ? tm.split(' ')[1].substring(0, 5) : tm.substring(0, 5));
+};
+
+export const getLateMinutes = (t: any, isAdmin: boolean = false) => {
+  if (isAdmin) return 0;
   const inTimeStr = extractTimeStr(t.checkInTime);
   const schTimeStr = extractTimeStr(t.scheduledStartTime);
   if (schTimeStr && inTimeStr) {
@@ -29,15 +29,21 @@ export const getLateMinutes = (t: any) => {
     const [inH, inM] = inTimeStr.split(':').map(Number);
     let diff = (inH * 60 + inM) - (schH * 60 + schM);
     if (diff < 0 && (24 - schH + inH) < 12) diff += 24 * 60;
-    if (diff > 0 && diff < 12 * 60) return diff;
+    if (diff > 0 && diff < 12 * 60) {
+      return diff;
+    }
   }
+  
+  if (t.lateMinutes !== undefined) return t.lateMinutes;
+  if (t.latePenaltyMinutes !== undefined && t.latePenaltyMinutes > 0) return t.latePenaltyMinutes / 3;
   return 0;
 };
 
-export const getLatePenaltyMinutes = (t: any) => {
+export const getLatePenaltyMinutes = (t: any, isAdmin: boolean = false) => {
+  if (isAdmin) return 0;
   if (t.isLateExcused) return 0;
   if (t.latePenaltyMinutes !== undefined && t.latePenaltyMinutes > 0) return t.latePenaltyMinutes;
-  const lateMins = getLateMinutes(t);
+  const lateMins = getLateMinutes(t, isAdmin);
   if (lateMins >= 10) return lateMins * 3;
   return 0;
 };
@@ -61,10 +67,6 @@ export const getPhonePenalty = (t: any, hourlyRate: number) => {
 
 export const getTotalHours = (t: any) => {
   if (t.totalHours !== undefined) return t.totalHours;
-  const extractTimeStr = (tm: string | undefined | null) => {
-      if (!tm) return null;
-      return tm.includes('T') ? tm.split('T')[1].substring(0, 5) : (tm.includes(' ') ? tm.split(' ')[1].substring(0, 5) : tm.substring(0, 5));
-  };
   
   const inTimeStr = extractTimeStr(t.checkInTime);
   const outTimeStr = extractTimeStr(t.checkOutTime);
