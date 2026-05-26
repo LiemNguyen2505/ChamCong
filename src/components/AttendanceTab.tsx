@@ -852,7 +852,7 @@ export const AttendanceTab: React.FC<AttendanceTabProps> = ({
                               }}>
                                 <h4 className={`font-black ${adminTheme.text} text-sm uppercase leading-tight`}>{employee?.fullName || 'Không rõ'}</h4>
                                 <div className="flex flex-wrap gap-1 mt-1">
-                                  {log.status === 'pending_approval' && <span className="px-1.5 py-0.5 bg-amber-100 text-amber-700 text-[8px] font-black rounded uppercase tracking-wider">Duyệt</span>}
+                                  {log.status === 'pending_approval' && <span className="px-1.5 py-0.5 bg-amber-100 text-amber-700 text-[8px] font-black rounded uppercase tracking-wider">Chờ duyệt</span>}
                                   {log.isAbandonedShift && <span className="px-1.5 py-0.5 bg-rose-100 text-rose-700 text-[8px] font-black rounded uppercase tracking-wider">Bỏ</span>}
                                 </div>
                               </div>
