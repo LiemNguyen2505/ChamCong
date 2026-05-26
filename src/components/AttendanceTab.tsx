@@ -506,7 +506,7 @@ export const AttendanceTab: React.FC<AttendanceTabProps> = ({
             const totalLate = dayLogs.reduce((sum, log) => sum + getLateMinutes(log, isSubjectAdmin(log.empId || '')), 0);
             const totalPenalty = dayLogs.reduce((sum, log) => {
               const emp = nhanViens.find(nv => nv.empId === log.empId);
-              const penaltyMins = getLatePenaltyMinutes(log, isSubjectAdmin(log.empId || ''));
+              const penaltyMins = getLatePenaltyMinutes(log, isSubjectAdmin(log.empId || ''), filteredChamCongs.filter(c => c.empId === log.empId));
               const penalty = penaltyMins > 0 ? roundToUnit(penaltyMins * ((emp?.hourlyRate || 0) / 60)) : 0;
               return sum + penalty;
             }, 0);
@@ -661,9 +661,9 @@ export const AttendanceTab: React.FC<AttendanceTabProps> = ({
                               )}
                             </td>
                             <td className="border border-[#e0e0e0] p-[8px_12px] text-xs text-center font-mono" style={{ width: `${TABLE_COL_WIDTHS.PHAT_TRE}px` }}>
-                              {getLatePenaltyMinutes(log, isSubjectAdmin(log.empId || '')) > 0 ? (
+                              {getLatePenaltyMinutes(log, isSubjectAdmin(log.empId || ''), filteredChamCongs.filter(c => c.empId === log.empId)) > 0 ? (
                                 <span className="text-rose-600 font-bold tabular-nums">
-                                  {formatCurrency(roundToUnit(getLatePenaltyMinutes(log, isSubjectAdmin(log.empId || '')) * ((employee?.hourlyRate || 0) / 60)))}
+                                  {formatCurrency(roundToUnit(getLatePenaltyMinutes(log, isSubjectAdmin(log.empId || ''), filteredChamCongs.filter(c => c.empId === log.empId)) * ((employee?.hourlyRate || 0) / 60)))}
                                 </span>
                               ) : (
                                 <span className="text-slate-200">-</span>
@@ -743,7 +743,7 @@ export const AttendanceTab: React.FC<AttendanceTabProps> = ({
               const totalLatePenalty = dayLogs.reduce((sum, log) => {
                 const employee = nhanViens.find(nv => nv.empId === log.empId);
                 const hourlyRate = employee?.hourlyRate || 0;
-                const penaltyMins = getLatePenaltyMinutes(log, isSubjectAdmin(log.empId || ''));
+                const penaltyMins = getLatePenaltyMinutes(log, isSubjectAdmin(log.empId || ''), filteredChamCongs.filter(c => c.empId === log.empId));
                 const penalty = penaltyMins > 0 ? roundToUnit(penaltyMins * (hourlyRate / 60)) : 0;
                 return sum + penalty;
               }, 0);
@@ -968,7 +968,7 @@ export const AttendanceTab: React.FC<AttendanceTabProps> = ({
             const totalLate = logs.reduce((sum, l) => sum + getLateMinutes(l), 0);
             const totalLateLogs = logs.filter(l => getLateMinutes(l) > 0).length;
             const totalPenalty = logs.reduce((sum, l) => {
-              const penaltyMins = getLatePenaltyMinutes(l);
+              const penaltyMins = getLatePenaltyMinutes(l, isSubjectAdmin(l.empId || ''), logs);
               const penalty = penaltyMins > 0 ? roundToUnit(penaltyMins * ((historyEmployee.hourlyRate || 0) / 60)) : 0;
               return sum + penalty;
             }, 0);
@@ -1104,9 +1104,9 @@ export const AttendanceTab: React.FC<AttendanceTabProps> = ({
                               )}
                             </td>
                             <td className="border border-[#e0e0e0] p-[8px_12px] text-center font-mono" style={{ width: `${TABLE_COL_WIDTHS.PHAT_TRE}px` }}>
-                              {getLatePenaltyMinutes(log, isSubjectAdmin(log.empId || '')) > 0 ? (
+                              {getLatePenaltyMinutes(log, isSubjectAdmin(log.empId || ''), logs) > 0 ? (
                                 <span className="text-rose-600 font-bold tabular-nums">
-                                  {formatCurrency(roundToUnit(getLatePenaltyMinutes(log, isSubjectAdmin(log.empId || '')) * ((historyEmployee.hourlyRate || 0) / 60)))}
+                                  {formatCurrency(roundToUnit(getLatePenaltyMinutes(log, isSubjectAdmin(log.empId || ''), logs) * ((historyEmployee.hourlyRate || 0) / 60)))}
                                 </span>
                               ) : (
                                 <span className="text-slate-200 font-light">-</span>
