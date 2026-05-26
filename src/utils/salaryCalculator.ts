@@ -3,8 +3,9 @@ import { safeFormat } from './dateUtils';
 
 export const roundToUnit = (num: number) => Math.round(num);
 
-export function calculateTtnPenalty(timesheets: any[], violations: any[] = []) {
+export function calculateTtnPenalty(timesheets: any[], violations: any[] = [], isAdmin: boolean = false) {
   const getLateMinutes = (t: any) => {
+    if (isAdmin) return 0;
     if (t.lateMinutes !== undefined) return t.lateMinutes;
     const extractTimeStr = (tm: string | undefined | null) => {
         if (!tm) return null;
@@ -22,7 +23,28 @@ export function calculateTtnPenalty(timesheets: any[], violations: any[] = []) {
     return 0;
   };
 
-  const lateCountForTtn = timesheets.filter(t => getLateMinutes(t) > 0 && !t.isLateExcused).length;
+  let lateCountForTtn = 0;
+  let minorLateCount = 0;
+  
+  const sortedTimesheets = [...timesheets].sort((a, b) => {
+      const timeA = a.date + 'T' + (a.checkInTime || '00:00');
+      const timeB = b.date + 'T' + (b.checkInTime || '00:00');
+      return timeA.localeCompare(timeB);
+  });
+  
+  for (const t of sortedTimesheets) {
+      if (t.isLateExcused) continue;
+      const mins = getLateMinutes(t);
+      if (mins >= 10) {
+          lateCountForTtn++;
+      } else if (mins > 0) {
+          minorLateCount++;
+          if (minorLateCount > 5) {
+              lateCountForTtn++;
+          }
+      }
+  }
+
   const skipShiftForTtn = timesheets.find(t => getLateMinutes(t) >= 300 && !t.isLateExcused);
   const violationCount = violations.length;
   // SUSPENDED: const phoneViolationCount = timesheets.filter(t => t.hasPhoneViolation).length;
@@ -87,14 +109,24 @@ export function calculateNetSalary(
   adjustments: any[],
   holidays: any[],
   localAdj: any = {},
-  violations: any[] = []
+  violations: any[] = [],
+  isAdmin: boolean = false
 ) {
   // Use all timesheets and violations for TTN penalty calculation
-  const ttnPenalty = calculateTtnPenalty(timesheets, violations);
+  const ttnPenalty = calculateTtnPenalty(timesheets, violations, isAdmin);
   
   // Filter approved timesheets for salary calculation
-  const approvedTimesheets = timesheets.filter(cc => cc.status !== 'pending_approval');
+  let approvedTimesheets = timesheets.filter(cc => cc.status !== 'pending_approval');
   
+  // Sort by date/time to properly track occurrences over the month
+  approvedTimesheets.sort((a, b) => {
+    const timeA = a.date + 'T' + (a.checkInTime || '00:00');
+    const timeB = b.date + 'T' + (b.checkInTime || '00:00');
+    return timeA.localeCompare(timeB);
+  });
+  
+  let minorLateCountInMonth = 0;
+
   // Dynamically calculate missing totalHours and late minutes
   const calculatedTimesheets = approvedTimesheets.map(cc => {
     let computedHours = cc.totalHours || 0;
@@ -129,10 +161,28 @@ export function calculateNetSalary(
     }
     
     let penaltyMins = cc.latePenaltyMinutes || 0;
-    if (cc.isLateExcused) {
+    if (isAdmin) {
+        lateVal = 0;
         penaltyMins = 0;
-    } else if ((cc.latePenaltyMinutes === undefined || cc.latePenaltyMinutes === 0) && lateVal >= 10) {
-        penaltyMins = lateVal * 3;
+    } else if (cc.isLateExcused) {
+        penaltyMins = 0;
+    } else {
+        if (lateVal >= 10) {
+            penaltyMins = lateVal * 3;
+        } else if (lateVal > 0) {
+            minorLateCountInMonth++;
+            if (minorLateCountInMonth > 5) {
+                penaltyMins = lateVal * 3;
+            } else {
+                penaltyMins = 0; // Clear it in case it was incorrectly set during check-in
+            }
+        }
+    }
+    
+    // Override if explicitly defined and > 0, but since the new rule says recalculate it, 
+    // we only allow it if it was manually set larger than what we calculated.
+    if (cc.latePenaltyMinutes !== undefined && cc.latePenaltyMinutes > penaltyMins && lateVal >= 10) {
+       penaltyMins = cc.latePenaltyMinutes;
     }
 
     return { 
