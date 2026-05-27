@@ -175,7 +175,17 @@ export const useEmployeeAttendance = (
         
         let totalHours = 0;
         let totalPay = 0;
-        const checkInTimeStr = latestLog.checkInTime || scheduledShiftTime;
+        let checkInTimeStr = latestLog.checkInTime || scheduledShiftTime;
+        
+        // Optimize check-in time if they arrived early
+        if (latestLog.scheduledStartTime && checkInTimeStr) {
+           const inDate = new Date(`${latestLog.date}T${checkInTimeStr}`);
+           const schDate = new Date(`${latestLog.date}T${latestLog.scheduledStartTime}`);
+           if (inDate.getTime() < schDate.getTime()) {
+               checkInTimeStr = latestLog.scheduledStartTime;
+           }
+        }
+        
         let updateData: any = {
           photoCheckOut: capturedPhoto,
           gpsOut: coords, // Save GPS coords
