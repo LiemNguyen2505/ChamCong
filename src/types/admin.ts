@@ -105,6 +105,7 @@ export interface Timesheet {
   createdByAdminId?: string;
   incompleteTasks?: string[];
   checkoutRequiresApproval?: boolean;
+  scheduledStartTime?: string;
   scheduledShiftEndTime?: string;
   selectedShiftEndTime?: string;
   note?: string;
