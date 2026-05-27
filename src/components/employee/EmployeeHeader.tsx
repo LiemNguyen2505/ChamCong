@@ -86,7 +86,12 @@ export const EmployeeHeader: React.FC<EmployeeHeaderProps> = ({
         <div className="min-w-0">
           {loggedInEmployee ? (
             <span className="text-[14px] md:text-base font-medium text-white/90 italic">
-              {`Chào ${loggedInEmployee.fullName.split(' ').slice(-1)[0]}!`}
+              {`Chào ${
+                loggedInEmployee.fullName === 'Nguyễn Thị Hồng Anh' ? 'Hồng Anh' :
+                loggedInEmployee.fullName === 'Huỳnh Thuý Anh' ? 'Thuý Anh' :
+                loggedInEmployee.fullName === 'Thạch Thị Bích Tiền' ? 'Bích Tiền' :
+                loggedInEmployee.fullName.split(' ').slice(-1)[0]
+              }!`}
             </span>
           ) : (
             <span className="text-[11px] md:text-sm font-semibold text-white/90 uppercase tracking-wider truncate block">
