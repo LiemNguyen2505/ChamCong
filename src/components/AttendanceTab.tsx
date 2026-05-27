@@ -2,11 +2,14 @@ import React from 'react';
 import { format } from 'date-fns';
 import { vi } from 'date-fns/locale';
 import { motion } from 'motion/react';
-import { Plus, Download, Calendar, X, ChevronLeft, ChevronRight, CheckCircle2, Edit2, Trash2, Smartphone, Clock, AlertCircle, ChevronDown, FileCheck, Image as ImageIcon, MapPin, ArrowLeft } from 'lucide-react';
+import { Plus, Download, Calendar, X, ChevronLeft, ChevronRight, CheckCircle2, Edit2, Trash2, Smartphone, Clock, AlertCircle, ChevronDown, FileCheck, Image as ImageIcon, MapPin, ArrowLeft, Save } from 'lucide-react';
 import { MonthlyAttendanceTable } from './MonthlyAttendanceTable';
 import { Employee, Timesheet, AdminAccount } from '../types/admin';
 import { safeFormat, safeParseDate } from '../utils/dateUtils';
 import { TABLE_COL_WIDTHS, formatMinutes, formatDecimalHours, getTimeStyle, calculateShifts, getLateMinutes, getLatePenaltyMinutes, getTotalHours } from '../utils/adminHelpers';
+import { db } from '../firebase';
+import { doc, updateDoc } from 'firebase/firestore';
+import { toast } from 'react-hot-toast';
 
 interface AttendanceTabProps {
   activeTab: string;
@@ -93,6 +96,42 @@ export const AttendanceTab: React.FC<AttendanceTabProps> = ({
   } | null>(null);
 
   const isAdminOrSuperAdmin = currentAdmin?.role === 'SuperAdmin' || currentAdmin?.role === 'BranchAdmin';
+
+  const [inlineEditingLogId, setInlineEditingLogId] = React.useState<string | null>(null);
+  const [inlineEditingCheckIn, setInlineEditingCheckIn] = React.useState<string>('');
+  const [inlineEditingCheckOut, setInlineEditingCheckOut] = React.useState<string>('');
+
+  const handleSaveInlineEdit = async (log: Timesheet) => {
+    try {
+      let updates: any = {};
+      
+      const constructDateStr = (dateStr: string, timeStr: string) => {
+        if (!timeStr) return null;
+        return `${dateStr}T${timeStr}:00+07:00`;
+      };
+      
+      const newCheckIn = inlineEditingCheckIn ? constructDateStr(log.date, inlineEditingCheckIn) : log.checkInTime;
+      const newCheckOut = inlineEditingCheckOut ? constructDateStr(log.date, inlineEditingCheckOut) : log.checkOutTime;
+      
+      updates.checkInTime = newCheckIn;
+      updates.checkOutTime = newCheckOut;
+      
+      if (inlineEditingCheckIn && inlineEditingCheckOut) {
+         const [inH, inM] = inlineEditingCheckIn.split(':').map(Number);
+         const [outH, outM] = inlineEditingCheckOut.split(':').map(Number);
+         let diff = (outH + outM / 60) - (inH + inM / 60);
+         if (diff < 0) diff += 24; // Handle overnight shift simply
+         updates.totalHours = diff;
+      }
+      
+      await updateDoc(doc(db, 'timesheets', log.id), updates);
+      toast.success('Đã cập nhật giờ công');
+      setInlineEditingLogId(null);
+    } catch (err) {
+      console.error(err);
+      toast.error('Lỗi khi cập nhật giờ công');
+    }
+  };
 
   const PhotoPreviewModal = () => {
     if (!previewPhoto) return null;
@@ -872,7 +911,11 @@ export const AttendanceTab: React.FC<AttendanceTabProps> = ({
                               <div className="flex items-center gap-4 flex-1 overflow-hidden">
                                 <div className="flex items-center gap-2 border-r border-slate-200 pr-3 min-w-0">
                                   <span className="text-[9px] text-slate-400 font-black uppercase tracking-tighter">Vào</span>
-                                  <span className="text-xs font-bold text-slate-700">{log.checkInTime ? safeFormat(log.checkInTime, 'HH:mm', '--:--', log.date) : '--:--'}</span>
+                                  {inlineEditingLogId === log.id ? (
+                                    <input type="time" value={inlineEditingCheckIn} onChange={(e) => setInlineEditingCheckIn(e.target.value)} onClick={(e) => e.stopPropagation()} className="w-16 bg-transparent border-b border-blue-400 focus:outline-none focus:border-blue-600 text-xs font-bold text-slate-700 tabular-nums" />
+                                  ) : (
+                                    <span className="text-xs font-bold text-slate-700">{log.checkInTime ? safeFormat(log.checkInTime, 'HH:mm', '--:--', log.date) : '--:--'}</span>
+                                  )}
                                   {isAdminOrSuperAdmin && (log.photoCheckIn || log.AnhVaoCa) && (
                                     <button 
                                       onClick={() => setPreviewPhoto({
@@ -890,7 +933,11 @@ export const AttendanceTab: React.FC<AttendanceTabProps> = ({
                                 </div>
                                 <div className="flex items-center gap-2 min-w-0">
                                   <span className="text-[9px] text-slate-400 font-black uppercase tracking-tighter">Ra</span>
-                                  <span className="text-xs font-bold text-slate-700">{log.checkOutTime ? safeFormat(log.checkOutTime, 'HH:mm', '--:--', log.date) : '--:--'}</span>
+                                  {inlineEditingLogId === log.id ? (
+                                    <input type="time" value={inlineEditingCheckOut} onChange={(e) => setInlineEditingCheckOut(e.target.value)} onClick={(e) => e.stopPropagation()} className="w-16 bg-transparent border-b border-blue-400 focus:outline-none focus:border-blue-600 text-xs font-bold text-slate-700 tabular-nums" />
+                                  ) : (
+                                    <span className="text-xs font-bold text-slate-700">{log.checkOutTime ? safeFormat(log.checkOutTime, 'HH:mm', '--:--', log.date) : '--:--'}</span>
+                                  )}
                                   {isAdminOrSuperAdmin && (log.photoCheckOut || log.AnhRaCa) && (
                                     <button 
                                       onClick={() => setPreviewPhoto({
@@ -917,22 +964,26 @@ export const AttendanceTab: React.FC<AttendanceTabProps> = ({
                                   </button>
                                 )}
                                 {canEdit && (
+                                  inlineEditingLogId === log.id ? (
+                                    <button
+                                      onClick={(e) => { e.stopPropagation(); handleSaveInlineEdit(log.id); }}
+                                      className="p-1 text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors border border-emerald-100 flex items-center justify-center"
+                                    >
+                                      <Save className="w-4 h-4" />
+                                    </button>
+                                  ) : (
                                     <button
                                       onClick={(e) => {
                                         e.stopPropagation();
-                                        setEditingAttendance({
-                                          ...log,
-                                          totalHours: log.totalHours,
-                                          lateMinutes: log.lateMinutes,
-                                          checkInTime: log.checkInTime ? safeFormat(log.checkInTime, 'HH:mm', '', log.date) : '',
-                                          checkOutTime: log.checkOutTime ? safeFormat(log.checkOutTime, 'HH:mm', '', log.date) : ''
-                                        });
-                                        setShowEditAttendanceModal(true);
+                                        setInlineEditingLogId(log.id);
+                                        setInlineEditingCheckIn(log.checkInTime ? safeFormat(log.checkInTime, 'HH:mm', '', log.date) : '');
+                                        setInlineEditingCheckOut(log.checkOutTime ? safeFormat(log.checkOutTime, 'HH:mm', '', log.date) : '');
                                       }}
                                       className="p-1 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors border border-blue-100"
                                     >
                                       <Edit2 className="w-4 h-4" />
                                     </button>
+                                  )
                                 )}
                                 {canDelete && (
                                     <button
@@ -1215,7 +1266,11 @@ export const AttendanceTab: React.FC<AttendanceTabProps> = ({
                                       <div className="flex items-center gap-3 flex-1 overflow-hidden">
                                         <div className="flex items-center gap-1.5 border-r border-slate-200 pr-2 min-w-0">
                                           <span className="text-[9px] text-slate-400 font-black uppercase">Vào</span>
-                                          <span className="text-[11px] font-black text-slate-700 whitespace-nowrap leading-none">{log.checkInTime ? safeFormat(log.checkInTime, 'HH:mm', '--:--', log.date) : '--:--'}</span>
+                                          {inlineEditingLogId === log.id ? (
+                                            <input type="time" value={inlineEditingCheckIn} onChange={(e) => setInlineEditingCheckIn(e.target.value)} onClick={(e) => e.stopPropagation()} className="w-16 bg-transparent border-b border-blue-400 focus:outline-none focus:border-blue-600 text-[11px] font-black text-slate-700 tabular-nums leading-none" />
+                                          ) : (
+                                            <span className="text-[11px] font-black text-slate-700 whitespace-nowrap leading-none">{log.checkInTime ? safeFormat(log.checkInTime, 'HH:mm', '--:--', log.date) : '--:--'}</span>
+                                          )}
                                           {isAdminOrSuperAdmin && (log.photoCheckIn || log.AnhVaoCa) && (
                                             <button 
                                               onClick={() => setPreviewPhoto({
@@ -1233,7 +1288,11 @@ export const AttendanceTab: React.FC<AttendanceTabProps> = ({
                                         </div>
                                         <div className="flex items-center gap-1.5 min-w-0">
                                           <span className="text-[9px] text-slate-400 font-black uppercase leading-none">Ra</span>
-                                          <span className="text-[11px] font-black text-slate-700 whitespace-nowrap leading-none">{log.checkOutTime ? safeFormat(log.checkOutTime, 'HH:mm', '--:--', log.date) : '--:--'}</span>
+                                          {inlineEditingLogId === log.id ? (
+                                            <input type="time" value={inlineEditingCheckOut} onChange={(e) => setInlineEditingCheckOut(e.target.value)} onClick={(e) => e.stopPropagation()} className="w-16 bg-transparent border-b border-blue-400 focus:outline-none focus:border-blue-600 text-[11px] font-black text-slate-700 tabular-nums leading-none" />
+                                          ) : (
+                                            <span className="text-[11px] font-black text-slate-700 whitespace-nowrap leading-none">{log.checkOutTime ? safeFormat(log.checkOutTime, 'HH:mm', '--:--', log.date) : '--:--'}</span>
+                                          )}
                                           {isAdminOrSuperAdmin && (log.photoCheckOut || log.AnhRaCa) && (
                                             <button 
                                               onClick={() => setPreviewPhoto({
@@ -1266,22 +1325,26 @@ export const AttendanceTab: React.FC<AttendanceTabProps> = ({
                                             </button>
                                           )}
                                           {['SuperAdmin', 'BranchAdmin'].includes(currentAdmin?.role || '') && (
+                                            inlineEditingLogId === log.id ? (
+                                              <button
+                                                onClick={(e) => { e.stopPropagation(); handleSaveInlineEdit(log.id); }}
+                                                className="p-1 text-emerald-600 hover:bg-emerald-50 rounded transition-colors border border-emerald-100 flex items-center justify-center"
+                                              >
+                                                <Save className="w-3.5 h-3.5" />
+                                              </button>
+                                            ) : (
                                               <button
                                                 onClick={(e) => {
                                                   e.stopPropagation();
-                                                  setEditingAttendance({
-                                                    ...log,
-                                                    totalHours: log.totalHours,
-                                                    lateMinutes: log.lateMinutes,
-                                                    checkInTime: log.checkInTime ? safeFormat(log.checkInTime, 'HH:mm', '', log.date) : '',
-                                                    checkOutTime: log.checkOutTime ? safeFormat(log.checkOutTime, 'HH:mm', '', log.date) : ''
-                                                  });
-                                                  setShowEditAttendanceModal(true);
+                                                  setInlineEditingLogId(log.id);
+                                                  setInlineEditingCheckIn(log.checkInTime ? safeFormat(log.checkInTime, 'HH:mm', '', log.date) : '');
+                                                  setInlineEditingCheckOut(log.checkOutTime ? safeFormat(log.checkOutTime, 'HH:mm', '', log.date) : '');
                                                 }}
                                                 className="p-1 text-blue-600 hover:bg-blue-50 rounded transition-colors border border-blue-100"
                                               >
                                                 <Edit2 className="w-3.5 h-3.5" />
                                               </button>
+                                            )
                                           )}
                                           {(currentAdmin?.role === 'SuperAdmin' || (log.createdByAdminId && log.createdByAdminId === currentAdmin?.id)) && (
                                               <button
