@@ -146,20 +146,17 @@ export default function App() {
     }
   }, []);
 
-  const isInitialFetchingStarted = useRef(false);
-
   useEffect(() => {
-    // If not logged in yet, we still might need data for the login screen (employees list)
-    // So we load once regardless of being logged in or not, or if auth state changes
-    if (!hasInitialLoadedRef.current && !isInitialFetchingStarted.current) {
-      isInitialFetchingStarted.current = true;
-      fetchInitialData();
-    }
+    // Always fetch data on mount so we have data for login screen
+    fetchInitialData();
 
     const unsubscribe = onAuthStateChanged(auth, (user) => {
       setCurrentUser(user);
     });
-    return () => unsubscribe();
+    
+    return () => {
+      unsubscribe();
+    };
   }, [fetchInitialData]);
 
   return (
