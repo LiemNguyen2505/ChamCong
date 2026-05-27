@@ -3,6 +3,8 @@ import { safeFormat } from './dateUtils';
 
 export const roundToUnit = (num: number) => Math.round(num);
 
+import { getTotalHours } from './adminHelpers';
+
 export function calculateTtnPenalty(timesheets: any[], violations: any[] = [], isAdmin: boolean = false) {
   const getLateMinutes = (t: any) => {
     if (isAdmin) return 0;
@@ -129,21 +131,25 @@ export function calculateNetSalary(
 
   // Dynamically calculate missing totalHours and late minutes
   const calculatedTimesheets = approvedTimesheets.map(cc => {
-    let computedHours = cc.totalHours || 0;
+    let computedHours = getTotalHours(cc);
     const extractTimeStr = (t: string | undefined | null) => {
         if (!t) return null;
         return t.includes('T') ? t.split('T')[1].substring(0, 5) : (t.includes(' ') ? t.split(' ')[1].substring(0, 5) : t.substring(0, 5));
     };
     
-    const inTimeStr = extractTimeStr(cc.checkInTime);
+    let inTimeStr = extractTimeStr(cc.checkInTime);
     const outTimeStr = extractTimeStr(cc.checkOutTime);
 
-    if (!computedHours && inTimeStr && outTimeStr) {
-      const [inH, inM] = inTimeStr.split(':').map(Number);
-      const [outH, outM] = outTimeStr.split(':').map(Number);
-      let diff = (outH * 60 + outM) - (inH * 60 + inM);
-      if (diff < 0) diff += 24 * 60;
-      if (diff > 0) computedHours = diff / 60;
+    // Apply scheduled shift optimization to inTimeStr for late calculation:
+    if (cc.scheduledStartTime && inTimeStr) {
+        const schTimeStr = extractTimeStr(cc.scheduledStartTime);
+        if (schTimeStr) {
+          const [schH, schM] = schTimeStr.split(':').map(Number);
+          const [inH, inM] = inTimeStr.split(':').map(Number);
+          if (inH * 60 + inM < schH * 60 + schM) {
+            inTimeStr = schTimeStr;
+          }
+        }
     }
 
     let lateVal = cc.lateMinutes;
