@@ -299,10 +299,7 @@ export const SmartScheduleBuilder: React.FC<SmartScheduleBuilderProps> = (props)
           const shiftId = getShiftDeterministicId(emp.id, dateStr, preset.id);
           const shift = localSchedules.find(s => s.id === shiftId);
           
-          let isShiftVisible = false;
-          if (shift) {
-             isShiftVisible = activeBranch === 'All' || shift.locationId === activeBranch;
-          }
+          let isShiftVisible = !!shift;
 
           const isActive = isShiftVisible;
           const isOffSlot = shift?.isOff;
