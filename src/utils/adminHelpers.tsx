@@ -91,18 +91,33 @@ export const getPhonePenalty = (t: any, hourlyRate: number) => {
 };
 
 export const getTotalHours = (t: any) => {
-  if (t.totalHours !== undefined) return t.totalHours;
-  
   const inTimeStr = extractTimeStr(t.checkInTime);
   const outTimeStr = extractTimeStr(t.checkOutTime);
 
   if (inTimeStr && outTimeStr) {
-    const [inH, inM] = inTimeStr.split(':').map(Number);
+    let [inH, inM] = inTimeStr.split(':').map(Number);
+    
+    // Optimize check-in time against scheduled start time
+    if (t.scheduledStartTime) {
+      const scheduledStr = extractTimeStr(t.scheduledStartTime);
+      if (scheduledStr) {
+        const [schH, schM] = scheduledStr.split(':').map(Number);
+        if (inH * 60 + inM < schH * 60 + schM) {
+          inH = schH;
+          inM = schM;
+        }
+      }
+    }
+
     const [outH, outM] = outTimeStr.split(':').map(Number);
     let diff = (outH * 60 + outM) - (inH * 60 + inM);
-    if (diff < 0) diff += 24 * 60;
+    if (diff < 0) diff += 24 * 60; // overnight
     if (diff > 0) return diff / 60;
   }
+  
+  // Fallback to static totalHours if checkIn/checkOut are malformed or missing
+  if (t.totalHours !== undefined) return t.totalHours;
+
   return 0;
 };
 
