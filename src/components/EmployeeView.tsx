@@ -153,9 +153,9 @@ export default function EmployeeView({
   const employeeTodayShifts = useMemo(() => {
     if (!loggedInEmployee) return [];
     return globalData.lichLamViecs
-      .filter((s: any) => s.date === format(new Date(), 'yyyy-MM-dd') && !s.isOff && s.locationId === kioskBranch && s.empId === loggedInEmployee.id)
+      .filter((s: any) => s.date === format(new Date(), 'yyyy-MM-dd') && !s.isOff && s.empId === loggedInEmployee.id)
       .sort((a: any, b: any) => a.startTime.localeCompare(b.startTime));
-  }, [globalData.lichLamViecs, loggedInEmployee, kioskBranch]);
+  }, [globalData.lichLamViecs, loggedInEmployee]);
 
   const isSubjectAdmin = loggedInEmployee?.empId?.toUpperCase() === 'ADMIN' || 
                          admins.some((a: any) => a.email === loggedInEmployee?.fullName);
