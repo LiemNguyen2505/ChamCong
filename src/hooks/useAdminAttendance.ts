@@ -87,7 +87,7 @@ export const useAdminAttendance = ({
       await logAction('Chấm công hộ', 'Chấm công', `Chấm công hộ cho ${employee.fullName} (Mã: ${manualAttendance.empId}) vào ngày ${manualAttendance.date}`);
 
       toast.success('Chấm công hộ thành công', { id: loadingToast });
-      await fetchInitialData(filterMonth, true);
+      await fetchInitialData(filterMonth, ['chamCongs']);
       setShowManualCheckin(false);
       setManualAttendance({
         empId: '',
@@ -164,7 +164,7 @@ export const useAdminAttendance = ({
       await logAction('Sửa', 'Chấm công', `Sửa bản ghi chấm công của ${employee.fullName} (Mã: ${editingAttendance.empId}) ngày ${editingAttendance.date}`);
 
       toast.success('Cập nhật chấm công thành công', { id: loadingToast });
-      await fetchInitialData(filterMonth, true);
+      await fetchInitialData(filterMonth, ['chamCongs']);
       setShowEditAttendanceModal(false);
       setEditingAttendance(null);
     } catch (error) {
@@ -208,7 +208,7 @@ export const useAdminAttendance = ({
 
       await logAction('Duyệt giờ công', log.empId, `Duyệt giờ công ngoài lịch cho ${log.empId} ngày ${log.date}`);
       toast.success('Đã duyệt giờ công thành công', { id: loadingToast });
-      await fetchInitialData(filterMonth, true);
+      await fetchInitialData(filterMonth, ['chamCongs']);
     } catch (error) {
       console.error(error);
       toast.error('Lỗi khi duyệt giờ công', { id: loadingToast });
@@ -232,7 +232,7 @@ export const useAdminAttendance = ({
           await deleteDoc(doc(db, 'timesheets', log.id));
           await logAction('Xóa', 'Chấm công', `Xóa bản ghi chấm công của nhân viên (Mã: ${log.empId}) ngày ${log.date}`);
           toast.success('Xóa bản ghi thành công', { id: loadingToast });
-          await fetchInitialData(filterMonth, true);
+          await fetchInitialData(filterMonth, ['chamCongs']);
         } catch (error) {
           console.error(error);
           toast.error('Lỗi khi xóa bản ghi', { id: loadingToast });
