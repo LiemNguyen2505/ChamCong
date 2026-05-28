@@ -40,6 +40,7 @@ interface AttendanceTabProps {
   BranchTabs: React.FC<any>;
   isLoading?: boolean;
   admins: AdminAccount[];
+  fetchInitialData?: (month?: string, force?: any) => Promise<any>;
 }
 
 const formatCurrency = (val: number) => new Intl.NumberFormat('vi-VN').format(val);
@@ -74,7 +75,8 @@ export const AttendanceTab: React.FC<AttendanceTabProps> = ({
   checkEmployeeReview,
   BranchTabs,
   isLoading,
-  admins
+  admins,
+  fetchInitialData
 }) => {
   if (activeTab !== 'bangcongthang') return null;
 
@@ -105,20 +107,23 @@ export const AttendanceTab: React.FC<AttendanceTabProps> = ({
     try {
       let updates: any = {};
       
-      const constructDateStr = (dateStr: string, timeStr: string) => {
-        if (!timeStr) return null;
-        return `${dateStr}T${timeStr}:00+07:00`;
-      };
-      
-      const newCheckIn = inlineEditingCheckIn ? constructDateStr(log.date, inlineEditingCheckIn) : log.checkInTime;
-      const newCheckOut = inlineEditingCheckOut ? constructDateStr(log.date, inlineEditingCheckOut) : log.checkOutTime;
+      const newCheckIn = inlineEditingCheckIn || log.checkInTime;
+      const newCheckOut = inlineEditingCheckOut || log.checkOutTime;
       
       updates.checkInTime = newCheckIn;
       updates.checkOutTime = newCheckOut;
       
-      if (inlineEditingCheckIn && inlineEditingCheckOut) {
-         const [inH, inM] = inlineEditingCheckIn.split(':').map(Number);
-         const [outH, outM] = inlineEditingCheckOut.split(':').map(Number);
+      if (newCheckIn && newCheckOut) {
+         const getHM = (val: string) => {
+            if (val.includes('T')) {
+               const date = new Date(val);
+               return [date.getHours(), date.getMinutes()];
+            }
+            return val.split(':').map(Number);
+         };
+         
+         const [inH, inM] = getHM(newCheckIn);
+         const [outH, outM] = getHM(newCheckOut);
          let diff = (outH + outM / 60) - (inH + inM / 60);
          if (diff < 0) diff += 24; // Handle overnight shift simply
          updates.totalHours = diff;
@@ -127,6 +132,9 @@ export const AttendanceTab: React.FC<AttendanceTabProps> = ({
       await updateDoc(doc(db, 'timesheets', log.id), updates);
       toast.success('Đã cập nhật giờ công');
       setInlineEditingLogId(null);
+      if (fetchInitialData) {
+         await fetchInitialData(filterMonth, ['chamCongs']);
+      }
     } catch (err) {
       console.error(err);
       toast.error('Lỗi khi cập nhật giờ công');
@@ -966,7 +974,7 @@ export const AttendanceTab: React.FC<AttendanceTabProps> = ({
                                 {canEdit && (
                                   inlineEditingLogId === log.id ? (
                                     <button
-                                      onClick={(e) => { e.stopPropagation(); handleSaveInlineEdit(log.id); }}
+                                      onClick={(e) => { e.stopPropagation(); handleSaveInlineEdit(log); }}
                                       className="p-1 text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors border border-emerald-100 flex items-center justify-center"
                                     >
                                       <Save className="w-4 h-4" />
@@ -1327,7 +1335,7 @@ export const AttendanceTab: React.FC<AttendanceTabProps> = ({
                                           {['SuperAdmin', 'BranchAdmin'].includes(currentAdmin?.role || '') && (
                                             inlineEditingLogId === log.id ? (
                                               <button
-                                                onClick={(e) => { e.stopPropagation(); handleSaveInlineEdit(log.id); }}
+                                                onClick={(e) => { e.stopPropagation(); handleSaveInlineEdit(log); }}
                                                 className="p-1 text-emerald-600 hover:bg-emerald-50 rounded transition-colors border border-emerald-100 flex items-center justify-center"
                                               >
                                                 <Save className="w-3.5 h-3.5" />
