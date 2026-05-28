@@ -32,9 +32,12 @@ export function useSmartScheduleBuilder(props: SmartScheduleBuilderProps) {
   const [employeeOrder, setEmployeeOrder] = useState<string[]>(() => {
     try {
       const saved = localStorage.getItem('smart_schedule_emp_order');
-      if (saved) return JSON.parse(saved);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) return parsed;
+      }
     } catch {}
-    return employees.map(e => e.id);
+    return employees ? employees.map(e => e.id) : [];
   });
 
   useEffect(() => {
@@ -527,7 +530,7 @@ export function useSmartScheduleBuilder(props: SmartScheduleBuilderProps) {
         
         // Next, check their shifts in this branch this week to see if there's a role override
         const activeBranchShifts = localSchedules.filter(s => 
-          s.empId === e.id && 
+          (s.empId === e.id || s.empId === e.empId) && 
           s.locationId === activeBranch &&
           s.date >= weekStartStr && 
           s.date <= weekEndStr
@@ -548,7 +551,7 @@ export function useSmartScheduleBuilder(props: SmartScheduleBuilderProps) {
         if (manualSupport) return manualSupport.role === 'PV' || manualSupport.role === 'BOTH';
         
         const activeBranchShifts = localSchedules.filter(s => 
-          s.empId === e.id && 
+          (s.empId === e.id || s.empId === e.empId) && 
           s.locationId === activeBranch &&
           s.date >= weekStartStr && 
           s.date <= weekEndStr
@@ -564,8 +567,8 @@ export function useSmartScheduleBuilder(props: SmartScheduleBuilderProps) {
     });
     
     const sortFn = (a: Employee, b: Employee) => {
-        const indexA = employeeOrder.indexOf(a.id);
-        const indexB = employeeOrder.indexOf(b.id);
+        const indexA = employeeOrder?.indexOf ? employeeOrder.indexOf(a.id) : -1;
+        const indexB = employeeOrder?.indexOf ? employeeOrder.indexOf(b.id) : -1;
         if (indexA !== -1 && indexB !== -1) return indexA - indexB;
         if (indexA !== -1) return -1;
         if (indexB !== -1) return 1;
