@@ -40,8 +40,9 @@ export default function App() {
   const hasInitialLoadedRef = useRef(false);
   const isFetchingInProgress = useRef(false); // GLOBAL FETCH LOCK
 
-  const fetchInitialData = useCallback(async (monthYear?: string, force = false) => {
+  const fetchInitialData = useCallback(async (monthYear?: string, force: boolean | string | string[] = false, options?: { empId?: string, onlyToday?: boolean }) => {
     const targetMonth = monthYear || format(new Date(), 'yyyy-MM');
+    const cacheKey = `${targetMonth}_${options?.empId || 'all'}_${options?.onlyToday ? 'today' : 'month'}`;
     const now = Date.now();
     
     // 0. AVOID FLOODING DURING CRASHES
@@ -55,18 +56,17 @@ export default function App() {
     }
 
     // 1. CACHE CHECK
-    if (!force && dataCacheRef.current[targetMonth]) {
-      // console.log(`✅ [App] Cache Hit: ${targetMonth}`);
-      setGlobalData({ ...dataCacheRef.current[targetMonth], lastUpdated: new Date().toISOString() });
-      return dataCacheRef.current[targetMonth];
+    if (!force && dataCacheRef.current[cacheKey]) {
+      setGlobalData((prev: any) => ({ ...prev, ...dataCacheRef.current[cacheKey], lastUpdated: new Date().toISOString() }));
+      return dataCacheRef.current[cacheKey];
     }
 
-    // 2. GLOBAL FETCH LOCK
+    // 2. GLOBAL FETCH LOCK (Only apply if force is completely false)
     if (isFetchingInProgress.current && !force) {
       return;
     }
 
-    // 3. THROTTLE (2 seconds)
+    // 3. THROTTLE (2 seconds) - allow targeted force updates
     const lastFetch = (window as any).lastGlobalFetchTime || 0;
     if (!force && (now - lastFetch < 2000)) {
        return;
@@ -78,7 +78,7 @@ export default function App() {
     isFetchingInProgress.current = true;
     
     try {
-      console.log(`🚀 [App] Fetching data for: ${targetMonth}`);
+      console.log(`🚀 [App] Fetching data for: ${cacheKey}, force=${force}`);
       const [year, month] = targetMonth.split('-').map(Number);
       
       const rawStart = new Date(year, month - 1, 1);
@@ -96,30 +96,48 @@ export default function App() {
       
       const startDate = formatLocal(bufferStart);
       const endDate = formatLocal(bufferEnd);
+      const todayStr = format(new Date(), 'yyyy-MM-dd');
 
-      const config: { key: string; query: any; type: 'static' | 'dynamic' }[] = [
+      const config: { key: string; query: any; type: 'static' | 'dynamic' | 'lazy' }[] = [
         { key: 'nhanViens', query: query(collection(db, 'employees'), limit(500)), type: 'dynamic' },
         { key: 'admins', query: query(collection(db, 'Admins'), limit(100)), type: 'dynamic' },
-        { key: 'canhBaos', query: query(collection(db, 'CanhBao'), orderBy('timestamp', 'desc'), limit(30)), type: 'dynamic' },
-        { key: 'notifications', query: query(collection(db, 'Notifications'), orderBy('createdAt', 'desc'), limit(30)), type: 'dynamic' },
-        { key: 'auditLogs', query: query(collection(db, 'AuditLogs'), orderBy('timestamp', 'desc'), limit(15)), type: 'dynamic' },
-        { key: 'approvalRequests', query: query(collection(db, 'ApprovalRequests'), orderBy('createdAt', 'desc'), limit(200)), type: 'dynamic' },
+        { key: 'canhBaos', query: query(collection(db, 'CanhBao'), orderBy('timestamp', 'desc'), limit(30)), type: 'lazy' },
+        { key: 'notifications', query: query(collection(db, 'Notifications'), orderBy('createdAt', 'desc'), limit(30)), type: 'lazy' },
+        { key: 'auditLogs', query: query(collection(db, 'AuditLogs'), orderBy('timestamp', 'desc'), limit(15)), type: 'lazy' },
+        { key: 'approvalRequests', query: query(collection(db, 'ApprovalRequests'), orderBy('createdAt', 'desc'), limit(200)), type: 'lazy' },
         { key: 'holidays', query: query(collection(db, 'Holidays'), limit(50)), type: 'static' },
         { key: 'materialItems', query: query(collection(db, 'MaterialItems'), limit(50)), type: 'static' },
-        { key: 'payrollAdjustments', query: query(collection(db, 'PayrollAdjustments'), where('monthYear', '==', targetMonth)), type: 'dynamic' },
-        { key: 'violations', query: query(collection(db, 'Violations'), where('monthYear', '==', targetMonth)), type: 'dynamic' },
-        { key: 'materialLossLogs', query: query(collection(db, 'MaterialLossLogs'), where('monthYear', '==', targetMonth), orderBy('processedAt', 'desc'), limit(100)), type: 'dynamic' },
-        { key: 'retainedSalaryRecords', query: query(collection(db, 'RetainedSalaryRecords'), orderBy('createdAt', 'desc'), limit(500)), type: 'dynamic' },
-        { key: 'salaryAdvanceRecords', query: query(collection(db, 'SalaryAdvanceRecords'), where('monthYear', '==', targetMonth), orderBy('createdAt', 'desc')), type: 'dynamic' },
-        { key: 'chamCongs', query: query(collection(db, 'timesheets'), where('date', '>=', startDate), where('date', '<=', endDate), limit(3000)), type: 'dynamic' },
-        { key: 'lichLamViecs', query: query(collection(db, 'LichLamViec'), where('date', '>=', startDate), where('date', '<=', endDate), limit(3000)), type: 'dynamic' },
-        { key: 'bulletinNotes', query: query(collection(db, 'BulletinBoard'), orderBy('isPinned', 'desc'), orderBy('createdAt', 'desc'), limit(100)), type: 'dynamic' },
+        { key: 'payrollAdjustments', query: options?.empId ? query(collection(db, 'PayrollAdjustments'), where('monthYear', '==', targetMonth), where('empId', '==', options.empId)) : query(collection(db, 'PayrollAdjustments'), where('monthYear', '==', targetMonth)), type: 'lazy' },
+        { key: 'violations', query: options?.empId ? query(collection(db, 'Violations'), where('monthYear', '==', targetMonth), where('empId', '==', options.empId)) : query(collection(db, 'Violations'), where('monthYear', '==', targetMonth)), type: 'lazy' },
+        { key: 'materialLossLogs', query: query(collection(db, 'MaterialLossLogs'), where('monthYear', '==', targetMonth), orderBy('processedAt', 'desc'), limit(100)), type: 'lazy' },
+        { key: 'retainedSalaryRecords', query: query(collection(db, 'RetainedSalaryRecords'), orderBy('createdAt', 'desc'), limit(500)), type: 'lazy' },
+        { key: 'salaryAdvanceRecords', query: options?.empId ? query(collection(db, 'SalaryAdvanceRecords'), where('monthYear', '==', targetMonth), where('empId', '==', options.empId), orderBy('createdAt', 'desc')) : query(collection(db, 'SalaryAdvanceRecords'), where('monthYear', '==', targetMonth), orderBy('createdAt', 'desc')), type: 'lazy' },
+        { key: 'chamCongs', query: options?.empId ? (options.onlyToday ? query(collection(db, 'timesheets'), where('date', '==', todayStr), where('empId', '==', options.empId), limit(5)) : query(collection(db, 'timesheets'), where('date', '>=', startDate), where('date', '<=', endDate), where('empId', '==', options.empId), limit(100))) : query(collection(db, 'timesheets'), where('date', '>=', startDate), where('date', '<=', endDate), limit(3000)), type: 'lazy' },
+        { key: 'lichLamViecs', query: options?.empId ? (options.onlyToday ? query(collection(db, 'LichLamViec'), where('date', '==', todayStr), where('empId', '==', options.empId), limit(5)) : query(collection(db, 'LichLamViec'), where('date', '>=', startDate), where('date', '<=', endDate), where('empId', '==', options.empId), limit(100))) : query(collection(db, 'LichLamViec'), where('date', '>=', startDate), where('date', '<=', endDate), limit(3000)), type: 'lazy' },
+        { key: 'bulletinNotes', query: query(collection(db, 'BulletinBoard'), orderBy('isPinned', 'desc'), orderBy('createdAt', 'desc'), limit(100)), type: 'lazy' },
         { key: 'planningGoals', query: query(collection(db, 'PlanningGoals'), limit(100)), type: 'static' },
-        { key: 'xinNghiPheps', query: query(collection(db, 'XinNghiPhep'), limit(1000)), type: 'static' },
-        { key: 'salaryHistories', query: query(collection(db, 'SalaryHistories'), limit(500)), type: 'static' }
+        { key: 'xinNghiPheps', query: options?.empId ? query(collection(db, 'XinNghiPhep'), where('empId', '==', options.empId), limit(100)) : query(collection(db, 'XinNghiPhep'), limit(1000)), type: 'lazy' },
+        { key: 'salaryHistories', query: query(collection(db, 'SalaryHistories'), limit(500)), type: 'lazy' }
       ];
 
-      const activeQueries = config.filter(c => !(!force && c.type === 'static' && hasInitialLoadedRef.current));
+      // If force is a targeted array/string, ONLY fetch those queries
+      const forceKeys = Array.isArray(force) ? force : (typeof force === 'string' ? [force] : null);
+      
+      const activeQueries = config.filter(c => {
+        if (forceKeys) {
+          return forceKeys.includes(c.key);
+        }
+        if (force === true) {
+          return true; // Fetch all if force is true
+        }
+        if (hasInitialLoadedRef.current) return false; // Initial load only fetches types: dynamic & static
+        return c.type !== 'lazy'; // Only fetch dynamic & static on start, ignore lazy
+      });
+
+      if (activeQueries.length === 0) {
+          return {}; // Nothing to fetch
+      }
+
       const snapshots = await Promise.all(activeQueries.map(c => getDocs(c.query)));
       
       const newData: any = {};
@@ -128,8 +146,9 @@ export default function App() {
       });
 
       setGlobalData((prev: any) => {
+        // preserve the old data for keys we didn't fetch
         const merged = { ...prev, ...newData, lastUpdated: new Date().toISOString() };
-        dataCacheRef.current[targetMonth] = merged;
+        dataCacheRef.current[cacheKey] = merged;
         return merged;
       });
       
