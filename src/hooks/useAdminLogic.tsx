@@ -128,13 +128,6 @@ export function useAdminLogic(globalData: any, fetchInitialData: any, isLoading:
       if (!isProtected) {
         setShowCompactActionMenu(false);
         setShowDatePickerGrid(false);
-        
-        // Reset state to default (Bảng Chấm Công Overview)
-        if (historyEmployee || historyDay) {
-          setHistoryEmployee(null);
-          setHistoryDay(null);
-          setMobileHistoryMode('employee'); // Default back to employee list view
-        }
       }
     };
 
@@ -310,11 +303,21 @@ export function useAdminLogic(globalData: any, fetchInitialData: any, isLoading:
     const raw = globalData.nhanViens;
     if (currentAdmin?.role === 'SuperAdmin') return raw;
     const adminLocations = currentAdmin?.locationIds || [];
-    return raw.filter(nv => 
+    
+    const employeesWithShifts = new Set();
+    globalData.lichLamViecs?.forEach((s: any) => {
+      if (adminLocations.includes(s.locationId)) {
+        employeesWithShifts.add(s.empId);
+      }
+    });
+
+    return raw.filter((nv: any) => 
       (nv.locationId && adminLocations.includes(nv.locationId)) || 
-      (nv.locationIds && nv.locationIds.some((id: string) => adminLocations.includes(id)))
+      (nv.locationIds && nv.locationIds.some((id: string) => adminLocations.includes(id))) ||
+      employeesWithShifts.has(nv.id) ||
+      employeesWithShifts.has(nv.empId)
     );
-  }, [globalData.nhanViens, currentAdmin]);
+  }, [globalData.nhanViens, globalData.lichLamViecs, currentAdmin]);
 
   // Get current admin display name
   const adminDisplayName = useMemo(() => {
@@ -458,7 +461,7 @@ export function useAdminLogic(globalData: any, fetchInitialData: any, isLoading:
         position,
         goalShifts: Number(goalShifts)
       }, { merge: true });
-      await fetchInitialData(filterMonth, true);
+      await fetchInitialData(filterMonth, ['planningGoals']);
       toast.success('Đã cập nhật mục tiêu', { id: loadingToast });
     } catch (error) {
       console.error('Error updating planning goal:', error);
@@ -738,7 +741,8 @@ export function useAdminLogic(globalData: any, fetchInitialData: any, isLoading:
         return cc;
       });
 
-      statsMap[emp.id] = calculateNetSalary(emp, filterMonth, adjustedTimesheets, payrollAdjustments, holidays, localAdjustments[emp.id] || {}, violations.filter(v => (v.empId === emp.id || v.empId === emp.empId) && v.monthYear === filterMonth));
+      const isSubjectAdmin = emp.empId?.toUpperCase() === 'ADMIN' || admins.some((a: any) => a.email === emp.fullName);
+      statsMap[emp.id] = calculateNetSalary(emp, filterMonth, adjustedTimesheets, payrollAdjustments, holidays, localAdjustments[emp.id] || {}, violations.filter(v => (v.empId === emp.id || v.empId === emp.empId) && v.monthYear === filterMonth), isSubjectAdmin);
     });
     return statsMap;
   }, [nhanViens, chamCongs, lichLamViecs, payrollAdjustments, holidays, localAdjustments, filterMonth, violations]);
@@ -748,7 +752,8 @@ export function useAdminLogic(globalData: any, fetchInitialData: any, isLoading:
         return allEmployeeSalaryStatsMap[emp.id];
     }
     // Very fallback logic if called for different month
-    return calculateNetSalary(emp, month, [], payrollAdjustments, holidays, localAdjustments[emp.id] || {}, violations.filter(v => (v.empId === emp.id || v.empId === emp.empId) && v.monthYear === month));
+    const isSubjectAdmin = emp.empId?.toUpperCase() === 'ADMIN' || admins.some((a: any) => a.email === emp.fullName);
+    return calculateNetSalary(emp, month, [], payrollAdjustments, holidays, localAdjustments[emp.id] || {}, violations.filter(v => (v.empId === emp.id || v.empId === emp.empId) && v.monthYear === month), isSubjectAdmin);
   }, [allEmployeeSalaryStatsMap, filterMonth, payrollAdjustments, holidays, localAdjustments, violations]);
 
   useEffect(() => {
@@ -993,7 +998,7 @@ export function useAdminLogic(globalData: any, fetchInitialData: any, isLoading:
         plannedEndTime: newEndTime
       });
       toast.success('Đã cập nhật giờ ra ca dự kiến!', { id: loadingToast });
-      await fetchInitialData(filterMonth, true); // Force refresh cache
+      await fetchInitialData(filterMonth, ['lichLamViecs']); // Force refresh cache
       setShowAdjustModal(false);
     } catch (error) {
       toast.error('Lỗi khi cập nhật giờ ra ca', { id: loadingToast });
@@ -1119,7 +1124,7 @@ export function useAdminLogic(globalData: any, fetchInitialData: any, isLoading:
       });
       setCurrentAdmin({ ...currentAdmin, notificationSettings: newSettings });
       toast.success(`Đã ${newSettings.enabled ? 'bật' : 'tắt'} thông báo`, { id: loadingToast });
-      await fetchInitialData(filterMonth, true);
+      await fetchInitialData(filterMonth, ['admins']);
     } catch (error) {
       toast.error('Lỗi khi cập nhật cài đặt', { id: loadingToast });
     }
