@@ -67,7 +67,7 @@ export default function AdminView({
   isLoading: isGlobalLoading 
 }: { 
   globalData: any, 
-  fetchInitialData: (monthYear?: string, force?: boolean) => Promise<any>, 
+  fetchInitialData: (monthYear?: string, force?: any) => Promise<any>, 
   isLoading: boolean 
 }) {
   const logic = useAdminLogic(globalData, fetchInitialData, isGlobalLoading);
@@ -496,6 +496,7 @@ export default function AdminView({
             checkEmployeeReview={checkEmployeeReview}
             BranchTabs={CommonBranchTabs}
             isLoading={loading}
+            fetchInitialData={fetchInitialData}
           />
 
           {activeTab === 'bangluong' && (
