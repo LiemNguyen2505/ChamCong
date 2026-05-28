@@ -50,7 +50,7 @@ export const useAdminViolations = ({
       }
       
       toast.success('Ghi nhận vi phạm thành công');
-      fetchInitialData(filterMonth, true); // Force refresh cache for this month
+      fetchInitialData(filterMonth, ['violations']); // Force refresh cache for this month
       logAction('Thêm vi phạm', emp?.fullName || violation.empId, violation.type);
     } catch (error) {
       console.error('Error adding violation:', error);
@@ -90,7 +90,7 @@ export const useAdminViolations = ({
       }
       
       toast.success('Đã xóa vi phạm thành công', { id: loadingToast });
-      fetchInitialData(filterMonth, true);
+      fetchInitialData(filterMonth, ['violations']);
     } catch (error) {
       console.error('Error deleting violation:', error);
       toast.error('Lỗi khi xóa vi phạm', { id: loadingToast });
