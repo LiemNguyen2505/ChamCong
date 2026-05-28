@@ -1,7 +1,10 @@
-import React, { useMemo, useEffect } from 'react';
+import React, { useMemo, useEffect, useState } from 'react';
 import { format, parseISO, getDaysInMonth, startOfMonth, addDays } from 'date-fns';
-import { X, Clock, AlertTriangle, CheckCircle, XCircle, CalendarOff, UserX } from 'lucide-react';
+import { X, Clock, AlertTriangle, CheckCircle, XCircle, CalendarOff, UserX, Edit2, Save } from 'lucide-react';
 import { safeFormat, safeParseDate } from '../utils/dateUtils';
+import { db } from '../firebase';
+import { doc, updateDoc } from 'firebase/firestore';
+import toast from 'react-hot-toast';
 
 import { getPhonePenalty } from '../utils/adminHelpers';
 
@@ -12,6 +15,7 @@ interface EmployeeAttendanceDetailModalProps {
   month: string; // YYYY-MM
   onClose: () => void;
   adminTheme: any;
+  fetchInitialData: (monthYear: string, force: any) => Promise<any>;
 }
 
 export const EmployeeAttendanceDetailModal: React.FC<EmployeeAttendanceDetailModalProps> = ({
@@ -20,8 +24,50 @@ export const EmployeeAttendanceDetailModal: React.FC<EmployeeAttendanceDetailMod
   schedules,
   month,
   onClose,
-  adminTheme
+  adminTheme,
+  fetchInitialData
 }) => {
+  const [editingShiftId, setEditingShiftId] = useState<string | null>(null);
+  const [editValues, setEditValues] = useState<{ checkIn: string, checkOut: string }>({ checkIn: '', checkOut: '' });
+  const [isSaving, setIsSaving] = useState(false);
+
+  const handleSaveShift = async (shiftId: string, originalDate: string) => {
+    if (!editValues.checkIn || !editValues.checkOut) {
+      toast.error('Vui lòng nhập đầy đủ giờ vào và ra');
+      return;
+    }
+    setIsSaving(true);
+    try {
+      const ts = timesheets.find(t => t.id === shiftId);
+      if (!ts) throw new Error('Không tìm thấy ca làm việc');
+
+      // Calculate new diff
+      const [inH, inM] = editValues.checkIn.split(':').map(Number);
+      const [outH, outM] = editValues.checkOut.split(':').map(Number);
+      let diff = (outH * 60 + outM) - (inH * 60 + inM);
+      if (diff < 0) diff += 24 * 60;
+      let newTotalHours = diff > 0 ? diff / 60 : 0;
+
+      await updateDoc(doc(db, 'timesheets', shiftId), {
+        checkInTime: editValues.checkIn,
+        checkOutTime: editValues.checkOut,
+        totalHours: newTotalHours,
+        status: 'Present',
+        checkoutRequiresApproval: false, // Ensure it's approved
+        isAbandonedShift: false
+      });
+      
+      toast.success('Đã cập nhật giờ công');
+      setEditingShiftId(null);
+      await fetchInitialData(month, ['chamCongs']);
+    } catch (error) {
+      console.error(error);
+      toast.error('Có lỗi xảy ra khi lưu');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
   useEffect(() => {
     const handleEsc = (e: KeyboardEvent) => {
       if (e.key === 'Escape') onClose();
@@ -172,11 +218,46 @@ export const EmployeeAttendanceDetailModal: React.FC<EmployeeAttendanceDetailMod
                         <div key={shift.id || index} className="p-4 flex flex-col sm:flex-row sm:items-center gap-4">
                           {/* Time & Hours */}
                           <div className="flex-1 grid grid-cols-2 sm:grid-cols-4 gap-4">
-                            <div>
+                            <div className="relative group/edit">
                               <span className="text-xs text-slate-500 block mb-1">Thời gian</span>
-                              <div className="font-medium text-slate-900">
-                                {shift.checkIn} - {shift.checkOut}
-                              </div>
+                              {editingShiftId === shift.id ? (
+                                <div className="flex items-center gap-2">
+                                  <input 
+                                    type="time" 
+                                    value={editValues.checkIn}
+                                    onChange={(e) => setEditValues({...editValues, checkIn: e.target.value})}
+                                    className="p-1 border rounded text-xs w-20"
+                                  />
+                                  <span>-</span>
+                                  <input 
+                                    type="time" 
+                                    value={editValues.checkOut}
+                                    onChange={(e) => setEditValues({...editValues, checkOut: e.target.value})}
+                                    className="p-1 border rounded text-xs w-20"
+                                  />
+                                  <button onClick={() => handleSaveShift(shift.id, day.date)} disabled={isSaving} className="text-emerald-600 ml-1 hover:text-emerald-700">
+                                    <Save className="w-4 h-4" />
+                                  </button>
+                                  <button onClick={() => setEditingShiftId(null)} disabled={isSaving} className="text-slate-400 hover:text-slate-600">
+                                    <X className="w-4 h-4" />
+                                  </button>
+                                </div>
+                              ) : (
+                                <div className="font-medium text-slate-900 flex items-center gap-2">
+                                  {shift.checkIn} - {shift.checkOut}
+                                  {shift.id && (
+                                    <button 
+                                      onClick={() => {
+                                        setEditingShiftId(shift.id);
+                                        setEditValues({ checkIn: shift.checkIn, checkOut: shift.checkOut });
+                                      }}
+                                      className="opacity-0 group-hover/edit:opacity-100 transition-opacity text-slate-400 hover:text-blue-600 p-1 rounded-md hover:bg-blue-50"
+                                    >
+                                      <Edit2 className="w-3.5 h-3.5" />
+                                    </button>
+                                  )}
+                                </div>
+                              )}
                             </div>
                             <div>
                               <span className="text-xs text-slate-500 block mb-1">Giờ công</span>
