@@ -130,7 +130,7 @@ export const EmployeeManagement: React.FC<EmployeeManagementProps> = ({
       await addDoc(collection(db, 'employees'), employeeData);
       await logAction('Thêm', 'Nhân viên', `Thêm nhân viên ${employeeData.fullName} (Mã: ${maNV})`);
       toast.success('Thêm nhân viên thành công', { id: loadingToast });
-      await fetchInitialData(undefined, true);
+      await fetchInitialData(undefined, ['nhanViens']);
       
       setNewEmployee({
         empId: '',
@@ -198,7 +198,7 @@ export const EmployeeManagement: React.FC<EmployeeManagementProps> = ({
       await logAction('Sửa', 'Nhân viên', `Sửa thông tin nhân viên ${editingEmployee.fullName} (Mã: ${editingEmployee.empId})`);
       
       toast.success('Cập nhật nhân viên thành công', { id: loadingToast });
-      await fetchInitialData(undefined, true);
+      await fetchInitialData(undefined, ['nhanViens']);
       setShowEditEmployeeModal(false);
       setEditingEmployee(null);
     } catch (error) {
@@ -437,7 +437,7 @@ export const EmployeeManagement: React.FC<EmployeeManagementProps> = ({
                                 onClick={(e) => {
                                   e.stopPropagation();
                                   setOpenMenuEmpId(null);
-                                  openConfirmModal('Xóa NV', `Xóa ${nv.fullName}?`, async () => { await deleteDoc(doc(db, 'employees', nv.id)); toast.success('Xóa thành công'); await fetchInitialData(undefined, true); });
+                                  openConfirmModal('Xóa NV', `Xóa ${nv.fullName}?`, async () => { await deleteDoc(doc(db, 'employees', nv.id)); toast.success('Xóa thành công'); await fetchInitialData(undefined, ['nhanViens']); });
                                 }}
                                 className="w-full flex items-center gap-2.5 px-3 py-2 text-[10px] font-black text-rose-500 active:bg-rose-50 border-t border-stone-50 uppercase"
                               >
@@ -540,7 +540,7 @@ export const EmployeeManagement: React.FC<EmployeeManagementProps> = ({
                             </>
                           )}
                           <button onClick={(e) => { e.stopPropagation(); setEditingEmployee(nv); setShowEditEmployeeModal(true); }} className="p-1.5 text-sky-600 hover:bg-sky-50 rounded" title="Sửa"><Edit2 className="w-3.5 h-3.5" /></button>
-                          <button onClick={(e) => { e.stopPropagation(); openConfirmModal('Xóa NV', `Xóa ${nv.fullName}?`, async () => { await deleteDoc(doc(db, 'employees', nv.id)); toast.success('Xóa thành công'); await fetchInitialData(undefined, true); }); }} className="p-1.5 text-red-600 hover:bg-red-50 rounded" title="Xóa"><Trash2 className="w-3.5 h-3.5" /></button>
+                          <button onClick={(e) => { e.stopPropagation(); openConfirmModal('Xóa NV', `Xóa ${nv.fullName}?`, async () => { await deleteDoc(doc(db, 'employees', nv.id)); toast.success('Xóa thành công'); await fetchInitialData(undefined, ['nhanViens']); }); }} className="p-1.5 text-red-600 hover:bg-red-50 rounded" title="Xóa"><Trash2 className="w-3.5 h-3.5" /></button>
                         </div>
                       </td>
                     </tr>
