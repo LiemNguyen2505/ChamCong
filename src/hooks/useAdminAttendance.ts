@@ -8,7 +8,7 @@ import { Timesheet, Employee, AdminAccount } from '../types/admin';
 interface UseAdminAttendanceProps {
   nhanViens: Employee[];
   currentAdmin: AdminAccount | null;
-  fetchInitialData: (month?: string, force?: boolean) => Promise<any>;
+  fetchInitialData: (month?: string, force?: any) => Promise<any>;
   filterMonth: string;
   logAction: (action: string, target: string, details: string) => Promise<void>;
   openConfirmModal: (title: string, message: string, onConfirm: () => void) => void;
@@ -121,11 +121,19 @@ export const useAdminAttendance = ({
       let lateMinutes = 0;
       let latePenaltyMinutes = 0;
 
+      let diffCheckInISO = new Date(`${editingAttendance.date}T${editingAttendance.checkInTime}`).toISOString();
+      let diffCheckOutISO = null;
+
       if (editingAttendance.scheduledStartTime && editingAttendance.checkInTime) {
         const [schH, schM] = editingAttendance.scheduledStartTime.split(':').map(Number);
         const [selH, selM] = editingAttendance.checkInTime.split(':').map(Number);
         const selTotal = selH * 60 + selM;
         const schTotal = schH * 60 + schM;
+        
+        if (selTotal < schTotal) {
+           diffCheckInISO = new Date(`${editingAttendance.date}T${editingAttendance.scheduledStartTime}`).toISOString();
+        }
+        
         if (selTotal > schTotal) {
           lateMinutes = selTotal - schTotal;
           if (lateMinutes >= 10) {
@@ -141,7 +149,19 @@ export const useAdminAttendance = ({
 
       if (editingAttendance.checkOutTime) {
         checkOutISO = new Date(`${editingAttendance.date}T${editingAttendance.checkOutTime}`).toISOString();
-        const diffMs = new Date(checkOutISO).getTime() - new Date(checkInISO).getTime();
+        diffCheckOutISO = checkOutISO;
+        
+        if (editingAttendance.scheduledEndTime && editingAttendance.checkOutTime) {
+           const [schH, schM] = editingAttendance.scheduledEndTime.split(':').map(Number);
+           const [selH, selM] = editingAttendance.checkOutTime.split(':').map(Number);
+           const selTotal = selH * 60 + selM;
+           const schTotal = schH * 60 + schM;
+           if (selTotal > schTotal) {
+               diffCheckOutISO = new Date(`${editingAttendance.date}T${editingAttendance.scheduledEndTime}`).toISOString();
+           }
+        }
+        
+        const diffMs = new Date(diffCheckOutISO).getTime() - new Date(diffCheckInISO).getTime();
         totalHours = Math.max(0, diffMs / (1000 * 60 * 60));
         totalPay = totalHours * employee.hourlyRate;
       }
