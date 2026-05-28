@@ -50,7 +50,7 @@ export const HolidayConfigModal: React.FC<HolidayConfigModalProps> = ({
       };
       await setDoc(doc(db, 'Holidays', newDate), newHoliday);
       setLocalHolidays([...localHolidays, newHoliday]);
-      if (fetchInitialData) await fetchInitialData(undefined, true);
+      if (fetchInitialData) await fetchInitialData(undefined, ['holidays']);
       setNewDate('');
       setNewName('');
       setNewMultiplier('2');
@@ -68,7 +68,7 @@ export const HolidayConfigModal: React.FC<HolidayConfigModalProps> = ({
     try {
       await deleteDoc(doc(db, 'Holidays', id));
       setLocalHolidays(localHolidays.filter(h => h.id !== id));
-      if (fetchInitialData) await fetchInitialData(undefined, true);
+      if (fetchInitialData) await fetchInitialData(undefined, ['holidays']);
       toast.success('Đã xóa ngày lễ');
     } catch (error) {
       console.error('Error deleting holiday:', error);
