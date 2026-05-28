@@ -585,8 +585,8 @@ export default function AdminView({
 
           {activeTab === 'lichlamviec' && (
             <ScheduleView 
-              nhanViens={nhanViens}
-              lichLamViecs={lichLamViecs}
+              nhanViens={globalData.nhanViens}
+              lichLamViecs={globalData.lichLamViecs}
               filterBranch={filterBranch}
               filterMonth={filterMonth}
               currentAdmin={currentAdmin}
@@ -734,7 +734,7 @@ export default function AdminView({
           monthYear={editingAdjustment.monthYear}
           empId={editingAdjustment.empId}
           onClose={() => setEditingAdjustment(null)}
-          onSave={() => { setEditingAdjustment(null); fetchInitialData(filterMonth, true); }}
+          onSave={() => { setEditingAdjustment(null); fetchInitialData(filterMonth, ['payrollAdjustments']); }}
           adminTheme={adminTheme}
         />
       )}
@@ -747,6 +747,7 @@ export default function AdminView({
           month={filterMonth}
           onClose={() => setSelectedEmployeeForDetails(null)}
           adminTheme={adminTheme}
+          fetchInitialData={fetchInitialData}
         />
       )}
 
