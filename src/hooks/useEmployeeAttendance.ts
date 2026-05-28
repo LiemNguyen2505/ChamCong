@@ -232,7 +232,7 @@ export const useEmployeeAttendance = (
       }
       setActionType(null);
       setPhotoData(null);
-      await fetchInitialData(undefined, true);
+      await fetchInitialData(undefined, ['chamCongs']);
     } catch (error) {
       toast.error('Lỗi khi lưu dữ liệu');
     } finally {
