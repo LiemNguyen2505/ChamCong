@@ -44,7 +44,7 @@ export default function EmployeeView({
   isLoading
 }: {
   globalData: any,
-  fetchInitialData: (monthYear?: string, force?: boolean) => Promise<any>,
+  fetchInitialData: (monthYear?: string, force?: any | string | string[], options?: { empId?: string, onlyToday?: boolean }) => Promise<any>,
   isLoading: boolean
 }) {
   const navigate = useNavigate();
