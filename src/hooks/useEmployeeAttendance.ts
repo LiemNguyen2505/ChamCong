@@ -11,7 +11,7 @@ export const useEmployeeAttendance = (
   kioskBranch: string | null,
   workSchedules: any[],
   latestLog: any,
-  fetchInitialData: (monthYear?: string, force?: boolean) => Promise<any>,
+  fetchInitialData: (monthYear?: string, force?: any) => Promise<any>,
   admins: any[]
 ) => {
   const [actionType, setActionType] = useState<'check-in' | 'check-out' | null>(null);
@@ -50,7 +50,7 @@ export const useEmployeeAttendance = (
 
     const todayStr = format(new Date(), 'yyyy-MM-dd');
     const todayShifts = workSchedules
-      .filter(s => s.date === todayStr && !s.isOff && s.locationId === kioskBranch && s.empId === loggedInEmployee.id)
+      .filter(s => s.date === todayStr && !s.isOff && s.locationId === kioskBranch && (s.empId === loggedInEmployee.id || s.empId === loggedInEmployee.empId))
       .sort((a, b) => a.startTime.localeCompare(b.startTime));
 
     const now = new Date();
@@ -122,10 +122,8 @@ export const useEmployeeAttendance = (
             }
           } else if (selTotal < schTotal) {
             const earlyMinutes = schTotal - selTotal;
-            if (earlyMinutes <= 30) {
-              finalCheckInTime = scheduledShiftTime; // Clamp to scheduled time
-            } else {
-              if (!isAdmin) isExtraShift = true; // Early more than 30 mins
+            if (earlyMinutes > 30 && !isAdmin) {
+              isExtraShift = true; // Early more than 30 mins
             }
           }
         }
@@ -134,7 +132,7 @@ export const useEmployeeAttendance = (
           empId: loggedInEmployee.empId,
           fullName: loggedInEmployee.fullName,
           date: format(new Date(), 'yyyy-MM-dd'),
-          checkInTime: finalCheckInTime,
+          checkInTime: selectedShiftTime,
           actualCheckInTime: selectedShiftTime, // Preserve real time just in case
           checkOutTime: null,
           locationId: kioskBranch,
@@ -186,6 +184,16 @@ export const useEmployeeAttendance = (
            }
         }
         
+        // Optimize check-out time if they left late
+        let checkOutTimeStrCalc = selectedShiftTime;
+        if (scheduledShiftTime) {
+           const outDate = new Date(`${latestLog.date}T${selectedShiftTime}`);
+           const schOutDate = new Date(`${latestLog.date}T${scheduledShiftTime}`);
+           if (outDate.getTime() > schOutDate.getTime()) {
+               checkOutTimeStrCalc = scheduledShiftTime;
+           }
+        }
+        
         let updateData: any = {
           photoCheckOut: capturedPhoto,
           gpsOut: coords, // Save GPS coords
@@ -197,7 +205,7 @@ export const useEmployeeAttendance = (
         if (checkInTimeStr) {
           const checkInDate = new Date(`${latestLog.date}T${checkInTimeStr}`);
           const todayStr = format(new Date(), 'yyyy-MM-dd');
-          const checkOutDate = new Date(`${todayStr}T${selectedShiftTime}`);
+          const checkOutDate = new Date(`${todayStr}T${checkOutTimeStrCalc}`);
           
           let diffMs = checkOutDate.getTime() - checkInDate.getTime();
           
