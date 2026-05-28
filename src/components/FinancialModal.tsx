@@ -116,7 +116,7 @@ export const FinancialModal: React.FC<FinancialModalProps> = ({
       toast.success('Đã thêm khoản giữ lương', { id: loadingToast });
       setView('list');
       resetForm();
-      fetchInitialData(filterMonth, true);
+      fetchInitialData(filterMonth, ['salaryHistories']);
     } catch (error) {
       console.error(error);
       toast.error('Lỗi khi xử lý', { id: loadingToast });
@@ -165,7 +165,7 @@ export const FinancialModal: React.FC<FinancialModalProps> = ({
       toast.success('Đã thêm khoản hoàn trả', { id: loadingToast });
       setView('list');
       resetForm();
-      fetchInitialData(filterMonth, true);
+      fetchInitialData(filterMonth, ['salaryHistories']);
     } catch (error) {
       console.error(error);
       toast.error('Lỗi khi xử lý hoàn trả', { id: loadingToast });
