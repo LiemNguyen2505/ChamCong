@@ -91,6 +91,10 @@ export const getPhonePenalty = (t: any, hourlyRate: number) => {
 };
 
 export const getTotalHours = (t: any) => {
+  if (t.totalHours !== undefined && t.totalHours !== null && typeof t.totalHours === 'number') {
+    return t.totalHours;
+  }
+
   const inTimeStr = extractTimeStr(t.checkInTime);
   const outTimeStr = extractTimeStr(t.checkOutTime);
 
@@ -114,9 +118,6 @@ export const getTotalHours = (t: any) => {
     if (diff < 0) diff += 24 * 60; // overnight
     if (diff > 0) return diff / 60;
   }
-  
-  // Fallback to static totalHours if checkIn/checkOut are malformed or missing
-  if (t.totalHours !== undefined) return t.totalHours;
 
   return 0;
 };
