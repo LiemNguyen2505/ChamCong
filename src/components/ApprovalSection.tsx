@@ -559,7 +559,7 @@ export const ApprovalSection: React.FC<ApprovalSectionProps> = ({
                               
                               await logAction('Duyệt yêu cầu', req.fullName, `Duyệt ${getRequestTypeLabel(req.type).label} cho ${req.fullName}`);
                               toast.success('Đã duyệt yêu cầu', { id: loadingToast });
-                              await fetchInitialData(undefined, true);
+                              await fetchInitialData(undefined, ['approvalRequests', 'chamCongs', 'xinNghiPheps', 'payrollAdjustments', 'salaryAdvanceRecords']);
                             } catch (error) {
                               toast.error('Lỗi khi duyệt', { id: loadingToast });
                             }
@@ -637,7 +637,7 @@ export const ApprovalSection: React.FC<ApprovalSectionProps> = ({
                               
                               await logAction('Từ chối yêu cầu', req.fullName, `Từ chối ${getRequestTypeLabel(req.type).label} cho ${req.fullName}`);
                               toast.success('Đã từ chối!', { id: loadingToast });
-                              await fetchInitialData(undefined, true);
+                              await fetchInitialData(undefined, ['approvalRequests', 'chamCongs', 'xinNghiPheps', 'payrollAdjustments', 'salaryAdvanceRecords']);
                             } catch (error) {
                               toast.error('Lỗi khi từ chối', { id: loadingToast });
                             }
@@ -857,7 +857,7 @@ export const ApprovalSection: React.FC<ApprovalSectionProps> = ({
                                     
                                     await logAction('Duyệt yêu cầu', req.fullName, `Duyệt ${getRequestTypeLabel(req.type).label} cho ${req.fullName}`);
                                     toast.success('Đã duyệt thành công!', { id: loadingToast });
-                                    await fetchInitialData(undefined, true);
+                                    await fetchInitialData(undefined, ['approvalRequests', 'chamCongs', 'xinNghiPheps', 'payrollAdjustments', 'salaryAdvanceRecords']);
                                   } catch (error) {
                                     toast.error('Lỗi khi duyệt', { id: loadingToast });
                                   }
@@ -936,7 +936,7 @@ export const ApprovalSection: React.FC<ApprovalSectionProps> = ({
                                     
                                     await logAction('Từ chối yêu cầu', req.fullName, `Từ chối yêu cầu cho ${req.fullName}`);
                                     toast.success('Đã từ chối!', { id: loadingToast });
-                                    await fetchInitialData(undefined, true);
+                                    await fetchInitialData(undefined, ['approvalRequests', 'chamCongs', 'xinNghiPheps', 'payrollAdjustments', 'salaryAdvanceRecords']);
                                   } catch (error) {
                                     toast.error('Lỗi khi từ chối', { id: loadingToast });
                                   }
@@ -1012,7 +1012,7 @@ export const ApprovalSection: React.FC<ApprovalSectionProps> = ({
                             try {
                               await updateDoc(doc(db, 'ApprovalRequests', req.id), { status: 'pending', adminId: deleteField(), processedAt: deleteField() });
                               toast.success('Đã hoàn tác');
-                              await fetchInitialData(undefined, true);
+                              await fetchInitialData(undefined, ['approvalRequests', 'chamCongs', 'xinNghiPheps', 'payrollAdjustments', 'salaryAdvanceRecords']);
                             } catch (error) { toast.error('Lỗi'); }
                           })}
                           className="p-2 bg-stone-100 text-stone-600 rounded-lg active:scale-90 transition-all border border-stone-200"
@@ -1075,7 +1075,7 @@ export const ApprovalSection: React.FC<ApprovalSectionProps> = ({
                                 try {
                                   await updateDoc(doc(db, 'ApprovalRequests', req.id), { status: 'pending', adminId: deleteField(), processedAt: deleteField() });
                                   toast.success('Đã hoàn tác');
-                                  await fetchInitialData(undefined, true);
+                                  await fetchInitialData(undefined, ['approvalRequests', 'chamCongs', 'xinNghiPheps', 'payrollAdjustments', 'salaryAdvanceRecords']);
                                 } catch (error) { toast.error('Lỗi'); }
                               })}
                               className="text-amber-600 hover:text-amber-700 text-[10px] font-bold flex items-center gap-1 justify-end ml-auto uppercase"
