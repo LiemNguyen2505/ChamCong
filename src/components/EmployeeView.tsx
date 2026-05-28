@@ -150,6 +150,29 @@ export default function EmployeeView({
 
   const [selectedMonth, setSelectedMonth] = useState(format(new Date(), 'yyyy-MM'));
 
+  // 1. Fetch only today's data on login
+  const hasFetchedTodayRef = useRef(false);
+  useEffect(() => {
+    if (loggedInEmployee && !hasFetchedTodayRef.current) {
+      hasFetchedTodayRef.current = true;
+      fetchInitialData(undefined, ['chamCongs', 'lichLamViecs', 'xinNghiPheps', 'payrollAdjustments', 'violations', 'salaryAdvanceRecords'], { empId: loggedInEmployee.empId, onlyToday: true });
+    }
+  }, [loggedInEmployee, fetchInitialData]);
+
+  // 2. Fetch full month data when switching to history or salary tabs
+  useEffect(() => {
+    if (loggedInEmployee && (showHistory || showSalaryDetails || showStats)) {
+      fetchInitialData(selectedMonth, ['chamCongs', 'lichLamViecs', 'xinNghiPheps', 'payrollAdjustments', 'violations', 'salaryAdvanceRecords'], { empId: loggedInEmployee.empId });
+    }
+  }, [showHistory, showSalaryDetails, showStats, selectedMonth, loggedInEmployee, fetchInitialData]);
+
+  // 3. Fetch full month data when opening weekly schedule
+  useEffect(() => {
+    if (loggedInEmployee && showWeeklySchedule) {
+      fetchInitialData(selectedMonth, ['lichLamViecs'], { empId: loggedInEmployee.empId });
+    }
+  }, [showWeeklySchedule, selectedMonth, loggedInEmployee, fetchInitialData]);
+
   const employeeTodayShifts = useMemo(() => {
     if (!loggedInEmployee) return [];
     return globalData.lichLamViecs
@@ -328,7 +351,7 @@ export default function EmployeeView({
                 format={format}
                 selectedMonth={selectedMonth}
                 globalData={globalData}
-                onRefresh={() => fetchInitialData(undefined, true)}
+                onRefresh={() => fetchInitialData(undefined, ['chamCongs', 'lichLamViecs'])}
               />
             )
           ) : (
