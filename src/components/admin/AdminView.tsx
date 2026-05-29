@@ -472,6 +472,7 @@ export default function AdminView({
             setActiveTab={setActiveTab}
             filterBranch={filterBranch}
             filterMonth={filterMonth}
+            setFilterMonth={setFilterMonth}
             nhanViens={nhanViens}
             admins={admins}
             filteredChamCongs={filteredChamCongs}
