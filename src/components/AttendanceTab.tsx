@@ -1,5 +1,5 @@
 import React from 'react';
-import { format } from 'date-fns';
+import { format, subDays, addDays, parseISO } from 'date-fns';
 import { vi } from 'date-fns/locale';
 import { motion } from 'motion/react';
 import { Plus, Download, Calendar, X, ChevronLeft, ChevronRight, CheckCircle2, Edit2, Trash2, Smartphone, Clock, AlertCircle, ChevronDown, FileCheck, Image as ImageIcon, MapPin, ArrowLeft, Save } from 'lucide-react';
@@ -41,6 +41,7 @@ interface AttendanceTabProps {
   isLoading?: boolean;
   admins: AdminAccount[];
   fetchInitialData?: (month?: string, force?: any) => Promise<any>;
+  setFilterMonth?: (m: string) => void;
 }
 
 const formatCurrency = (val: number) => new Intl.NumberFormat('vi-VN').format(val);
@@ -76,18 +77,52 @@ export const AttendanceTab: React.FC<AttendanceTabProps> = ({
   BranchTabs,
   isLoading,
   admins,
-  fetchInitialData
+  fetchInitialData,
+  setFilterMonth
 }) => {
   if (activeTab !== 'bangcongthang') return null;
 
+  const getEmployeeForLog = (log: any) => {
+    let emp = undefined;
+    if (log.empId) {
+      if (log.empId !== '') emp = nhanViens.find(nv => nv.empId === log.empId);
+      if (!emp) emp = nhanViens.find(nv => nv.id === log.empId);
+    }
+    if (!emp && log.fullName) {
+      emp = nhanViens.find(nv => nv.fullName === log.fullName);
+    }
+    return emp || { fullName: log.fullName || 'Unknown', hourlyRate: 0 };
+  };
+
   const isSubjectAdmin = (empId: string) => {
+    if (!empId) return false;
     if (empId.toUpperCase() === 'ADMIN') return true;
-    const emp = nhanViens.find(e => e.empId === empId || e.id === empId);
+    const emp = nhanViens.find(e => (e.empId === empId && e.empId !== '') || e.id === empId);
     return emp ? admins.some((a: any) => a.email === emp.fullName) : false;
   };
 
   const [yyyy, mm] = filterMonth.split('-');
   const displayMonthYear = `${mm}-${yyyy}`;
+  
+  const todayStr = format(new Date(), 'yyyy-MM-dd');
+  const defaultMobileDay = filterMonth === format(new Date(), 'yyyy-MM') ? todayStr : `${filterMonth}-01`;
+  const effectiveHistoryDay = historyDay || defaultMobileDay;
+
+  const handlePrevDay = () => {
+    const prevDay = format(subDays(parseISO(effectiveHistoryDay), 1), 'yyyy-MM-dd');
+    setHistoryDay(prevDay);
+    if (setFilterMonth && prevDay.substring(0, 7) !== filterMonth) {
+      setFilterMonth(prevDay.substring(0, 7));
+    }
+  };
+
+  const handleNextDay = () => {
+    const nextDay = format(addDays(parseISO(effectiveHistoryDay), 1), 'yyyy-MM-dd');
+    setHistoryDay(nextDay);
+    if (setFilterMonth && nextDay.substring(0, 7) !== filterMonth) {
+      setFilterMonth(nextDay.substring(0, 7));
+    }
+  };
 
   const [previewPhoto, setPreviewPhoto] = React.useState<{
     url: string;
@@ -127,6 +162,12 @@ export const AttendanceTab: React.FC<AttendanceTabProps> = ({
          let diff = (outH + outM / 60) - (inH + inM / 60);
          if (diff < 0) diff += 24; // Handle overnight shift simply
          updates.totalHours = diff;
+         
+         // Calculate totalPay
+         const employee = getEmployeeForLog(log);
+         if (employee && employee.hourlyRate) {
+           updates.totalPay = diff * employee.hourlyRate;
+         }
       }
       
       await updateDoc(doc(db, 'timesheets', log.id), updates);
@@ -259,17 +300,20 @@ export const AttendanceTab: React.FC<AttendanceTabProps> = ({
               </div>
               <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-xl shadow-inner border border-slate-200">
                 <button
-                  onClick={handlePrevMonth}
-                  className="p-1 text-slate-400 hover:text-blue-600 transition-colors"
+                  onClick={handlePrevDay}
+                  className="p-1 text-slate-400 hover:text-blue-600 transition-colors active:scale-90"
                 >
                   <ChevronLeft className="w-4 h-4" />
                 </button>
-                <div className="px-2.5 py-1 bg-white rounded-lg shadow-sm border border-slate-200 min-w-[70px] text-center">
-                  <span className="text-xs md:text-sm font-black text-slate-800 tabular-nums">{displayMonthYear}</span>
-                </div>
+                <button 
+                  onClick={() => setShowDatePickerGrid(true)}
+                  className="px-2.5 py-1 bg-white rounded-lg shadow-sm border border-slate-200 min-w-[85px] text-center active:scale-95 transition-all outline-none"
+                >
+                  <span className="text-xs font-black text-slate-800 tabular-nums">{format(parseISO(effectiveHistoryDay), 'dd/MM/yyyy')}</span>
+                </button>
                 <button
-                  onClick={handleNextMonth}
-                  className="p-1 text-slate-400 hover:text-blue-600 transition-colors"
+                  onClick={handleNextDay}
+                  className="p-1 text-slate-400 hover:text-blue-600 transition-colors active:scale-90"
                 >
                   <ChevronRight className="w-4 h-4" />
                 </button>
@@ -306,8 +350,8 @@ export const AttendanceTab: React.FC<AttendanceTabProps> = ({
             <div className="flex flex-wrap items-center gap-3 w-full">
               {/* Back button removed as it's now an arrow in the header */}
               
-              {/* Mobile Row 2: Selected Employee + Calendar + ManualCheckin + Excel */}
-              <div className="md:hidden w-full grid grid-cols-[1fr_auto_auto_auto] items-center gap-2">
+              {/* Mobile Row 2: Selected Employee + ManualCheckin + Excel */}
+              <div className="md:hidden w-full grid grid-cols-[1fr_auto_auto] items-center gap-2">
                 <div className="relative">
                   <select
                     value={historyEmployee?.id || ''}
@@ -336,14 +380,6 @@ export const AttendanceTab: React.FC<AttendanceTabProps> = ({
                   </select>
                   <ChevronDown className={`absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 ${adminTheme.text === 'text-white' ? 'text-white/80' : 'text-slate-400'} pointer-events-none`} />
                 </div>
-
-                <button
-                  onClick={() => setShowDatePickerGrid(true)}
-                  className="w-11 h-11 flex items-center justify-center bg-rose-600 text-white rounded-2xl shadow-md active:scale-95 transition-all"
-                  title="Chọn ngày"
-                >
-                  <Calendar className="w-5 h-5" />
-                </button>
 
                 <button
                   onClick={(e) => { e.stopPropagation(); setShowManualCheckin(true); }}
@@ -399,13 +435,16 @@ export const AttendanceTab: React.FC<AttendanceTabProps> = ({
               <div className="modal-content w-full max-w-sm bg-white border border-slate-200 rounded-3xl p-6 shadow-2xl animate-in zoom-in-95 duration-200" onClick={(e) => e.stopPropagation()}>
                   <div className="flex items-center justify-between mb-6">
                       <div className="flex items-center gap-3">
-                          <div className="p-2 bg-blue-100 rounded-xl">
-                              <Calendar className="w-5 h-5 text-blue-600" />
-                          </div>
-                          <div>
+                          <button onClick={() => { if (setFilterMonth) { const [y, m] = filterMonth.split('-').map(Number); setFilterMonth(format(new Date(y, m - 2, 1), 'yyyy-MM')); } }} className="p-1 text-slate-400 hover:text-blue-600 transition-colors">
+                            <ChevronLeft className="w-5 h-5" />
+                          </button>
+                          <div className="text-center">
                               <h4 className="text-sm font-black text-slate-900 uppercase leading-none">Chọn ngày</h4>
                               <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider mt-1">{filterMonth}</p>
                           </div>
+                          <button onClick={() => { if (setFilterMonth) { const [y, m] = filterMonth.split('-').map(Number); setFilterMonth(format(new Date(y, m, 1), 'yyyy-MM')); } }} className="p-1 text-slate-400 hover:text-blue-600 transition-colors">
+                            <ChevronRight className="w-5 h-5" />
+                          </button>
                       </div>
                       <button onClick={() => setShowDatePickerGrid(false)} className="p-2 hover:bg-slate-100 rounded-full transition-colors active:scale-90">
                           <X className="w-5 h-5 text-slate-400" />
@@ -545,14 +584,14 @@ export const AttendanceTab: React.FC<AttendanceTabProps> = ({
           {(() => {
             const dayLogs = filteredChamCongs.filter(cc => cc.date === effectiveHistoryDay);
             const sortedLogs = [...dayLogs].sort((a, b) => {
-              const nameA = nhanViens.find(nv => nv.empId === a.empId)?.fullName || '';
-              const nameB = nhanViens.find(nv => nv.empId === b.empId)?.fullName || '';
+              const nameA = getEmployeeForLog(a).fullName || '';
+              const nameB = getEmployeeForLog(b).fullName || '';
               return nameA.localeCompare(nameB);
             });
 
             const totalLate = dayLogs.reduce((sum, log) => sum + getLateMinutes(log, isSubjectAdmin(log.empId || '')), 0);
             const totalPenalty = dayLogs.reduce((sum, log) => {
-              const emp = nhanViens.find(nv => nv.empId === log.empId);
+              const emp = getEmployeeForLog(log);
               const penaltyMins = getLatePenaltyMinutes(log, isSubjectAdmin(log.empId || ''), filteredChamCongs.filter(c => c.empId === log.empId));
               const penalty = penaltyMins > 0 ? roundToUnit(penaltyMins * ((emp?.hourlyRate || 0) / 60)) : 0;
               return sum + penalty;
@@ -606,7 +645,7 @@ export const AttendanceTab: React.FC<AttendanceTabProps> = ({
                     </thead>
                     <tbody className="divide-y divide-[#e0e0e0]">
                       {sortedLogs.map((log, index) => {
-                        const employee = nhanViens.find(nv => nv.empId === log.empId);
+                        const employee = getEmployeeForLog(log);
                         const canDelete = currentAdmin?.role === 'SuperAdmin' || (log.createdByAdminId && log.createdByAdminId === currentAdmin?.id);
                         const canEdit = ['SuperAdmin', 'BranchAdmin'].includes(currentAdmin?.role);
                         const showEmployeeName = index === 0 || sortedLogs[index - 1].empId !== log.empId;
@@ -778,8 +817,8 @@ export const AttendanceTab: React.FC<AttendanceTabProps> = ({
               const dayLogs = filteredChamCongs.filter(cc => cc.date === effectiveHistoryDay);
               
               const sortedLogs = [...dayLogs].sort((a, b) => {
-                const nameA = nhanViens.find(nv => nv.empId === a.empId)?.fullName || '';
-                const nameB = nhanViens.find(nv => nv.empId === b.empId)?.fullName || '';
+                const nameA = getEmployeeForLog(a).fullName || '';
+                const nameB = getEmployeeForLog(b).fullName || '';
                 return nameA.localeCompare(nameB);
               });
               
@@ -788,7 +827,7 @@ export const AttendanceTab: React.FC<AttendanceTabProps> = ({
               const lateMins = dayLogs.reduce((sum, log) => sum + getLateMinutes(log, isSubjectAdmin(log.empId || '')), 0);
               const lateLogsCount = dayLogs.filter(log => getLateMinutes(log, isSubjectAdmin(log.empId || '')) > 0).length;
               const totalLatePenalty = dayLogs.reduce((sum, log) => {
-                const employee = nhanViens.find(nv => nv.empId === log.empId);
+                const employee = getEmployeeForLog(log);
                 const hourlyRate = employee?.hourlyRate || 0;
                 const penaltyMins = getLatePenaltyMinutes(log, isSubjectAdmin(log.empId || ''), filteredChamCongs.filter(c => c.empId === log.empId));
                 const penalty = penaltyMins > 0 ? roundToUnit(penaltyMins * (hourlyRate / 60)) : 0;
@@ -883,7 +922,7 @@ export const AttendanceTab: React.FC<AttendanceTabProps> = ({
 
                   <div className="space-y-4">
                     {sortedLogs.map((log, logIdx) => {
-                      const employee = nhanViens.find(nv => nv.empId === log.empId);
+                      const employee = getEmployeeForLog(log);
                       const canDelete = currentAdmin?.role === 'SuperAdmin' || (log.createdByAdminId && log.createdByAdminId === currentAdmin?.id);
                       const canEdit = ['SuperAdmin', 'BranchAdmin'].includes(currentAdmin?.role || '');
                       return (
