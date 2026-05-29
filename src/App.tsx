@@ -131,6 +131,15 @@ export default function App() {
           return true; // Fetch all if force is true
         }
         if (hasInitialLoadedRef.current) return false; // Initial load only fetches types: dynamic & static
+        
+        // OPTIMIZATION: If no one is logged in, don't fetch heavy global lists on mount!
+        const hasSavedEmployee = !!localStorage.getItem('loggedInEmployee');
+        const hasSavedAdmin = !!localStorage.getItem('currentAdmin');
+        
+        if (!hasSavedEmployee && !hasSavedAdmin) {
+           return false; // Skip all automatic fetches on first screen to save reads, Login will query explicitly.
+        }
+
         return c.type !== 'lazy'; // Only fetch dynamic & static on start, ignore lazy
       });
 
