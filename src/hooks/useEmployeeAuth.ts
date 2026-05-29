@@ -43,23 +43,39 @@ export const useEmployeeAuth = (employees: Employee[], admins: any[], kioskBranc
 
     const savedAdmin = localStorage.getItem('currentAdmin');
     if (savedAdmin) {
-      try {
-        const admin = JSON.parse(savedAdmin);
-        // Find employee matching admin
-        const emp = employees.find(e => 
-          e.phone === admin.phone || 
-          e.phone === admin.email || 
-          e.fullName === admin.email
-        );
-        if (emp) {
-          setLoggedInEmployee(emp);
-          localStorage.setItem('loggedInEmployee', JSON.stringify(emp));
+      const runAutoLogin = async () => {
+        try {
+          const admin = JSON.parse(savedAdmin);
+          const q = query(
+            collection(db, 'employees'), 
+            where('phone', 'in', [admin.phone || null, admin.email || null].filter(Boolean))
+          );
+          const snapshot = await getDocs(q);
+          
+          if (!snapshot.empty) {
+            const docSnap = snapshot.docs[0];
+            const emp = { id: docSnap.id, ...docSnap.data() } as Employee;
+            setLoggedInEmployee(emp);
+            localStorage.setItem('loggedInEmployee', JSON.stringify(emp));
+            return;
+          }
+          
+          // Fallback check by name if phone/email didn't match
+          const nameQ = query(collection(db, 'employees'), where('fullName', '==', admin.email || ''));
+          const nameSnap = await getDocs(nameQ);
+          if (!nameSnap.empty) {
+            const docSnap = nameSnap.docs[0];
+            const emp = { id: docSnap.id, ...docSnap.data() } as Employee;
+            setLoggedInEmployee(emp);
+            localStorage.setItem('loggedInEmployee', JSON.stringify(emp));
+          }
+        } catch (e) {
+          console.error("Auto-login error", e);
         }
-      } catch (e) {
-        console.error("Auto-login error", e);
-      }
+      };
+      runAutoLogin();
     }
-  }, [loggedInEmployee, employees]);
+  }, [loggedInEmployee]);
 
   useEffect(() => {
     if (loggedInEmployee) {
@@ -100,11 +116,17 @@ export const useEmployeeAuth = (employees: Employee[], admins: any[], kioskBranc
     setPendingEmployee(null);
     
     try {
-      const emp = employees.find(e => e.phone === empIdInput);
-      if (!emp) {
+      const q = query(collection(db, 'employees'), where('phone', '==', empIdInput));
+      const querySnapshot = await getDocs(q);
+      
+      if (querySnapshot.empty) {
         setError('Số điện thoại không tồn tại.');
+        setIsSubmitting(false);
         return;
       }
+      
+      const docSnap = querySnapshot.docs[0];
+      const emp = { id: docSnap.id, ...docSnap.data() } as Employee;
       
       if (emp.pinCode !== pinInput) {
         // Fallback for existing users who might not have their pinCode updated properly in the DB yet
