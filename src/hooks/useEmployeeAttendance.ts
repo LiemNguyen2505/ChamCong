@@ -177,9 +177,11 @@ export const useEmployeeAttendance = (
         
         // Optimize check-in time if they arrived early
         if (latestLog.scheduledStartTime && checkInTimeStr) {
-           const inDate = new Date(`${latestLog.date}T${checkInTimeStr}`);
-           const schDate = new Date(`${latestLog.date}T${latestLog.scheduledStartTime}`);
-           if (inDate.getTime() < schDate.getTime()) {
+           const [inH, inM] = checkInTimeStr.split(':').map(Number);
+           const [schH, schM] = latestLog.scheduledStartTime.split(':').map(Number);
+           let inTotal = inH * 60 + inM;
+           let schTotal = schH * 60 + schM;
+           if (inTotal < schTotal || (inTotal > 21 * 60 && schTotal < 3 * 60)) {
                checkInTimeStr = latestLog.scheduledStartTime;
            }
         }
@@ -187,9 +189,12 @@ export const useEmployeeAttendance = (
         // Optimize check-out time if they left late
         let checkOutTimeStrCalc = selectedShiftTime;
         if (scheduledShiftTime) {
-           const outDate = new Date(`${latestLog.date}T${selectedShiftTime}`);
-           const schOutDate = new Date(`${latestLog.date}T${scheduledShiftTime}`);
-           if (outDate.getTime() > schOutDate.getTime()) {
+           const [outH, outM] = selectedShiftTime.split(':').map(Number);
+           const [schOutH, schOutM] = scheduledShiftTime.split(':').map(Number);
+           let outTotal = outH * 60 + outM;
+           let schOutTotal = schOutH * 60 + schOutM;
+           
+           if (outTotal > schOutTotal || (schOutTotal > 21 * 60 && outTotal < 3 * 60)) {
                checkOutTimeStrCalc = scheduledShiftTime;
            }
         }
