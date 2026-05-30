@@ -15,15 +15,48 @@ export const TABLE_COL_WIDTHS = {
   ACTIONS: 120
 };
 
-export const extractTimeStr = (tm: string | undefined | null) => {
+export const extractTimeStr = (tm: string | undefined | null, dateStr?: string | null) => {
     if (!tm || tm === '--:--') return null;
+    if (tm.length === 5 && tm.includes(':')) return tm; // "HH:mm" format
+    
+    // Check if it's an ISO string or Timestamp
+    const d = safeParseDate(tm, dateStr);
+    if (d) {
+      const h = String(d.getHours()).padStart(2, '0');
+      const m = String(d.getMinutes()).padStart(2, '0');
+      return `${h}:${m}`;
+    }
+    
     return tm.includes('T') ? tm.split('T')[1].substring(0, 5) : (tm.includes(' ') ? tm.split(' ')[1].substring(0, 5) : tm.substring(0, 5));
+};
+
+export const getScheduledStartTime = (t: any) => {
+  let schTimeStr = extractTimeStr(t.scheduledStartTime, t.date);
+  if (!schTimeStr) {
+    const inTimeStr = extractTimeStr(t.actualCheckInTime || t.checkInTime, t.date);
+    if (inTimeStr) {
+      const [inH, inM] = inTimeStr.split(':').map(Number);
+      const inTotal = inH * 60 + inM;
+      const commonShifts = [6 * 60, 14 * 60 + 30, 17 * 60, 18 * 60, 22 * 60 + 30];
+      for (const shift of commonShifts) {
+        // Find closest shift (allow up to 60 mins early and 120 mins late)
+        const diff = inTotal - shift;
+        if (diff >= -60 && diff <= 120) {
+          schTimeStr = `${String(Math.floor(shift / 60)).padStart(2, '0')}:${String(shift % 60).padStart(2, '0')}`;
+          break;
+        }
+      }
+    }
+  }
+  return schTimeStr;
 };
 
 export const getLateMinutes = (t: any, isAdmin: boolean = false) => {
   if (isAdmin) return 0;
-  const inTimeStr = extractTimeStr(t.checkInTime);
-  const schTimeStr = extractTimeStr(t.scheduledStartTime);
+  
+  const inTimeStr = extractTimeStr(t.actualCheckInTime || t.checkInTime, t.date);
+  let schTimeStr = getScheduledStartTime(t);
+
   if (schTimeStr && inTimeStr) {
     const [schH, schM] = schTimeStr.split(':').map(Number);
     const [inH, inM] = inTimeStr.split(':').map(Number);
@@ -91,29 +124,42 @@ export const getPhonePenalty = (t: any, hourlyRate: number) => {
 };
 
 export const getTotalHours = (t: any) => {
-  if (t.totalHours !== undefined && t.totalHours !== null && typeof t.totalHours === 'number') {
-    return t.totalHours;
-  }
+  // Always dynamically calculate to ensure scheduled time enforcement is respected
+  // if (t.totalHours !== undefined && t.totalHours !== null && typeof t.totalHours === 'number') {
+  //   return t.totalHours;
+  // }
 
-  const inTimeStr = extractTimeStr(t.checkInTime);
-  const outTimeStr = extractTimeStr(t.checkOutTime);
+  const inTimeStr = extractTimeStr(t.checkInTime, t.date);
+  const outTimeStr = extractTimeStr(t.checkOutTime, t.date);
 
   if (inTimeStr && outTimeStr) {
     let [inH, inM] = inTimeStr.split(':').map(Number);
     
     // Optimize check-in time against scheduled start time
-    if (t.scheduledStartTime) {
-      const scheduledStr = extractTimeStr(t.scheduledStartTime);
-      if (scheduledStr) {
-        const [schH, schM] = scheduledStr.split(':').map(Number);
-        if (inH * 60 + inM < schH * 60 + schM) {
+    const schedStartTimeStr = getScheduledStartTime(t);
+    if (schedStartTimeStr) {
+      if (schedStartTimeStr) {
+        const [schH, schM] = schedStartTimeStr.split(':').map(Number);
+        if (inH * 60 + inM < schH * 60 + schM || (inH * 60 + inM > 21 * 60 && schH * 60 + schM < 3 * 60)) {
           inH = schH;
           inM = schM;
         }
       }
     }
 
-    const [outH, outM] = outTimeStr.split(':').map(Number);
+    let [outH, outM] = outTimeStr.split(':').map(Number);
+    
+    // Optimize check-out time against scheduled end time
+    if (t.scheduledEndTime) {
+      const scheduledEndStr = extractTimeStr(t.scheduledEndTime, t.date);
+      if (scheduledEndStr) {
+        const [schEndH, schEndM] = scheduledEndStr.split(':').map(Number);
+        if (outH * 60 + outM > schEndH * 60 + schEndM || (schEndH * 60 + schEndM > 21 * 60 && outH * 60 + outM < 3 * 60)) {
+          outH = schEndH;
+          outM = schEndM;
+        }
+      }
+    }
     let diff = (outH * 60 + outM) - (inH * 60 + inM);
     if (diff < 0) diff += 24 * 60; // overnight
     if (diff > 0) return diff / 60;
