@@ -65,6 +65,20 @@ export const AttendanceActionForm: React.FC<AttendanceActionFormProps> = ({
     }
   }, [actionType, format, setSelectedShiftTime]);
 
+  useEffect(() => {
+    if ((actionType === 'check-in' || actionType === 'check-out') && todayShifts.length > 0 && !selectedShiftId) {
+      const firstShift = todayShifts[0];
+      setSelectedShiftId(firstShift.id);
+      if (actionType === 'check-in') {
+        setScheduledShiftTime(firstShift.startTime);
+        const nowStr = format(new Date(), 'HH:mm');
+        setSelectedShiftTime(nowStr);
+      } else {
+        setScheduledShiftTime(firstShift.endTime);
+      }
+    }
+  }, [actionType, todayShifts, selectedShiftId]);
+
   return (
     <div className="space-y-4 animate-in fade-in zoom-in-95 duration-300">
       <div className="flex items-center justify-between -mt-3 mb-2">
