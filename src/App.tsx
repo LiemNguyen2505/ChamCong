@@ -40,7 +40,7 @@ export default function App() {
   const hasInitialLoadedRef = useRef(false);
   const isFetchingInProgress = useRef(false); // GLOBAL FETCH LOCK
 
-  const fetchInitialData = useCallback(async (monthYear?: string, force: boolean | string | string[] = false, options?: { empId?: string, onlyToday?: boolean }) => {
+  const fetchInitialData = useCallback(async (monthYear?: string, force: boolean | string | string[] = false, options?: { empId?: string, docId?: string, onlyToday?: boolean }) => {
     const targetMonth = monthYear || format(new Date(), 'yyyy-MM');
     const cacheKey = `${targetMonth}_${options?.empId || 'all'}_${options?.onlyToday ? 'today' : 'month'}`;
     const now = Date.now();
@@ -113,7 +113,7 @@ export default function App() {
         { key: 'retainedSalaryRecords', query: query(collection(db, 'RetainedSalaryRecords'), orderBy('createdAt', 'desc'), limit(500)), type: 'lazy' },
         { key: 'salaryAdvanceRecords', query: options?.empId ? query(collection(db, 'SalaryAdvanceRecords'), where('monthYear', '==', targetMonth), where('empId', '==', options.empId), orderBy('createdAt', 'desc')) : query(collection(db, 'SalaryAdvanceRecords'), where('monthYear', '==', targetMonth), orderBy('createdAt', 'desc')), type: 'lazy' },
         { key: 'chamCongs', query: options?.empId ? (options.onlyToday ? query(collection(db, 'timesheets'), where('date', '==', todayStr), where('empId', '==', options.empId), limit(5)) : query(collection(db, 'timesheets'), where('date', '>=', startDate), where('date', '<=', endDate), where('empId', '==', options.empId), limit(100))) : query(collection(db, 'timesheets'), where('date', '>=', startDate), where('date', '<=', endDate), limit(3000)), type: 'lazy' },
-        { key: 'lichLamViecs', query: options?.empId ? (options.onlyToday ? query(collection(db, 'LichLamViec'), where('date', '==', todayStr), where('empId', '==', options.empId), limit(5)) : query(collection(db, 'LichLamViec'), where('date', '>=', startDate), where('date', '<=', endDate), where('empId', '==', options.empId), limit(100))) : query(collection(db, 'LichLamViec'), where('date', '>=', startDate), where('date', '<=', endDate), limit(3000)), type: 'lazy' },
+        { key: 'lichLamViecs', query: (options?.empId || options?.docId) ? (options.onlyToday ? query(collection(db, 'LichLamViec'), where('date', '==', todayStr), where('empId', '==', options.docId || options.empId), limit(5)) : query(collection(db, 'LichLamViec'), where('date', '>=', startDate), where('date', '<=', endDate), where('empId', '==', options.docId || options.empId), limit(100))) : query(collection(db, 'LichLamViec'), where('date', '>=', startDate), where('date', '<=', endDate), limit(3000)), type: 'lazy' },
         { key: 'bulletinNotes', query: query(collection(db, 'BulletinBoard'), orderBy('isPinned', 'desc'), orderBy('createdAt', 'desc'), limit(100)), type: 'lazy' },
         { key: 'planningGoals', query: query(collection(db, 'PlanningGoals'), limit(100)), type: 'static' },
         { key: 'xinNghiPheps', query: options?.empId ? query(collection(db, 'XinNghiPhep'), where('empId', '==', options.empId), limit(100)) : query(collection(db, 'XinNghiPhep'), limit(1000)), type: 'lazy' },
