@@ -44,7 +44,7 @@ export default function EmployeeView({
   isLoading
 }: {
   globalData: any,
-  fetchInitialData: (monthYear?: string, force?: any | string | string[], options?: { empId?: string, onlyToday?: boolean }) => Promise<any>,
+  fetchInitialData: (monthYear?: string, force?: any | string | string[], options?: { empId?: string, docId?: string, onlyToday?: boolean }) => Promise<any>,
   isLoading: boolean
 }) {
   const navigate = useNavigate();
@@ -155,21 +155,21 @@ export default function EmployeeView({
   useEffect(() => {
     if (loggedInEmployee && hasFetchedTodayRef.current !== loggedInEmployee.empId) {
       hasFetchedTodayRef.current = loggedInEmployee.empId;
-      fetchInitialData(undefined, ['admins', 'chamCongs', 'lichLamViecs', 'xinNghiPheps', 'payrollAdjustments', 'violations', 'salaryAdvanceRecords'], { empId: loggedInEmployee.empId, onlyToday: true });
+      fetchInitialData(undefined, ['admins', 'chamCongs', 'lichLamViecs', 'xinNghiPheps', 'payrollAdjustments', 'violations', 'salaryAdvanceRecords'], { empId: loggedInEmployee.empId, docId: loggedInEmployee.id, onlyToday: true });
     }
   }, [loggedInEmployee, fetchInitialData]);
 
   // 2. Fetch full month data when switching to history or salary tabs
   useEffect(() => {
     if (loggedInEmployee && (showHistory || showSalaryDetails || showStats)) {
-      fetchInitialData(selectedMonth, ['holidays', 'chamCongs', 'lichLamViecs', 'xinNghiPheps', 'payrollAdjustments', 'violations', 'salaryAdvanceRecords'], { empId: loggedInEmployee.empId });
+      fetchInitialData(selectedMonth, ['holidays', 'chamCongs', 'lichLamViecs', 'xinNghiPheps', 'payrollAdjustments', 'violations', 'salaryAdvanceRecords'], { empId: loggedInEmployee.empId, docId: loggedInEmployee.id });
     }
   }, [showHistory, showSalaryDetails, showStats, selectedMonth, loggedInEmployee, fetchInitialData]);
 
   // 3. Fetch full month data when opening weekly schedule
   useEffect(() => {
     if (loggedInEmployee && showWeeklySchedule) {
-      fetchInitialData(selectedMonth, ['nhanViens', 'lichLamViecs'], { empId: loggedInEmployee.empId });
+      fetchInitialData(selectedMonth, ['nhanViens', 'lichLamViecs']);
     }
   }, [showWeeklySchedule, selectedMonth, loggedInEmployee, fetchInitialData]);
 
