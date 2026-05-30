@@ -30,6 +30,32 @@ export const extractTimeStr = (tm: string | undefined | null, dateStr?: string |
     return tm.includes('T') ? tm.split('T')[1].substring(0, 5) : (tm.includes(' ') ? tm.split(' ')[1].substring(0, 5) : tm.substring(0, 5));
 };
 
+export const getScheduledEndTime = (t: any) => {
+  let schTimeStr = extractTimeStr(t.scheduledEndTime, t.date);
+  if (!schTimeStr) {
+    const outTimeStr = extractTimeStr(t.checkOutTime || t.actualCheckOutTime, t.date);
+    if (outTimeStr) {
+      const [outH, outM] = outTimeStr.split(':').map(Number);
+      const outTotal = outH * 60 + outM;
+      const commonEndShifts = [11 * 60, 14 * 60, 15 * 60, 17 * 60, 22 * 60];
+      for (const shift of commonEndShifts) {
+        const diff = outTotal - shift;
+        if (diff >= -120 && diff <= 180) { // allow checking out 2 hours early up to 3 hours late
+          return `${String(Math.floor(shift / 60)).padStart(2, '0')}:${String(shift % 60).padStart(2, '0')}`;
+        }
+      }
+    }
+    
+    // Fallback exactly like old code
+    const startStr = getScheduledStartTime(t);
+    if (startStr === '06:00') return '11:00';
+    if (startStr === '12:00' || startStr === '12:30' || startStr === '14:30') return '17:00';
+    if (startStr === '17:00' || startStr === '18:00') return '22:00';
+    return null;
+  }
+  return schTimeStr;
+};
+
 export const getScheduledStartTime = (t: any) => {
   let schTimeStr = extractTimeStr(t.scheduledStartTime, t.date);
   if (!schTimeStr) {
@@ -150,14 +176,12 @@ export const getTotalHours = (t: any) => {
     let [outH, outM] = outTimeStr.split(':').map(Number);
     
     // Optimize check-out time against scheduled end time
-    if (t.scheduledEndTime) {
-      const scheduledEndStr = extractTimeStr(t.scheduledEndTime, t.date);
-      if (scheduledEndStr) {
-        const [schEndH, schEndM] = scheduledEndStr.split(':').map(Number);
-        if (outH * 60 + outM > schEndH * 60 + schEndM || (schEndH * 60 + schEndM > 21 * 60 && outH * 60 + outM < 3 * 60)) {
-          outH = schEndH;
-          outM = schEndM;
-        }
+    const schedEndTimeStr = getScheduledEndTime(t);
+    if (schedEndTimeStr) {
+      const [schEndH, schEndM] = schedEndTimeStr.split(':').map(Number);
+      if (outH * 60 + outM > schEndH * 60 + schEndM || (schEndH * 60 + schEndM > 21 * 60 && outH * 60 + outM < 3 * 60)) {
+        outH = schEndH;
+        outM = schEndM;
       }
     }
     let diff = (outH * 60 + outM) - (inH * 60 + inM);
