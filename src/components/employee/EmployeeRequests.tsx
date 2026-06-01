@@ -67,6 +67,21 @@ export const EmployeeRequests: React.FC<EmployeeRequestsProps> = ({
 
   const [isSubmitting, setIsSubmitting] = React.useState(false);
 
+  const getTargetBranch = () => {
+    let target = loggedInEmployee.locationId || kioskBranch;
+    if (requestDate && requestType !== 'salary_advance' && requestType !== 'feedback') {
+      const shift = allSchedules.find(s => 
+        (s.empId === loggedInEmployee.id || s.empId === loggedInEmployee.empId) && 
+        s.date === requestDate &&
+        !s.isOff
+      );
+      if (shift && shift.locationId) {
+        target = shift.locationId;
+      }
+    }
+    return target;
+  };
+
   const handleSubmitRequest = async () => {
     if (!loggedInEmployee) {
       toast.error('Lỗi: Không tìm thấy thông tin nhân viên');
@@ -91,11 +106,13 @@ export const EmployeeRequests: React.FC<EmployeeRequestsProps> = ({
     }
 
     setIsSubmitting(true);
+    const targetBranch = getTargetBranch();
+
     try {
       const newRequest = await addDoc(collection(db, 'ApprovalRequests'), {
         empId: loggedInEmployee.empId,
         fullName: loggedInEmployee.fullName,
-        locationId: kioskBranch,
+        locationId: targetBranch,
         type: requestType,
         status: 'pending',
         timestamp: serverTimestamp(),
@@ -111,7 +128,7 @@ export const EmployeeRequests: React.FC<EmployeeRequestsProps> = ({
       });
 
       const requestLabels: Record<string, string> = {
-        'off_sudden': 'Xin nghỉ phép',
+        'off_sudden': 'Nghỉ đột xuất',
         'shift_swap': 'Đổi ca',
         'late_early': 'Đi trễ / Về sớm',
         'forgot_check': 'Quên chấm công',
@@ -121,14 +138,11 @@ export const EmployeeRequests: React.FC<EmployeeRequestsProps> = ({
 
       const requestLabel = requestLabels[requestType] || 'Yêu cầu';
 
-      // Create notification for Admins (Both Branch and Super Admin)
-      // The single document with locationId + recipientId='admin' works with useNotifications readBy logic
-      // to ensure Super Admin reading it doesn't affect Branch Manager's unread status.
       await addDoc(collection(db, 'Notifications'), {
         recipientId: 'admin',
-        locationId: kioskBranch,
+        locationId: targetBranch,
         title: `Yêu cầu ${requestLabel}`,
-        message: `Nhân viên ${loggedInEmployee.fullName} thuộc quán ${kioskBranch} đã gửi một yêu cầu ${requestLabel}.`,
+        message: `Nhân viên ${loggedInEmployee.fullName} thuộc quán ${targetBranch} đã gửi một yêu cầu ${requestLabel}.`,
         type: requestType === 'feedback' ? 'support' : 'approval',
         priority: requestType === 'off_sudden' ? 'high' : 'medium',
         isRead: false,
@@ -233,7 +247,7 @@ export const EmployeeRequests: React.FC<EmployeeRequestsProps> = ({
                       >
                         <option value="">-- Chọn nhân viên --</option>
                         {employees
-                          .filter(e => e.empId !== loggedInEmployee.empId && (e.locationId === kioskBranch))
+                          .filter(e => e.empId !== loggedInEmployee.empId && (e.locationId === getTargetBranch()))
                           .map(emp => (
                             <option key={emp.id} value={emp.empId}>{emp.fullName}</option>
                           ))}
@@ -320,7 +334,7 @@ export const EmployeeRequests: React.FC<EmployeeRequestsProps> = ({
                         className={`w-full p-2.5 bg-white border border-slate-200 rounded-xl text-sm font-bold outline-none focus:ring-2 ${getRequestTypeConfig(requestType).ring} transition-all`}
                       />
                     </div>
-                    <div className="grid grid-cols-2 gap-2">
+                    <div className="grid grid-cols-2 gap-2 mt-2">
                       <div className="space-y-1">
                         <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Giờ vào</label>
                         <input
