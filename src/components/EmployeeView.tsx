@@ -164,7 +164,7 @@ export default function EmployeeView({
   useEffect(() => {
     if (loggedInEmployee && hasFetchedTodayRef.current !== loggedInEmployee.empId) {
       hasFetchedTodayRef.current = loggedInEmployee.empId;
-      fetchInitialData(undefined, ['admins', 'chamCongs', 'lichLamViecs', 'xinNghiPheps', 'payrollAdjustments', 'violations', 'salaryAdvanceRecords'], { empId: loggedInEmployee.empId, docId: loggedInEmployee.id, onlyToday: true });
+      fetchInitialData(undefined, ['admins', 'chamCongs', 'lichLamViecs'], { empId: loggedInEmployee.empId, docId: loggedInEmployee.id, onlyToday: true });
     }
   }, [loggedInEmployee, fetchInitialData]);
 
