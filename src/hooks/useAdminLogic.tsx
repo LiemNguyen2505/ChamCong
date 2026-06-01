@@ -20,6 +20,7 @@ import { LayoutDashboard, CheckCircle2, Calendar, DollarSign, TableProperties, S
 import { motion } from 'motion/react';
 
 import { formatCurrency } from '../utils/currency';
+import { matchSchedulesForTimesheet, findEmployee } from '../utils/adminHelpers';
 
 // Removed local formatCurrency
 const OWNER_EMAIL = 'nguyen.thanh.liem2505@gmail.com';
@@ -263,26 +264,71 @@ export function useAdminLogic(globalData: any, fetchInitialData: any, isLoading:
     return str.normalize('NFD').replace(/[\u0300-\u036f]/g, "").toLowerCase();
   };
 
-  // STABILIZER: Cô lập fetch data vào 1 useEffect duy nhất
+  const loadedKeysRef = useRef<Set<string>>(new Set());
+
+  // STABILIZER: Cô lập fetch data vào 1 useEffect duy nhất, load theo Tab để giảm số lượng read database
   useEffect(() => {
     if (!isAuthenticated) return;
     
-    // Prevent redundant fetches for the same month/branch in the same cycle
-    if (isLoadingRef.current === `${filterMonth}-${filterBranch}`) return;
-    isLoadingRef.current = `${filterMonth}-${filterBranch}`;
+    const keysToLoad = new Set<string>();
+    
+    // Always load these globally required ones (small static tables)
+    keysToLoad.add('nhanViens');
+    keysToLoad.add('admins');
+    
+    // Load based on active Tab
+    if (activeTab === 'dashboard') {
+       keysToLoad.add('chamCongs');
+       keysToLoad.add('xinNghiPheps');
+       keysToLoad.add('lichLamViecs'); // needed for matchSchedules
+       keysToLoad.add('approvalRequests');
+    }
+    else if (activeTab === 'bangluong' || activeTab === 'bangcongthang') {
+       keysToLoad.add('chamCongs');
+       keysToLoad.add('lichLamViecs');
+       keysToLoad.add('payrollAdjustments');
+       keysToLoad.add('violations');
+       keysToLoad.add('holidays');
+       keysToLoad.add('salaryAdvanceRecords');
+    }
+    else if (activeTab === 'xinnghiphep' || activeTab === 'duyetgio') {
+       keysToLoad.add('approvalRequests');
+       keysToLoad.add('xinNghiPheps');
+       keysToLoad.add('chamCongs');
+       keysToLoad.add('lichLamViecs');
+       keysToLoad.add('salaryAdvanceRecords');
+    }
+    else if (activeTab === 'lichlamviec') {
+       keysToLoad.add('lichLamViecs');
+    }
+    else if (activeTab === 'vipham') {
+       keysToLoad.add('violations');
+    }
+    else if (activeTab === 'canhbao') {
+       keysToLoad.add('canhBaos');
+    }
+    else if (activeTab === 'lichsu') {
+       keysToLoad.add('auditLogs');
+    }
 
-    const loadData = async () => {
-      try {
-        await fetchInitialData(filterMonth, true);
-      } catch (err) {
-        console.error("Failed to load data for month:", filterMonth, err);
-      } finally {
-        // App.tsx uses its own locks so this is just a local safety guard
-      }
-    };
+    const newKeysToFetch = Array.from(keysToLoad).filter(key => 
+       !loadedKeysRef.current.has(`${filterMonth}-${key}`)
+    );
 
-    loadData();
-  }, [filterMonth, filterBranch, isAuthenticated, fetchInitialData]);
+    if (newKeysToFetch.length > 0) {
+      newKeysToFetch.forEach(k => loadedKeysRef.current.add(`${filterMonth}-${k}`));
+      
+      const loadData = async () => {
+        try {
+          await fetchInitialData(filterMonth, newKeysToFetch);
+        } catch (err) {
+          console.error("Failed to load data for keys:", newKeysToFetch, err);
+        }
+      };
+
+      loadData();
+    }
+  }, [filterMonth, filterBranch, isAuthenticated, activeTab, fetchInitialData]);
 
   const isLoadingRef = useRef('');
 
@@ -403,7 +449,7 @@ export function useAdminLogic(globalData: any, fetchInitialData: any, isLoading:
     const adminLocations = currentAdmin?.locationIds || [];
     // Adjustments are linked to employees, filter by examining the employee's branch
     return raw.filter(adj => {
-      const emp = globalData.nhanViens.find((e: any) => e.id === adj.empId || e.empId === adj.empId);
+      const emp = findEmployee(adj.empId, undefined, globalData.nhanViens);
       return emp && adminLocations.includes(emp.locationId);
     });
   }, [globalData.payrollAdjustments, globalData.nhanViens, currentAdmin]);
@@ -413,7 +459,7 @@ export function useAdminLogic(globalData: any, fetchInitialData: any, isLoading:
     if (currentAdmin?.role === 'SuperAdmin') return raw;
     const adminLocations = currentAdmin?.locationIds || [];
     return raw.filter(v => {
-      const emp = globalData.nhanViens.find((e: any) => e.id === v.empId || e.empId === v.empId);
+      const emp = findEmployee(v.empId, undefined, globalData.nhanViens);
       return emp && adminLocations.includes(emp.locationId);
     });
   }, [globalData.violations, globalData.nhanViens, currentAdmin]);
@@ -423,7 +469,7 @@ export function useAdminLogic(globalData: any, fetchInitialData: any, isLoading:
     if (currentAdmin?.role === 'SuperAdmin') return raw;
     const adminLocations = currentAdmin?.locationIds || [];
     return raw.filter(sh => {
-      const empFound = globalData.nhanViens.find((e: any) => e.id === sh.empId || e.empId === sh.empId);
+      const empFound = findEmployee(sh.empId, undefined, globalData.nhanViens);
       return empFound && adminLocations.includes(empFound.locationId);
     });
   }, [globalData.salaryHistories, globalData.nhanViens, currentAdmin]);
@@ -522,9 +568,18 @@ export function useAdminLogic(globalData: any, fetchInitialData: any, isLoading:
   }, [filterBranch]);
 
   const filteredChamCongs = useMemo(() => {
-    if (filterBranch === 'All') return chamCongs;
-    return chamCongs.filter(cc => cc.locationId === filterBranch);
-  }, [chamCongs, filterBranch]);
+    let result = chamCongs;
+    if (filterBranch !== 'All') {
+      result = chamCongs.filter(cc => cc.locationId === filterBranch);
+    }
+    
+    return result.map(cc => {
+      const emp = findEmployee(cc.empId, cc.fullName, nhanViens);
+      const possibleIds = emp ? [emp.id, emp.empId].filter(Boolean) : [cc.empId, cc.id];
+      const daySchedules = lichLamViecs.filter(s => s.date === cc.date && possibleIds.includes(s.empId) && !s.isOff);
+      return matchSchedulesForTimesheet(cc, daySchedules);
+    });
+  }, [chamCongs, filterBranch, lichLamViecs]);
 
   const filteredLichLamViecs = useMemo(() => {
     if (filterBranch === 'All') return lichLamViecs;
@@ -710,35 +765,20 @@ export function useAdminLogic(globalData: any, fetchInitialData: any, isLoading:
   const allEmployeeSalaryStatsMap = useMemo(() => {
     const statsMap: Record<string, any> = {};
     nhanViens.forEach(emp => {
-      const empTimesheets = chamCongs.filter(cc => (cc.empId === emp.id || cc.empId === emp.empId) && cc.date.startsWith(filterMonth));
-      const empSchedules = lichLamViecs.filter(s => (s.empId === emp.id || s.empId === emp.empId) && s.date.startsWith(filterMonth) && !s.isOff);
+      const empTimesheets = chamCongs.filter(cc => {
+          if (!cc.date.startsWith(filterMonth)) return false;
+          const matched = findEmployee(cc.empId, cc.fullName, nhanViens);
+          return matched && matched.id === emp.id;
+      });
+      const empSchedules = lichLamViecs.filter(s => {
+          if (!s.date.startsWith(filterMonth) || s.isOff) return false;
+          const matched = findEmployee(s.empId, s.fullName, nhanViens);
+          return matched && matched.id === emp.id;
+      });
 
       const adjustedTimesheets = empTimesheets.map(cc => {
         const daySchedules = empSchedules.filter(s => s.date === cc.date);
-        if (daySchedules.length > 0) {
-          const matchingSchedule = daySchedules.find(s => {
-            if (cc.checkInTime && s.startTime) {
-              const ccHour = parseInt(cc.checkInTime.split(':')[0]);
-              const sHour = parseInt(s.startTime.split(':')[0]);
-              return Math.abs(ccHour - sHour) <= 2;
-            }
-            return true;
-          });
-
-          if (matchingSchedule) {
-            const defaults = [{ s: '06:00', e: '11:00' }, { s: '12:00', e: '17:00' }, { s: '17:00', e: '22:00' }];
-            const isDefault = defaults.some(d => d.s === matchingSchedule.startTime && d.e === matchingSchedule.endTime);
-            if (!isDefault) {
-              const [sH, sM] = matchingSchedule.startTime.split(':').map(Number);
-              const [eH, eM] = matchingSchedule.endTime.split(':').map(Number);
-              const duration = (eH + eM/60) - (sH + sM/60);
-              if (duration > 0) {
-                return { ...cc, totalHours: duration, _isManualScheduleOverride: true };
-              }
-            }
-          }
-        }
-        return cc;
+        return matchSchedulesForTimesheet(cc, daySchedules);
       });
 
       const isSubjectAdmin = emp.empId?.toUpperCase() === 'ADMIN' || admins.some((a: any) => a.email === emp.fullName);
