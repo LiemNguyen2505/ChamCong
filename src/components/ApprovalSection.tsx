@@ -26,6 +26,7 @@ import {
 import { db } from '../firebase';
 import { toast } from 'react-hot-toast';
 import { Employee, AdminAccount, ApprovalRequest } from '../types/admin';
+import { findEmployee } from '../utils/adminHelpers';
 
 interface ApprovalSectionProps {
   adminTheme: any;
@@ -38,7 +39,7 @@ interface ApprovalSectionProps {
   setRequestTypeFilter: (filter: string) => void;
   currentAdmin: AdminAccount | null;
   nhanViens: Employee[];
-  fetchInitialData: (monthYear?: string, force?: boolean) => Promise<any>;
+  fetchInitialData: (monthYear?: string, force?: any) => Promise<any>;
   logAction: (action: string, target: string, details: string) => Promise<void>;
   approvalHistory: ApprovalRequest[];
   openConfirmModal: (title: string, message: string, onConfirm: () => Promise<void>) => void;
@@ -405,7 +406,7 @@ export const ApprovalSection: React.FC<ApprovalSectionProps> = ({
                           async () => {
                             const loadingToast = toast.loading('Đang xử lý...');
                             try {
-                              const targetEmp = nhanViens.find(e => e.empId === req.empId || e.id === req.empId);
+                              const targetEmp = findEmployee(req.empId, req.fullName, nhanViens);
                               const firestoreId = targetEmp ? targetEmp.id : req.empId;
 
                               await updateDoc(doc(db, 'ApprovalRequests', req.id), {
@@ -476,7 +477,7 @@ export const ApprovalSection: React.FC<ApprovalSectionProps> = ({
                               } else if (req.type === 'salary_advance' && req.details?.advanceAmount) {
                                 const reqDate = req.details.requestDate || format(new Date(), 'yyyy-MM-dd');
                                 const monthYear = reqDate.substring(0, 7);
-                                const targetEmp = nhanViens.find(e => e.empId === req.empId || e.id === req.empId);
+                                const targetEmp = findEmployee(req.empId, req.fullName, nhanViens);
                                 const firestoreId = targetEmp ? targetEmp.id : req.empId;
                                 
                                 // 1. Create record in SalaryAdvanceRecords for UI visibility in Tab TẠM ỨNG LƯƠNG
@@ -501,7 +502,7 @@ export const ApprovalSection: React.FC<ApprovalSectionProps> = ({
                                 }, { merge: true });
                               } else if (req.type === 'forgot_check' && req.details?.requestDate) {
                                 // Create/Update timesheet for forgotten check-in/out
-                                const targetEmp = nhanViens.find(e => e.empId === req.empId || e.id === req.empId);
+                                const targetEmp = findEmployee(req.empId, req.fullName, nhanViens);
                                 if (targetEmp) {
                                   const dateStr = req.details.requestDate;
                                   const startTime = req.details.requestTime || '08:00';
@@ -515,7 +516,6 @@ export const ApprovalSection: React.FC<ApprovalSectionProps> = ({
                                   
                                   const totalPay = duration * (targetEmp.hourlyRate || 0);
 
-                                  // Check if timesheet already exists
                                   const q = query(collection(db, 'timesheets'), where('empId', '==', req.empId), where('date', '==', dateStr));
                                   const snap = await getDocs(q);
                                   
@@ -525,7 +525,9 @@ export const ApprovalSection: React.FC<ApprovalSectionProps> = ({
                                       checkOutTime: endTime,
                                       totalHours: duration,
                                       totalPay: totalPay,
+                                      isManualEdit: true,
                                       status: 'approved',
+                                      isAbandonedShift: false,
                                       approvedBy: currentAdmin?.email || 'admin',
                                       approvedAt: serverTimestamp()
                                     });
@@ -538,6 +540,7 @@ export const ApprovalSection: React.FC<ApprovalSectionProps> = ({
                                       checkOutTime: endTime,
                                       totalHours: duration,
                                       totalPay: totalPay,
+                                      isManualEdit: true,
                                       locationId: req.locationId,
                                       status: 'approved',
                                       approvedBy: currentAdmin?.email || 'admin',
@@ -576,7 +579,7 @@ export const ApprovalSection: React.FC<ApprovalSectionProps> = ({
                           async () => {
                             const loadingToast = toast.loading('Đang xử lý...');
                             try {
-                              const targetEmp = nhanViens.find(e => e.empId === req.empId || e.id === req.empId);
+                              const targetEmp = findEmployee(req.empId, req.fullName, nhanViens);
                               const firestoreId = targetEmp ? targetEmp.id : req.empId;
 
                               await updateDoc(doc(db, 'ApprovalRequests', req.id), {
@@ -703,7 +706,7 @@ export const ApprovalSection: React.FC<ApprovalSectionProps> = ({
                                 async () => {
                                   const loadingToast = toast.loading('Đang xử lý...');
                                   try {
-                                    const targetEmp = nhanViens.find(e => e.empId === req.empId || e.id === req.empId);
+                                    const targetEmp = findEmployee(req.empId, req.fullName, nhanViens);
                                     const firestoreId = targetEmp ? targetEmp.id : req.empId;
 
                                     await updateDoc(doc(db, 'ApprovalRequests', req.id), {
@@ -774,7 +777,7 @@ export const ApprovalSection: React.FC<ApprovalSectionProps> = ({
                                     } else if (req.type === 'salary_advance' && req.details?.advanceAmount) {
                                       const reqDate = req.details.requestDate || format(new Date(), 'yyyy-MM-dd');
                                       const monthYear = reqDate.substring(0, 7);
-                                      const targetEmp = nhanViens.find(e => e.empId === req.empId || e.id === req.empId);
+                                      const targetEmp = findEmployee(req.empId, req.fullName, nhanViens);
                                       const firestoreId = targetEmp ? targetEmp.id : req.empId;
 
                                       // 1. Create record in SalaryAdvanceRecords for UI visibility in Tab TẠM ỨNG LƯƠNG
@@ -799,7 +802,7 @@ export const ApprovalSection: React.FC<ApprovalSectionProps> = ({
                                       }, { merge: true });
                                     } else if (req.type === 'forgot_check' && req.details?.requestDate) {
                                       // Create/Update timesheet for forgotten check-in/out
-                                      const targetEmp = nhanViens.find(e => e.empId === req.empId || e.id === req.empId);
+                                      const targetEmp = findEmployee(req.empId, req.fullName, nhanViens);
                                       if (targetEmp) {
                                         const dateStr = req.details.requestDate;
                                         const startTime = req.details.requestTime || '08:00';
@@ -813,7 +816,6 @@ export const ApprovalSection: React.FC<ApprovalSectionProps> = ({
                                         
                                         const totalPay = duration * (targetEmp.hourlyRate || 0);
 
-                                        // Check if timesheet already exists
                                         const q = query(collection(db, 'timesheets'), where('empId', '==', req.empId), where('date', '==', dateStr));
                                         const snap = await getDocs(q);
                                         
@@ -823,7 +825,9 @@ export const ApprovalSection: React.FC<ApprovalSectionProps> = ({
                                             checkOutTime: endTime,
                                             totalHours: duration,
                                             totalPay: totalPay,
+                                            isManualEdit: true,
                                             status: 'approved',
+                                            isAbandonedShift: false, // Cập nhật lại không còn bỏ ca
                                             approvedBy: currentAdmin?.email || 'admin',
                                             approvedAt: serverTimestamp()
                                           });
@@ -836,6 +840,7 @@ export const ApprovalSection: React.FC<ApprovalSectionProps> = ({
                                             checkOutTime: endTime,
                                             totalHours: duration,
                                             totalPay: totalPay,
+                                            isManualEdit: true,
                                             locationId: req.locationId,
                                             status: 'approved',
                                             approvedBy: currentAdmin?.email || 'admin',
@@ -874,7 +879,7 @@ export const ApprovalSection: React.FC<ApprovalSectionProps> = ({
                                 async () => {
                                   const loadingToast = toast.loading('Đang xử lý...');
                                   try {
-                                    const targetEmp = nhanViens.find(e => e.empId === req.empId || e.id === req.empId);
+                                    const targetEmp = findEmployee(req.empId, req.fullName, nhanViens);
                                     const firestoreId = targetEmp ? targetEmp.id : req.empId;
 
                                     await updateDoc(doc(db, 'ApprovalRequests', req.id), {
