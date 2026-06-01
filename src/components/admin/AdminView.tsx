@@ -476,6 +476,7 @@ export default function AdminView({
             nhanViens={nhanViens}
             admins={admins}
             filteredChamCongs={filteredChamCongs}
+            globalData={globalData}
             currentAdmin={currentAdmin}
             adminTheme={adminTheme}
             historyDay={historyDay}
@@ -744,8 +745,8 @@ export default function AdminView({
       {selectedEmployeeForDetails && (
         <EmployeeAttendanceDetailModal
           employee={selectedEmployeeForDetails}
-          timesheets={chamCongs.filter(cc => cc.empId === selectedEmployeeForDetails.id || cc.empId === selectedEmployeeForDetails.empId)}
-          schedules={lichLamViecs.filter(s => s.empId === selectedEmployeeForDetails.id || s.empId === selectedEmployeeForDetails.empId)}
+          timesheets={filteredChamCongs.filter(cc => cc.empId === selectedEmployeeForDetails.id || cc.empId === selectedEmployeeForDetails.empId)}
+          schedules={filteredLichLamViecs.filter(s => s.empId === selectedEmployeeForDetails.id || s.empId === selectedEmployeeForDetails.empId)}
           month={filterMonth}
           onClose={() => setSelectedEmployeeForDetails(null)}
           adminTheme={adminTheme}
@@ -757,8 +758,8 @@ export default function AdminView({
         <EmployeeSalaryDetailModal
           employee={selectedEmployeeForSalaryDetails}
           month={filterMonth}
-          timesheets={chamCongs.filter(cc => (cc.empId === selectedEmployeeForSalaryDetails.id || cc.empId === selectedEmployeeForSalaryDetails.empId) && cc.date.startsWith(filterMonth))}
-          schedules={lichLamViecs.filter(s => (s.empId === selectedEmployeeForSalaryDetails.id || s.empId === selectedEmployeeForSalaryDetails.empId) && s.date.startsWith(filterMonth))}
+          timesheets={filteredChamCongs.filter(cc => (cc.empId === selectedEmployeeForSalaryDetails.id || cc.empId === selectedEmployeeForSalaryDetails.empId) && cc.date.startsWith(filterMonth))}
+          schedules={filteredLichLamViecs.filter(s => (s.empId === selectedEmployeeForSalaryDetails.id || s.empId === selectedEmployeeForSalaryDetails.empId) && s.date.startsWith(filterMonth))}
           adjustments={payrollAdjustments}
           holidays={holidays}
           onClose={() => setSelectedEmployeeForSalaryDetails(null)}
