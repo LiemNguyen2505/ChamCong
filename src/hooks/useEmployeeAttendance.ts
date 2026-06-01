@@ -4,6 +4,7 @@ import { collection, addDoc, updateDoc, doc, serverTimestamp, query, where, getD
 import { format } from 'date-fns';
 import toast from 'react-hot-toast';
 import { calculateDistance } from '../utils/geo';
+import { matchSchedulesForTimesheet } from '../utils/adminHelpers';
 import { CameraCaptureRef } from '../components/CameraCapture';
 
 export const useEmployeeAttendance = (
@@ -171,73 +172,58 @@ export const useEmployeeAttendance = (
       } else {
         if (!latestLog) return;
         
-        let totalHours = 0;
-        let totalPay = 0;
-        let checkInTimeStr = latestLog.checkInTime || scheduledShiftTime;
-        
-        // Optimize check-in time if they arrived early
-        if (latestLog.scheduledStartTime && checkInTimeStr) {
-           const [inH, inM] = checkInTimeStr.split(':').map(Number);
-           const [schH, schM] = latestLog.scheduledStartTime.split(':').map(Number);
-           let inTotal = inH * 60 + inM;
-           let schTotal = schH * 60 + schM;
-           if (inTotal < schTotal || (inTotal > 21 * 60 && schTotal < 3 * 60)) {
-               checkInTimeStr = latestLog.scheduledStartTime;
-           }
-        }
-        
-        // Optimize check-out time if they left late
-        let checkOutTimeStrCalc = selectedShiftTime;
-        if (scheduledShiftTime) {
-           const [outH, outM] = selectedShiftTime.split(':').map(Number);
-           const [schOutH, schOutM] = scheduledShiftTime.split(':').map(Number);
-           let outTotal = outH * 60 + outM;
-           let schOutTotal = schOutH * 60 + schOutM;
-           
-           if (outTotal > schOutTotal || (schOutTotal > 21 * 60 && outTotal < 3 * 60)) {
-               checkOutTimeStrCalc = scheduledShiftTime;
-           }
-        }
-        
         let updateData: any = {
           photoCheckOut: capturedPhoto,
           gpsOut: coords, // Save GPS coords
           noteCheckOut: note,
-          scheduledEndTime: scheduledShiftTime,
+          checkOutTime: selectedShiftTime,
           updatedAt: serverTimestamp()
         };
 
-        if (checkInTimeStr) {
-          const checkInDate = new Date(`${latestLog.date}T${checkInTimeStr}`);
-          const todayStr = format(new Date(), 'yyyy-MM-dd');
-          const checkOutDate = new Date(`${todayStr}T${checkOutTimeStrCalc}`);
-          
-          let diffMs = checkOutDate.getTime() - checkInDate.getTime();
-          
-          // Allow up to 16 hours for a single shift (e.g., night shift)
-          if (diffMs > 0 && diffMs <= 16 * 60 * 60 * 1000) {
-            totalHours = diffMs / (1000 * 60 * 60);
-            totalPay = totalHours * (loggedInEmployee.hourlyRate || 0);
-            updateData.checkOutTime = selectedShiftTime;
-            updateData.totalHours = totalHours;
-            updateData.totalPay = totalPay;
-          } else {
-            // Quên bấm RA CA và để giờ trôi
-            updateData.checkOutTime = selectedShiftTime;
-            updateData.totalHours = 0;
-            updateData.totalPay = 0;
-            updateData.isAbandonedShift = false; // We can keep this false, user just gets 0 hours
-            // They will do a request to correct this.
-          }
-        } else {
-            updateData.checkOutTime = selectedShiftTime;
-            updateData.totalHours = 0;
-            updateData.totalPay = 0;
+        const todayStr = format(new Date(), 'yyyy-MM-dd');
+        const daySchedules = workSchedules.filter(s => s.date === todayStr && (s.empId === loggedInEmployee.id || s.empId === loggedInEmployee.empId) && !s.isOff);
+        let updatedLog = { ...latestLog, checkOutTime: selectedShiftTime };
+        updatedLog = matchSchedulesForTimesheet(updatedLog, daySchedules);
+        
+        let isLateCheckoutExtra = false;
+        
+        // Cần duyệt nếu làm xuyên ca (spanning multiple shifts in a single timesheet implies working through breaks)
+        if (updatedLog._isManualScheduleOverride) {
+            isLateCheckoutExtra = true;
+        }
+
+        if (updatedLog.scheduledEndTime) {
+            updateData.scheduledEndTime = updatedLog.scheduledEndTime;
+            const [outH, outM] = selectedShiftTime.split(':').map(Number);
+            const [schOutH, schOutM] = updatedLog.scheduledEndTime.split(':').map(Number);
+            let outTotal = outH * 60 + outM;
+            let schOutTotal = schOutH * 60 + schOutM;
+
+            if (outTotal >= schOutTotal + 15 && latestLog.status !== 'approved' && latestLog.status !== 'Present_Approved') {
+                isLateCheckoutExtra = true;
+            }
+        }
+        
+        if (isLateCheckoutExtra) {
+            updateData.status = 'pending_approval';
+        }
+
+        if (latestLog.checkInTime) {
+           const [inH, inM] = latestLog.checkInTime.split(':').map(Number);
+           const [outH, outM] = selectedShiftTime.split(':').map(Number);
+           let diffMs = (outH * 60 + outM - (inH * 60 + inM)) * 60 * 1000;
+           if (diffMs < 0) diffMs += 24 * 60 * 60 * 1000;
+
+           if (!(diffMs > 0 && diffMs <= 16 * 60 * 60 * 1000)) {
+               // Quên bấm RA CA và để giờ trôi quá dài
+               updateData.isAbandonedShift = false;
+               // We flag it but do not wipe checkOutTime anymore since we have dynamic hours calculation that gives 0 in UI if needed
+           }
         }
 
         await updateDoc(doc(db, 'timesheets', latestLog.id), updateData);
         
-        if (latestLog?.checkInTime && updateData.totalHours === 0) {
+        if (latestLog?.checkInTime && updateData.isAbandonedShift === false) {
           toast.error('Không được ghi nhận giờ công do quên bấm RA CA! Vui lòng làm YÊU CẦU QUÊN CHẤM CÔNG gửi Quản lý.', { duration: 8000 });
         } else {
           toast.success('Ra ca thành công!');
