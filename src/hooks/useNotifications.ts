@@ -83,10 +83,13 @@ export const useNotifications = (
         );
       }
 
-      const processedNotifications = fetched.map(n => ({
+      let processedNotifications = fetched.map(n => ({
         ...n,
         isRead: n.readBy ? n.readBy.includes(userId) : n.isRead
       }));
+
+      // Bỏ các thông báo "Cập nhật bảng lương"
+      processedNotifications = processedNotifications.filter(n => n.title?.toLowerCase() !== 'cập nhật bảng lương');
       
       setNotifications(processedNotifications);
       setUnreadCount(processedNotifications.filter(n => !n.isRead).length);
