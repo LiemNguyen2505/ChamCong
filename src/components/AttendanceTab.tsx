@@ -6,7 +6,7 @@ import { Plus, Download, Calendar, X, ChevronLeft, ChevronRight, CheckCircle2, E
 import { MonthlyAttendanceTable } from './MonthlyAttendanceTable';
 import { Employee, Timesheet, AdminAccount } from '../types/admin';
 import { safeFormat, safeParseDate } from '../utils/dateUtils';
-import { TABLE_COL_WIDTHS, formatMinutes, formatDecimalHours, getTimeStyle, calculateShifts, getLateMinutes, getLatePenaltyMinutes, getTotalHours } from '../utils/adminHelpers';
+import { TABLE_COL_WIDTHS, formatMinutes, formatDecimalHours, getTimeStyle, calculateShifts, getLateMinutes, getLatePenaltyMinutes, getTotalHours, findEmployee } from '../utils/adminHelpers';
 import { db } from '../firebase';
 import { doc, updateDoc } from 'firebase/firestore';
 import { toast } from 'react-hot-toast';
@@ -18,6 +18,7 @@ interface AttendanceTabProps {
   filterMonth: string;
   nhanViens: Employee[];
   filteredChamCongs: Timesheet[];
+  globalData: any;
   currentAdmin: AdminAccount | null;
   adminTheme: any;
   historyDay: string | null;
@@ -54,6 +55,7 @@ export const AttendanceTab: React.FC<AttendanceTabProps> = ({
   filterMonth,
   nhanViens,
   filteredChamCongs,
+  globalData,
   currentAdmin,
   adminTheme,
   historyDay,
@@ -83,21 +85,14 @@ export const AttendanceTab: React.FC<AttendanceTabProps> = ({
   if (activeTab !== 'bangcongthang') return null;
 
   const getEmployeeForLog = (log: any) => {
-    let emp = undefined;
-    if (log.empId) {
-      if (log.empId !== '') emp = nhanViens.find(nv => nv.empId === log.empId);
-      if (!emp) emp = nhanViens.find(nv => nv.id === log.empId);
-    }
-    if (!emp && log.fullName) {
-      emp = nhanViens.find(nv => nv.fullName === log.fullName);
-    }
+    let emp = findEmployee(log.empId, log.fullName, nhanViens);
     return emp || { fullName: log.fullName || 'Unknown', hourlyRate: 0 };
   };
 
   const isSubjectAdmin = (empId: string) => {
     if (!empId) return false;
     if (empId.toUpperCase() === 'ADMIN') return true;
-    const emp = nhanViens.find(e => (e.empId === empId && e.empId !== '') || e.id === empId);
+    const emp = findEmployee(empId, undefined, nhanViens);
     return emp ? admins.some((a: any) => a.email === emp.fullName) : false;
   };
 
@@ -162,6 +157,7 @@ export const AttendanceTab: React.FC<AttendanceTabProps> = ({
          let diff = (outH + outM / 60) - (inH + inM / 60);
          if (diff < 0) diff += 24; // Handle overnight shift simply
          updates.totalHours = diff;
+         updates.isManualEdit = true;
          
          // Calculate totalPay
          const employee = getEmployeeForLog(log);
@@ -954,6 +950,23 @@ export const AttendanceTab: React.FC<AttendanceTabProps> = ({
                               </div>
                             </div>
                             
+                            {(() => {
+                                const employeeSchedules = globalData.lichLamViecs.filter(s => s.date === log.date && (s.empId === log.empId || s.empId === employee?.id) && !s.isOff);
+                                if (employeeSchedules.length > 0) {
+                                    return (
+                                        <div className="flex flex-wrap items-center gap-1 mb-2 mt-[-4px]">
+                                           <span className="text-[9px] text-slate-400 font-black uppercase tracking-tighter">Ca Lịch:</span>
+                                           {employeeSchedules.map((sc, i) => (
+                                               <span key={i} className="text-[9px] font-bold text-blue-700 bg-blue-50 px-1 py-0.5 rounded border border-blue-100 tabular-nums uppercase tracking-tighter">
+                                                   {sc.startTime || '--:--'} - {sc.endTime || '--:--'}
+                                               </span>
+                                           ))}
+                                        </div>
+                                    );
+                                }
+                                return null;
+                            })()}
+
                             <div className="flex items-center justify-between gap-1 p-1.5 bg-slate-50/80 rounded-xl border border-slate-100">
                               <div className="flex items-center gap-4 flex-1 overflow-hidden">
                                 <div className="flex items-center gap-2 border-r border-slate-200 pr-3 min-w-0">
@@ -1309,6 +1322,22 @@ export const AttendanceTab: React.FC<AttendanceTabProps> = ({
                                 <div className="divide-y divide-slate-50">
                                   {logsInDay.map((log) => (
                                     <div key={log.id} className="p-1.5 space-y-1 border-b border-slate-50 last:border-0 hover:bg-slate-50/50 transition-colors">
+                                    {(() => {
+                                        const employeeSchedules = globalData.lichLamViecs.filter(s => s.date === log.date && (s.empId === log.empId || s.empId === historyEmployee?.id) && !s.isOff);
+                                        if (employeeSchedules.length > 0) {
+                                            return (
+                                                <div className="flex flex-wrap items-center gap-1 mb-1.5 mt-0.5">
+                                                    <span className="text-[9px] text-slate-400 font-black uppercase tracking-tighter">Ca Lịch:</span>
+                                                    {employeeSchedules.map((sc, i) => (
+                                                        <span key={i} className="text-[9px] font-bold text-blue-700 bg-blue-50 px-1 py-0.5 rounded border border-blue-100 tabular-nums uppercase tracking-tighter">
+                                                            {sc.startTime || '--:--'} - {sc.endTime || '--:--'}
+                                                        </span>
+                                                    ))}
+                                                </div>
+                                            );
+                                        }
+                                        return null;
+                                    })()}
                                     <div className="flex items-center justify-between gap-1 p-1 bg-slate-50/50 rounded-lg border border-slate-100">
                                       <div className="flex items-center gap-3 flex-1 overflow-hidden">
                                         <div className="flex items-center gap-1.5 border-r border-slate-200 pr-2 min-w-0">
