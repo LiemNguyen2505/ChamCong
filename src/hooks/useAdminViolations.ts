@@ -2,13 +2,14 @@ import { db } from '../firebase';
 import { collection, doc, addDoc, deleteDoc, getDoc, serverTimestamp } from 'firebase/firestore';
 import { toast } from 'react-hot-toast';
 import { AdminAccount, Employee } from '../types/admin';
+import { findEmployee } from '../utils/adminHelpers';
 import { format as safeFormat } from 'date-fns';
 
 interface UseAdminViolationsProps {
   currentAdmin: AdminAccount | null;
   nhanViens: Employee[];
   filterMonth: string;
-  fetchInitialData: (month?: string, force?: boolean) => Promise<any>;
+  fetchInitialData: (month?: string, force?: any) => Promise<any>;
   logAction: (action: string, target: string, details: string) => Promise<void>;
 }
 
@@ -23,7 +24,7 @@ export const useAdminViolations = ({
   const handleAddViolation = async (violation: { empId: string; type: string; date: string; note?: string }) => {
     if (!currentAdmin) return;
     try {
-      const emp = nhanViens.find(nv => nv.id === violation.empId || nv.empId === violation.empId);
+      const emp = findEmployee(violation.empId, undefined, nhanViens);
       const monthYear = violation.date.substring(0, 7);
       const violationRef = await addDoc(collection(db, 'Violations'), {
         ...violation,
@@ -67,7 +68,7 @@ export const useAdminViolations = ({
       
       if (violationSnap.exists()) {
         const vData = violationSnap.data();
-        const emp = nhanViens.find(nv => nv.id === vData.empId || nv.empId === vData.empId);
+        const emp = findEmployee(vData.empId, undefined, nhanViens);
         
         await deleteDoc(violationRef);
         
