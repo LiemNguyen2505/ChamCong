@@ -4,6 +4,7 @@ import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { toast } from 'react-hot-toast';
 import { saveAs } from 'file-saver';
 import { AdminAccount, Employee, Timesheet } from '../types/admin';
+import { findEmployee } from '../utils/adminHelpers';
 
 const OWNER_EMAIL = 'nguyen.thanh.liem2505@gmail.com';
 
@@ -55,7 +56,7 @@ export const useAdminReport = ({
     ];
 
     const rows = filteredData.map(cc => {
-      const employee = nhanViens.find(nv => nv.id === cc.empId || nv.empId === cc.empId);
+      const employee = findEmployee(cc.empId, (cc as any).fullName, nhanViens);
       const stats = allEmployeeSalaryStatsMap[cc.empId] || { 
         currentHourlyRate: employee?.hourlyRate || 0,
         responsibilityBonus: 0,
@@ -206,7 +207,7 @@ export const useAdminReport = ({
       };
 
       const rows = reportData.map(cc => {
-        const employee = nhanViens.find(nv => nv.id === cc.empId || nv.empId === cc.empId);
+        const employee = findEmployee(cc.empId, (cc as any).fullName, nhanViens);
         return [
           escapeCSV(cc.date),
           escapeCSV(employee?.fullName || 'N/A'),
