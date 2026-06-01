@@ -30,51 +30,115 @@ export const extractTimeStr = (tm: string | undefined | null, dateStr?: string |
     return tm.includes('T') ? tm.split('T')[1].substring(0, 5) : (tm.includes(' ') ? tm.split(' ')[1].substring(0, 5) : tm.substring(0, 5));
 };
 
-export const getScheduledEndTime = (t: any) => {
-  let schTimeStr = extractTimeStr(t.scheduledEndTime, t.date);
-  if (!schTimeStr) {
-    const outTimeStr = extractTimeStr(t.checkOutTime || t.actualCheckOutTime, t.date);
-    if (outTimeStr) {
-      const [outH, outM] = outTimeStr.split(':').map(Number);
-      const outTotal = outH * 60 + outM;
-      const commonEndShifts = [11 * 60, 14 * 60, 15 * 60, 17 * 60, 22 * 60];
-      for (const shift of commonEndShifts) {
-        const diff = outTotal - shift;
-        if (diff >= -120 && diff <= 180) { // allow checking out 2 hours early up to 3 hours late
-          return `${String(Math.floor(shift / 60)).padStart(2, '0')}:${String(shift % 60).padStart(2, '0')}`;
+export const findEmployee = (empId: string | undefined | null, fullName: string | undefined | null, nhanViens: any[]) => {
+  if (empId && typeof empId === 'string' && empId.trim() !== '') {
+    const matches = nhanViens.filter(nv => nv.empId === empId || nv.id === empId);
+    if (matches.length > 0) {
+      if (fullName) {
+        const exactMatch = matches.find(nv => nv.fullName === fullName);
+        if (exactMatch) return exactMatch;
+      }
+      return matches[0];
+    }
+  }
+
+  if (fullName) {
+    return nhanViens.find(nv => nv.fullName === fullName);
+  }
+  
+  return undefined;
+};
+
+export const matchSchedulesForTimesheet = (cc: any, daySchedules: any[]) => {
+  if (!daySchedules || daySchedules.length === 0) return cc;
+
+  const ccInMins = cc.checkInTime ? parseInt(cc.checkInTime.split(':')[0]) * 60 + parseInt(cc.checkInTime.split(':')[1]) : null;
+  const ccOutMins = cc.checkOutTime ? parseInt(cc.checkOutTime.split(':')[0]) * 60 + parseInt(cc.checkOutTime.split(':')[1]) : null;
+
+  let matchIn = daySchedules[0];
+  if (ccInMins !== null) {
+    let minDiff = Infinity;
+    for (const s of daySchedules) {
+      if (!s.startTime) continue;
+      const sIn = parseInt(s.startTime.split(':')[0]) * 60 + parseInt(s.startTime.split(':')[1]);
+      const diff = Math.abs(ccInMins - sIn);
+      if (diff < minDiff) { minDiff = diff; matchIn = s; }
+    }
+  }
+
+  let matchOut = matchIn;
+  if (ccOutMins !== null) {
+    let minDiff = Infinity;
+    for (const s of daySchedules) {
+      if (!s.endTime) continue;
+      const sOut = parseInt(s.endTime.split(':')[0]) * 60 + parseInt(s.endTime.split(':')[1]);
+      const diff = Math.abs(ccOutMins - sOut);
+      if (diff < minDiff) { minDiff = diff; matchOut = s; }
+    }
+  }
+
+  if (matchIn && matchOut && matchIn.startTime && matchOut.endTime) {
+    const inTime = parseInt(matchIn.startTime.split(':')[0]) * 60 + parseInt(matchIn.startTime.split(':')[1]);
+    const outTime = parseInt(matchOut.endTime.split(':')[0]) * 60 + parseInt(matchOut.endTime.split(':')[1]);
+    if (outTime < inTime) {
+      matchOut = matchIn;
+    }
+  }
+
+  if (matchIn) {
+    const overrides: any = {
+      scheduledStartTime: matchIn.startTime,
+      scheduledEndTime: matchOut.endTime
+    };
+
+    const defaults = [{ s: '06:00', e: '11:00' }, { s: '12:00', e: '17:00' }, { s: '17:00', e: '22:00' }];
+    const isDefault = defaults.some(d => d.s === matchIn.startTime && d.e === matchOut.endTime);
+
+    if (!isDefault && matchIn.startTime && matchOut.endTime) {
+      const [sH, sM] = matchIn.startTime.split(':').map(Number);
+      const [eH, eM] = matchOut.endTime.split(':').map(Number);
+      const duration = (eH + eM / 60) - (sH + sM / 60);
+      if (duration > 0) {
+        overrides.totalHours = duration;
+        if (matchIn.id !== matchOut.id || matchIn.startTime !== matchOut.startTime) {
+           overrides._isManualScheduleOverride = true;
+           // Calculate the gap between shifts
+           let totalApprovedShiftMins = 0;
+           
+           const sInTime = matchIn.startTime ? parseInt(matchIn.startTime.split(':')[0]) * 60 + parseInt(matchIn.startTime.split(':')[1]) : 0;
+           const sOutTime = matchOut.endTime ? parseInt(matchOut.endTime.split(':')[0]) * 60 + parseInt(matchOut.endTime.split(':')[1]) : 0;
+           
+           for (const sched of daySchedules) {
+               if (sched.startTime && sched.endTime && !sched.isOff) {
+                   const startMins = parseInt(sched.startTime.split(':')[0]) * 60 + parseInt(sched.startTime.split(':')[1]);
+                   const endMins = parseInt(sched.endTime.split(':')[0]) * 60 + parseInt(sched.endTime.split(':')[1]);
+                   if (startMins >= sInTime && endMins <= sOutTime) {
+                       totalApprovedShiftMins += (endMins - startMins);
+                   }
+               }
+           }
+           
+           const totalSpannedMins = sOutTime - sInTime;
+           const gapMins = totalSpannedMins - totalApprovedShiftMins;
+           if (gapMins > 0) {
+               overrides._unapprovedGapHours = gapMins / 60;
+           }
         }
       }
     }
     
-    // Fallback exactly like old code
-    const startStr = getScheduledStartTime(t);
-    if (startStr === '06:00') return '11:00';
-    if (startStr === '12:00' || startStr === '12:30' || startStr === '14:30') return '17:00';
-    if (startStr === '17:00' || startStr === '18:00') return '22:00';
-    return null;
+    return { ...cc, ...overrides };
   }
-  return schTimeStr;
+
+  return cc;
+};
+
+export const getScheduledEndTime = (t: any) => {
+  return extractTimeStr(t.scheduledEndTime, t.date);
 };
 
 export const getScheduledStartTime = (t: any) => {
-  let schTimeStr = extractTimeStr(t.scheduledStartTime, t.date);
-  if (!schTimeStr) {
-    const inTimeStr = extractTimeStr(t.actualCheckInTime || t.checkInTime, t.date);
-    if (inTimeStr) {
-      const [inH, inM] = inTimeStr.split(':').map(Number);
-      const inTotal = inH * 60 + inM;
-      const commonShifts = [6 * 60, 14 * 60 + 30, 17 * 60, 18 * 60, 22 * 60 + 30];
-      for (const shift of commonShifts) {
-        // Find closest shift (allow up to 60 mins early and 120 mins late)
-        const diff = inTotal - shift;
-        if (diff >= -60 && diff <= 120) {
-          schTimeStr = `${String(Math.floor(shift / 60)).padStart(2, '0')}:${String(shift % 60).padStart(2, '0')}`;
-          break;
-        }
-      }
-    }
-  }
-  return schTimeStr;
+  return extractTimeStr(t.scheduledStartTime, t.date);
 };
 
 export const getLateMinutes = (t: any, isAdmin: boolean = false) => {
@@ -150,10 +214,10 @@ export const getPhonePenalty = (t: any, hourlyRate: number) => {
 };
 
 export const getTotalHours = (t: any) => {
-  // Always dynamically calculate to ensure scheduled time enforcement is respected
-  // if (t.totalHours !== undefined && t.totalHours !== null && typeof t.totalHours === 'number') {
-  //   return t.totalHours;
-  // }
+  // If admin manually edited this timesheet, always respect their exact saved hours
+  if (t.isManualEdit && typeof t.totalHours === 'number') {
+    return t.totalHours;
+  }
 
   const inTimeStr = extractTimeStr(t.checkInTime, t.date);
   const outTimeStr = extractTimeStr(t.checkOutTime, t.date);
@@ -179,13 +243,27 @@ export const getTotalHours = (t: any) => {
     const schedEndTimeStr = getScheduledEndTime(t);
     if (schedEndTimeStr) {
       const [schEndH, schEndM] = schedEndTimeStr.split(':').map(Number);
-      if (outH * 60 + outM > schEndH * 60 + schEndM || (schEndH * 60 + schEndM > 21 * 60 && outH * 60 + outM < 3 * 60)) {
-        outH = schEndH;
-        outM = schEndM;
+      const outTotal = outH * 60 + outM;
+      const schEndTotal = schEndH * 60 + schEndM;
+
+      if (outTotal > schEndTotal && outTotal <= schEndTotal + 14) {
+          outH = schEndH;
+          outM = schEndM;
+      } else if (outTotal >= schEndTotal + 15) {
+          if (t.status !== 'approved' && t.status !== 'Present_Approved') {
+              outH = schEndH;
+              outM = schEndM;
+          }
       }
     }
     let diff = (outH * 60 + outM) - (inH * 60 + inM);
     if (diff < 0) diff += 24 * 60; // overnight
+    
+    // Subtract gap if across multiple shifts and not approved
+    if (t._unapprovedGapHours && t.status !== 'approved' && t.status !== 'Present_Approved') {
+        diff -= t._unapprovedGapHours * 60;
+    }
+    
     if (diff > 0) return diff / 60;
   }
 
