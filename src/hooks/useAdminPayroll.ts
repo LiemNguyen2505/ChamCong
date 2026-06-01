@@ -3,12 +3,13 @@ import { db } from '../firebase';
 import { writeBatch, setDoc, doc, serverTimestamp, deleteField, collection, addDoc } from 'firebase/firestore';
 import { toast } from 'react-hot-toast';
 import { Employee, PayrollAdjustment } from '../types/admin';
+import { findEmployee } from '../utils/adminHelpers';
 
 interface UseAdminPayrollProps {
   nhanViens: Employee[];
   payrollAdjustments: any[];
   filterMonth: string;
-  fetchInitialData: (month?: string, force?: boolean) => Promise<any>;
+  fetchInitialData: (month?: string, force?: any) => Promise<any>;
   logAction: (action: string, target: string, details: string) => Promise<void>;
   currentAdmin: any;
   payrollActiveBranch: string;
@@ -76,7 +77,7 @@ export const useAdminPayroll = ({
         const changes = targets[keyId];
         if (!changes) continue;
         
-        const emp = nhanViens.find(n => n.id === keyId || n.empId === keyId);
+        const emp = findEmployee(keyId, undefined, nhanViens);
         if (!emp) continue;
 
         const matches = payrollAdjustments.filter(a => 
@@ -198,7 +199,7 @@ export const useAdminPayroll = ({
         setLocalAdjustments(newAdj);
       }
       
-      await fetchInitialData(filterMonth, true);
+      await fetchInitialData(filterMonth, ['payrollAdjustments', 'retainedSalaryRecords']);
 
       toast.success('Đã lưu bảng lương thành công!', { id: loadingToast });
     } catch (error) {
