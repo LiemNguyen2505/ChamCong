@@ -172,18 +172,6 @@ export const useAdminPayroll = ({
         if (changedFields.length > 0) {
           const detailStr = changedFields.map(f => `${f}: ${changes[f as keyof PayrollAdjustment]}`).join(', ');
           
-          await addDoc(collection(db, 'Notifications'), {
-             recipientId: emp.id,
-             locationId: emp.locationId || 'all',
-             title: 'Cập nhật bảng lương',
-             message: `Bảng lương tháng ${filterMonth} của bạn có thay đổi. Vui lòng kiểm tra lại.`,
-             type: 'payroll',
-             priority: 'normal',
-             isRead: false,
-             createdAt: serverTimestamp(),
-             senderId: currentAdmin?.id
-          });
-          
           logAction('Cập nhật lương', emp.fullName, `Cập nhật ${filterMonth}. Fields: ${detailStr}`);
         }
       }
