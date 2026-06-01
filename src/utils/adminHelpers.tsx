@@ -37,13 +37,23 @@ export const findEmployee = (empId: string | undefined | null, fullName: string 
       if (fullName) {
         const exactMatch = matches.find(nv => nv.fullName === fullName);
         if (exactMatch) return exactMatch;
+        
+        const cleanName = fullName.toLowerCase().trim();
+        const pMatch = matches.find(nv => nv.fullName && nv.fullName.toLowerCase().trim() === cleanName);
+        if (pMatch) return pMatch;
+
+        // DB BUG WORKAROUND: If empId matched but the name doesn't match the employees sharing this empId,
+        // it means empId is corrupted/duplicated. Trust the fullName instead.
+        const globalNameMatch = nhanViens.find(nv => nv.fullName === fullName || (nv.fullName && nv.fullName.toLowerCase().trim() === cleanName));
+        if (globalNameMatch) return globalNameMatch;
       }
       return matches[0];
     }
   }
 
   if (fullName) {
-    return nhanViens.find(nv => nv.fullName === fullName);
+    const cleanName = fullName.toLowerCase().trim();
+    return nhanViens.find(nv => nv.fullName === fullName || (nv.fullName && nv.fullName.toLowerCase().trim() === cleanName));
   }
   
   return undefined;
