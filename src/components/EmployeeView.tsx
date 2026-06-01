@@ -23,6 +23,7 @@ import { AttendanceActionForm } from './employee/AttendanceActionForm';
 import { EmployeeViolationTracker } from './employee/EmployeeViolationTracker';
 
 import { useEmployeeAuth } from '../hooks/useEmployeeAuth';
+import { matchSchedulesForTimesheet } from '../utils/adminHelpers';
 import { useEmployeeAttendance } from '../hooks/useEmployeeAttendance';
 import { useEmployeeUI } from '../hooks/useEmployeeUI';
 import { useAntiSlacking } from '../hooks/useAntiSlacking';
@@ -56,7 +57,15 @@ export default function EmployeeView({
   const admins = globalData.admins;
   const payrollAdjustments = globalData.payrollAdjustments;
   const holidays = globalData.holidays;
-  const monthTimesheets = globalData.chamCongs;
+  const monthTimesheets = useMemo(() => {
+    return (globalData.chamCongs || []).map((cc: any) => {
+      const emp = employees?.find((n:any) => n.empId === cc.empId || n.id === cc.empId);
+      const possibleIds = emp ? [emp.id, emp.empId].filter(Boolean) : [cc.empId, cc.id];
+      const daySchedules = (globalData.lichLamViecs || []).filter((s:any) => s.date === cc.date && possibleIds.includes(s.empId) && !s.isOff);
+      return matchSchedulesForTimesheet(cc, daySchedules);
+    });
+  }, [globalData.chamCongs, globalData.lichLamViecs]);
+
   const workSchedules = useMemo(() => {
     return globalData.lichLamViecs.filter((s: any) => s.date === format(new Date(), 'yyyy-MM-dd'));
   }, [globalData.lichLamViecs]);
@@ -92,7 +101,7 @@ export default function EmployeeView({
 
   const latestLog = useMemo(() => {
     if (!loggedInEmployee) return null;
-    return globalData.chamCongs
+    return monthTimesheets
       .filter((cc: any) => cc.empId === loggedInEmployee.empId)
       .sort((a: any, b: any) => {
         const dateB = b.date || '';
@@ -103,7 +112,7 @@ export default function EmployeeView({
         const combinedA = dateA + timeA;
         return combinedB.localeCompare(combinedA);
       })[0] || null;
-  }, [globalData.chamCongs, loggedInEmployee]);
+  }, [monthTimesheets, loggedInEmployee]);
 
   const {
     actionType, setActionType,
@@ -160,16 +169,26 @@ export default function EmployeeView({
   }, [loggedInEmployee, fetchInitialData]);
 
   // 2. Fetch full month data when switching to history or salary tabs
+  const employeeHasFetchedMonthRef = useRef<string | null>(null);
   useEffect(() => {
     if (loggedInEmployee && (showHistory || showSalaryDetails || showStats)) {
-      fetchInitialData(selectedMonth, ['holidays', 'chamCongs', 'lichLamViecs', 'xinNghiPheps', 'payrollAdjustments', 'violations', 'salaryAdvanceRecords'], { empId: loggedInEmployee.empId, docId: loggedInEmployee.id });
+      const lockKey = `${loggedInEmployee.empId}-${selectedMonth}-details`;
+      if (employeeHasFetchedMonthRef.current !== lockKey) {
+         employeeHasFetchedMonthRef.current = lockKey;
+         fetchInitialData(selectedMonth, ['holidays', 'chamCongs', 'lichLamViecs', 'xinNghiPheps', 'payrollAdjustments', 'violations', 'salaryAdvanceRecords'], { empId: loggedInEmployee.empId, docId: loggedInEmployee.id });
+      }
     }
   }, [showHistory, showSalaryDetails, showStats, selectedMonth, loggedInEmployee, fetchInitialData]);
 
   // 3. Fetch full month data when opening weekly schedule
+  const hasFetchedScheduleMonthRef = useRef<string | null>(null);
   useEffect(() => {
     if (loggedInEmployee && showWeeklySchedule) {
-      fetchInitialData(selectedMonth, ['nhanViens', 'lichLamViecs']);
+      const lockKey = `${loggedInEmployee.empId}-${selectedMonth}-schedule`;
+      if (hasFetchedScheduleMonthRef.current !== lockKey) {
+        hasFetchedScheduleMonthRef.current = lockKey;
+        fetchInitialData(selectedMonth, ['nhanViens', 'lichLamViecs']);
+      }
     }
   }, [showWeeklySchedule, selectedMonth, loggedInEmployee, fetchInitialData]);
 
