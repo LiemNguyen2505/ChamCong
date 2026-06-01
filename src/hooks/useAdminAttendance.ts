@@ -4,6 +4,7 @@ import { collection, updateDoc, doc, addDoc, deleteDoc, query, where, getDocs, w
 import { toast } from 'react-hot-toast';
 import { format } from 'date-fns';
 import { Timesheet, Employee, AdminAccount } from '../types/admin';
+import { findEmployee } from '../utils/adminHelpers';
 
 interface UseAdminAttendanceProps {
   nhanViens: Employee[];
@@ -49,7 +50,7 @@ export const useAdminAttendance = ({
 
     const loadingToast = toast.loading('Đang ghi nhận chấm công...');
     try {
-      const employee = nhanViens.find(nv => nv.empId === manualAttendance.empId);
+      const employee = findEmployee(manualAttendance.empId, undefined, nhanViens);
       if (!employee) {
         toast.error('Nhân viên không tồn tại', { id: loadingToast });
         return;
@@ -108,7 +109,7 @@ export const useAdminAttendance = ({
 
     const loadingToast = toast.loading('Đang cập nhật chấm công...');
     try {
-      const employee = nhanViens.find(nv => nv.empId === editingAttendance.empId);
+      const employee = findEmployee(editingAttendance.empId, undefined, nhanViens);
       if (!employee) {
         toast.error('Nhân viên không tồn tại', { id: loadingToast });
         return;
@@ -210,7 +211,7 @@ export const useAdminAttendance = ({
         });
       }
 
-      const targetEmp = nhanViens.find(e => e.empId === log.empId || e.id === log.empId);
+      const targetEmp = findEmployee(log.empId, (log as any).fullName, nhanViens);
       const recipientId = targetEmp ? targetEmp.id : log.empId;
       
       await addDoc(collection(db, 'Notifications'), {
