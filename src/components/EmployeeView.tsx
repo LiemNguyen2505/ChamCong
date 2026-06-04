@@ -45,7 +45,7 @@ export default function EmployeeView({
   isLoading
 }: {
   globalData: any,
-  fetchInitialData: (monthYear?: string, force?: any | string | string[], options?: { empId?: string, docId?: string, onlyToday?: boolean }) => Promise<any>,
+  fetchInitialData: (monthYear?: string, force?: any | string | string[], options?: { empId?: string, docId?: string, onlyToday?: boolean, exactDate?: string, branchId?: string }) => Promise<any>,
   isLoading: boolean
 }) {
   const navigate = useNavigate();
@@ -180,22 +180,29 @@ export default function EmployeeView({
     }
   }, [showHistory, showSalaryDetails, showStats, selectedMonth, loggedInEmployee, fetchInitialData]);
 
-  // 3. Fetch full month data when opening weekly schedule
-  const hasFetchedScheduleMonthRef = useRef<string | null>(null);
+  // 3. Fetch nhanViens when opening weekly schedule to show colleagues (schedule is handled by SmartScheduleBuilder onDateChange)
+  const hasFetchedScheduleMonthRef = useRef<boolean>(false);
   useEffect(() => {
-    if (loggedInEmployee && showWeeklySchedule) {
-      const lockKey = `${loggedInEmployee.empId}-${selectedMonth}-schedule`;
-      if (hasFetchedScheduleMonthRef.current !== lockKey) {
-        hasFetchedScheduleMonthRef.current = lockKey;
-        fetchInitialData(selectedMonth, ['nhanViens', 'lichLamViecs']);
-      }
+    if (loggedInEmployee && showWeeklySchedule && !hasFetchedScheduleMonthRef.current) {
+      hasFetchedScheduleMonthRef.current = true;
+      fetchInitialData(undefined, ['nhanViens']);
     }
-  }, [showWeeklySchedule, selectedMonth, loggedInEmployee, fetchInitialData]);
+  }, [showWeeklySchedule, loggedInEmployee, fetchInitialData]);
+
+  // 4. Fetch full nhanViens when opening request modal (for shift swapping)
+  const hasFetchedNhanViensForRequestRef = useRef<boolean>(false);
+  useEffect(() => {
+    if (loggedInEmployee && showRequestModal && !hasFetchedNhanViensForRequestRef.current) {
+      hasFetchedNhanViensForRequestRef.current = true;
+      // Fetch employees for the request modal so they can pick people to swap with ONLY. No need to fetch all schedules.
+      fetchInitialData(undefined, ['nhanViens']);
+    }
+  }, [showRequestModal, selectedMonth, loggedInEmployee, fetchInitialData]);
 
   const employeeTodayShifts = useMemo(() => {
     if (!loggedInEmployee) return [];
     return globalData.lichLamViecs
-      .filter((s: any) => s.date === format(new Date(), 'yyyy-MM-dd') && !s.isOff && s.empId === loggedInEmployee.id)
+      .filter((s: any) => s.date === format(new Date(), 'yyyy-MM-dd') && !s.isOff && (s.empId === loggedInEmployee.id || s.empId === loggedInEmployee.empId))
       .sort((a: any, b: any) => a.startTime.localeCompare(b.startTime));
   }, [globalData.lichLamViecs, loggedInEmployee]);
 
@@ -370,7 +377,7 @@ export default function EmployeeView({
                 format={format}
                 selectedMonth={selectedMonth}
                 globalData={globalData}
-                onRefresh={() => fetchInitialData(undefined, ['bulletinNotes', 'chamCongs', 'lichLamViecs'])}
+                onRefresh={() => fetchInitialData(undefined, ['bulletinNotes', 'chamCongs', 'lichLamViecs'], { empId: loggedInEmployee?.empId, docId: loggedInEmployee?.id, onlyToday: true })}
               />
             )
           ) : (
@@ -406,7 +413,8 @@ export default function EmployeeView({
                     return;
                   }
                   
-                  if (!selectedShiftId) {
+                  const selectedShift = employeeTodayShifts.find(s => s.id === selectedShiftId);
+                  if (!selectedShiftId || (selectedShift && selectedShift.locationId !== kioskBranch)) {
                     setShowOutsideScheduleModal(true);
                     return;
                   }
@@ -454,8 +462,14 @@ export default function EmployeeView({
                     return;
                   }
 
-                  // Bypass checkout reason if shift was outside schedule (emergency)
-                  if (selTotal > schTotal + 30 && note.trim() === '' && !latestLog?.isEmergency) {
+                  // Bypass checkout reason if shift was outside schedule (emergency or pending_approval)
+                  if (
+                    selTotal > schTotal + 30 && 
+                    note.trim() === '' && 
+                    !latestLog?.isEmergency && 
+                    latestLog?.status !== 'pending_approval' &&
+                    latestLog?.selectedShiftId
+                  ) {
                     setCheckoutWarningStep(4); // Tăng ca cần ghi chú
                     return;
                   }
@@ -509,7 +523,7 @@ export default function EmployeeView({
                     v.monthYear === format(new Date(), 'yyyy-MM')
                   )}
                   monthlyStats={monthlyStats}
-                  onRefresh={() => fetchInitialData(format(new Date(), 'yyyy-MM'))}
+                  onRefresh={() => fetchInitialData(format(new Date(), 'yyyy-MM'), ['violations'], { empId: loggedInEmployee?.empId, docId: loggedInEmployee?.id })}
                 />
               </div>
             </div>
@@ -644,15 +658,18 @@ export default function EmployeeView({
           </div>
           <div className="flex-1 bg-white overflow-hidden flex flex-col p-1 md:p-4">
             <SmartScheduleBuilder
-              employees={employees}
+              employees={employees || []}
               schedules={globalData.lichLamViecs}
-              currentBranchFilter={teamScheduleBranch === 'All' ? employees[0]?.locationId || 'Góc Phố' : teamScheduleBranch}
+              currentBranchFilter={teamScheduleBranch === 'All' ? (loggedInEmployee?.locationId || 'Góc Phố') : teamScheduleBranch}
               managedBranches={BRANCHES.map(b => b.id)}
               onAddShift={async () => {}}
               onUpdateShift={async () => {}}
               onDeleteShift={async () => {}}
               isReadOnly={true}
               planningGoals={[]}
+              onDateChange={(date) => {
+                fetchInitialData(undefined, ['lichLamViecs'], { exactDate: date, branchId: teamScheduleBranch === 'All' ? loggedInEmployee?.locationId : teamScheduleBranch });
+              }}
             />
           </div>
         </div>
@@ -663,8 +680,8 @@ export default function EmployeeView({
         setShowRequestModal={setShowRequestModal}
         loggedInEmployee={loggedInEmployee}
         theme={theme}
-        employees={employees}
-        allSchedules={globalData.lichLamViecs}
+        employees={employees || []}
+        allSchedules={globalData.lichLamViecs || []}
         kioskBranch={kioskBranch}
         requestType={requestType}
         setRequestType={setRequestType}
@@ -703,7 +720,12 @@ export default function EmployeeView({
         setOutsideScheduleReason={setNote}
         onConfirm={() => {
           setShowOutsideScheduleModal(false);
-          setShowEmergencyCheckInModal(true);
+          const isNativeBranch = loggedInEmployee?.locationId === kioskBranch || (loggedInEmployee?.locationIds && loggedInEmployee.locationIds.includes(kioskBranch));
+          if (isNativeBranch) {
+            cameraRef.current?.capturePhoto();
+          } else {
+            setShowEmergencyCheckInModal(true);
+          }
         }}
       />
 
