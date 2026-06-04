@@ -96,7 +96,7 @@ const CameraCapture = forwardRef<CameraCaptureRef, CameraCaptureProps>(({ onCapt
       }
       setError(null);
     } catch (err: any) {
-      console.error('Error accessing camera:', err);
+      console.warn('Camera warning:', err.message);
       const errorMsg = err.message || '';
       if (err.name === 'NotAllowedError' || errorMsg.includes('Permission denied')) {
         const isIframe = window.self !== window.top;
@@ -116,6 +116,10 @@ const CameraCapture = forwardRef<CameraCaptureRef, CameraCaptureProps>(({ onCapt
   }, [stopCamera]);
 
   const capturePhoto = useCallback(() => {
+    if (!videoRef.current || !canvasRef.current || !videoRef.current.videoWidth) {
+      onCapture('');
+      return;
+    }
     if (videoRef.current && canvasRef.current) {
       const video = videoRef.current;
       const canvas = canvasRef.current;
