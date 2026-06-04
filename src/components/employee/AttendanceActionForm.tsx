@@ -65,19 +65,7 @@ export const AttendanceActionForm: React.FC<AttendanceActionFormProps> = ({
     }
   }, [actionType, format, setSelectedShiftTime]);
 
-  useEffect(() => {
-    if ((actionType === 'check-in' || actionType === 'check-out') && todayShifts.length > 0 && !selectedShiftId) {
-      const firstShift = todayShifts[0];
-      setSelectedShiftId(firstShift.id);
-      if (actionType === 'check-in') {
-        setScheduledShiftTime(firstShift.startTime);
-        const nowStr = format(new Date(), 'HH:mm');
-        setSelectedShiftTime(nowStr);
-      } else {
-        setScheduledShiftTime(firstShift.endTime);
-      }
-    }
-  }, [actionType, todayShifts, selectedShiftId]);
+
 
   return (
     <div className="space-y-4 animate-in fade-in zoom-in-95 duration-300">
@@ -150,7 +138,10 @@ export const AttendanceActionForm: React.FC<AttendanceActionFormProps> = ({
                     const shiftId = e.target.value;
                     setSelectedShiftId(shiftId);
                     const shift = todayShifts.find(s => s.id === shiftId);
-                    if (!shift) return;
+                    if (!shift) {
+                      setScheduledShiftTime('');
+                      return;
+                    }
 
                     if (actionType === 'check-in') {
                       setScheduledShiftTime(shift.startTime);
@@ -168,6 +159,7 @@ export const AttendanceActionForm: React.FC<AttendanceActionFormProps> = ({
                       {shift.startTime} - {shift.endTime}
                     </option>
                   ))}
+                  <option value="">Ca ngoài lịch / Ca phát sinh</option>
                 </select>
                 <div className={`absolute right-1.5 top-1/2 -translate-y-1/2 ${actionType === 'check-in' ? 'text-emerald-600' : 'text-red-600'} pointer-events-none`}>
                   <ChevronDown className="w-4 h-4" />
