@@ -12,7 +12,7 @@ export const useEmployeeAttendance = (
   kioskBranch: string | null,
   workSchedules: any[],
   latestLog: any,
-  fetchInitialData: (monthYear?: string, force?: any) => Promise<any>,
+  fetchInitialData: (monthYear?: string, force?: any, options?: {empId?: string, docId?: string, onlyToday?: boolean}) => Promise<any>,
   admins: any[]
 ) => {
   const [actionType, setActionType] = useState<'check-in' | 'check-out' | null>(null);
@@ -48,6 +48,11 @@ export const useEmployeeAttendance = (
     setEmergencyManager('');
     setCoords(null);
     setGpsError(null);
+    setCheckinWarningStep(0);
+    setCheckoutWarningStep(0);
+    setShowOutsideScheduleModal(false);
+    setShowEmergencyCheckInModal(false);
+    setShowExtraSupportModal(false);
 
     const todayStr = format(new Date(), 'yyyy-MM-dd');
     const todayShifts = workSchedules
@@ -82,6 +87,9 @@ export const useEmployeeAttendance = (
       if (matchedShift) {
         setScheduledShiftTime(matchedShift.startTime);
         setSelectedShiftId(matchedShift.id);
+      } else {
+        setScheduledShiftTime('');
+        setSelectedShiftId('');
       }
     } else {
       setSelectedShiftTime(nowStr);
@@ -90,10 +98,15 @@ export const useEmployeeAttendance = (
         if (currentShift) {
           setScheduledShiftTime(currentShift.endTime);
           setSelectedShiftId(currentShift.id);
+        } else {
+          setSelectedShiftId('');
         }
       } else if (matchedShift) {
         setScheduledShiftTime(matchedShift.endTime);
         setSelectedShiftId(matchedShift.id);
+      } else {
+        setScheduledShiftTime('');
+        setSelectedShiftId('');
       }
     }
   };
@@ -231,7 +244,7 @@ export const useEmployeeAttendance = (
       }
       setActionType(null);
       setPhotoData(null);
-      await fetchInitialData(undefined, ['chamCongs']);
+      await fetchInitialData(undefined, ['chamCongs'], { empId: loggedInEmployee?.empId, docId: loggedInEmployee?.id, onlyToday: true });
     } catch (error) {
       toast.error('Lỗi khi lưu dữ liệu');
     } finally {
