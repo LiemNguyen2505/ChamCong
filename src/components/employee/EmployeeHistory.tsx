@@ -15,7 +15,8 @@ interface EmployeeHistoryProps {
   activeBranches?: string[];
   selectedMonth: string;
   setSelectedMonth: (month: string) => void;
-  fetchInitialData: (monthYear?: string) => Promise<any>;
+  fetchInitialData: (monthYear?: string, force?: any, options?: {empId?: string, docId?: string, onlyToday?: boolean}) => Promise<any>;
+  isSubjectAdmin?: boolean;
 }
 
 export const EmployeeHistory: React.FC<EmployeeHistoryProps> = ({
@@ -29,7 +30,8 @@ export const EmployeeHistory: React.FC<EmployeeHistoryProps> = ({
   activeBranches = [],
   selectedMonth,
   setSelectedMonth,
-  fetchInitialData
+  fetchInitialData,
+  isSubjectAdmin = false
 }) => {
   const branches = activeBranches.length > 0 ? activeBranches : [loggedInEmployee?.locationId || 'Góc Phố'];
   const [activeTab, setActiveTab] = useState<string>(branches[0]);
@@ -49,7 +51,7 @@ export const EmployeeHistory: React.FC<EmployeeHistoryProps> = ({
     const targetStr = format(target, 'yyyy-MM');
     
     setSelectedMonth(targetStr);
-    await fetchInitialData(targetStr);
+    await fetchInitialData(targetStr, ['holidays', 'chamCongs', 'lichLamViecs', 'xinNghiPheps', 'payrollAdjustments', 'violations', 'salaryAdvanceRecords'], { empId: loggedInEmployee.empId, docId: loggedInEmployee.id });
   };
   
   const shouldUseTabs = branches.length > 1;
@@ -186,7 +188,9 @@ export const EmployeeHistory: React.FC<EmployeeHistoryProps> = ({
                       }
 
                       let lateVal = cc.lateMinutes || (cc.latePenaltyMinutes ? cc.latePenaltyMinutes / 3 : 0);
-                      if (!lateVal && cc.scheduledStartTime && inTimeStr) {
+                      if (isSubjectAdmin) {
+                          lateVal = 0;
+                      } else if (!lateVal && cc.scheduledStartTime && inTimeStr) {
                           const schTimeStr = extractTimeStr(cc.scheduledStartTime);
                           if (schTimeStr) {
                             const [schH, schM] = schTimeStr.split(':').map(Number);
