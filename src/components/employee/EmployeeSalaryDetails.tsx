@@ -16,7 +16,7 @@ interface EmployeeSalaryDetailsProps {
   holidays: any[];
   selectedMonth: string;
   setSelectedMonth: (month: string) => void;
-  fetchInitialData: (monthYear?: string) => Promise<any>;
+  fetchInitialData: (monthYear?: string, force?: any, options?: {empId?: string, docId?: string, onlyToday?: boolean}) => Promise<any>;
   violations: any[];
 }
 
@@ -54,7 +54,7 @@ export const EmployeeSalaryDetails: React.FC<EmployeeSalaryDetailsProps> = ({
     const targetStr = format(target, 'yyyy-MM');
     
     setSelectedMonth(targetStr);
-    await fetchInitialData(targetStr);
+    await fetchInitialData(targetStr, ['holidays', 'chamCongs', 'lichLamViecs', 'xinNghiPheps', 'payrollAdjustments', 'violations', 'salaryAdvanceRecords'], { empId: loggedInEmployee.empId, docId: loggedInEmployee.id });
   };
   
   // Determine which stats to use based on tabs
