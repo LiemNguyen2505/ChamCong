@@ -7,7 +7,7 @@ import { useAdminPayroll } from './useAdminPayroll';
 import { useAdminReport } from './useAdminReport';
 import { useAdminMaterialLoss } from './useAdminMaterialLoss';
 import { useAdminTableColumns } from './useAdminTableColumns';
-import { collection, query, orderBy, onSnapshot, addDoc, serverTimestamp, deleteDoc, doc, updateDoc, getDocs, where, deleteField, getDoc, setDoc, increment, limit, writeBatch } from 'firebase/firestore';
+import { collection, query, orderBy, addDoc, serverTimestamp, deleteDoc, doc, updateDoc, getDocs, where, deleteField, getDoc, setDoc, increment, limit, writeBatch } from 'firebase/firestore';
 import { format, differenceInMonths, parseISO, addMonths } from 'date-fns';
 import { vi } from 'date-fns/locale';
 import { saveAs } from 'file-saver';
