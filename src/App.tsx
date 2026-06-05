@@ -40,9 +40,9 @@ export default function App() {
   const hasInitialLoadedRef = useRef(false);
   const isFetchingInProgress = useRef(false); // GLOBAL FETCH LOCK
 
-  const fetchInitialData = useCallback(async (monthYear?: string, force: boolean | string | string[] = false, options?: { empId?: string, docId?: string, onlyToday?: boolean }) => {
+  const fetchInitialData = useCallback(async (monthYear?: string, force: boolean | string | string[] = false, options?: { empId?: string, docId?: string, onlyToday?: boolean, exactDate?: string, branchId?: string }) => {
     const targetMonth = monthYear || format(new Date(), 'yyyy-MM');
-    const cacheKey = `${targetMonth}_${options?.empId || 'all'}_${options?.onlyToday ? 'today' : 'month'}`;
+    const cacheKey = `${targetMonth}_${options?.empId || 'all'}_${options?.exactDate || options?.onlyToday ? 'today' : 'month'}`;
     const now = Date.now();
     
     // 0. AVOID FLOODING DURING CRASHES
@@ -97,6 +97,30 @@ export default function App() {
       const startDate = formatLocal(bufferStart);
       const endDate = formatLocal(bufferEnd);
       const todayStr = format(new Date(), 'yyyy-MM-dd');
+      
+      let timesheetQuery = options?.empId 
+        ? (options.onlyToday 
+            ? query(collection(db, 'timesheets'), where('date', '==', todayStr), where('empId', '==', options.empId), limit(5)) 
+            : query(collection(db, 'timesheets'), where('date', '>=', startDate), where('date', '<=', endDate), where('empId', '==', options.empId), limit(100))) 
+        : query(collection(db, 'timesheets'), where('date', '>=', startDate), where('date', '<=', endDate), limit(3000));
+        
+      if (options?.exactDate) {
+        timesheetQuery = query(collection(db, 'timesheets'), where('date', '==', options.exactDate), limit(200));
+      }
+
+      let scheduleQuery = (options?.empId || options?.docId) 
+        ? (options.onlyToday 
+            ? query(collection(db, 'LichLamViec'), where('date', '==', todayStr), where('empId', '==', options.docId || options.empId), limit(5)) 
+            : query(collection(db, 'LichLamViec'), where('date', '>=', startDate), where('date', '<=', endDate), where('empId', '==', options.docId || options.empId), limit(100))) 
+        : query(collection(db, 'LichLamViec'), where('date', '>=', startDate), where('date', '<=', endDate), limit(3000));
+        
+      if (options?.exactDate) {
+         if (options?.branchId) {
+             scheduleQuery = query(collection(db, 'LichLamViec'), where('date', '==', options.exactDate), where('locationId', '==', options.branchId), limit(200));
+         } else {
+             scheduleQuery = query(collection(db, 'LichLamViec'), where('date', '==', options.exactDate), limit(200));
+         }
+      }
 
       const config: { key: string; query: any; type: 'static' | 'dynamic' | 'lazy' }[] = [
         { key: 'nhanViens', query: query(collection(db, 'employees'), limit(500)), type: 'dynamic' },
@@ -112,11 +136,13 @@ export default function App() {
         { key: 'materialLossLogs', query: query(collection(db, 'MaterialLossLogs'), where('monthYear', '==', targetMonth), orderBy('processedAt', 'desc'), limit(100)), type: 'lazy' },
         { key: 'retainedSalaryRecords', query: query(collection(db, 'RetainedSalaryRecords'), orderBy('createdAt', 'desc'), limit(500)), type: 'lazy' },
         { key: 'salaryAdvanceRecords', query: options?.empId ? query(collection(db, 'SalaryAdvanceRecords'), where('monthYear', '==', targetMonth), where('empId', '==', options.empId), orderBy('createdAt', 'desc')) : query(collection(db, 'SalaryAdvanceRecords'), where('monthYear', '==', targetMonth), orderBy('createdAt', 'desc')), type: 'lazy' },
-        { key: 'chamCongs', query: options?.empId ? (options.onlyToday ? query(collection(db, 'timesheets'), where('date', '==', todayStr), where('empId', '==', options.empId), limit(5)) : query(collection(db, 'timesheets'), where('date', '>=', startDate), where('date', '<=', endDate), where('empId', '==', options.empId), limit(100))) : query(collection(db, 'timesheets'), where('date', '>=', startDate), where('date', '<=', endDate), limit(3000)), type: 'lazy' },
-        { key: 'lichLamViecs', query: (options?.empId || options?.docId) ? (options.onlyToday ? query(collection(db, 'LichLamViec'), where('date', '==', todayStr), where('empId', '==', options.docId || options.empId), limit(5)) : query(collection(db, 'LichLamViec'), where('date', '>=', startDate), where('date', '<=', endDate), where('empId', '==', options.docId || options.empId), limit(100))) : query(collection(db, 'LichLamViec'), where('date', '>=', startDate), where('date', '<=', endDate), limit(3000)), type: 'lazy' },
+        { key: 'chamCongs', query: timesheetQuery, type: 'lazy' },
+        { key: 'lichLamViecs', query: scheduleQuery, type: 'lazy' },
         { key: 'bulletinNotes', query: query(collection(db, 'BulletinBoard'), orderBy('isPinned', 'desc'), orderBy('createdAt', 'desc'), limit(100)), type: 'lazy' },
         { key: 'planningGoals', query: query(collection(db, 'PlanningGoals'), limit(100)), type: 'static' },
-        { key: 'xinNghiPheps', query: options?.empId ? query(collection(db, 'XinNghiPhep'), where('empId', '==', options.empId), limit(100)) : query(collection(db, 'XinNghiPhep'), limit(1000)), type: 'lazy' },
+        { key: 'xinNghiPheps', query: options?.empId 
+            ? query(collection(db, 'XinNghiPhep'), where('empId', '==', options.empId), where('leaveDate', '>=', startDate), where('leaveDate', '<=', endDate), limit(100)) 
+            : query(collection(db, 'XinNghiPhep'), where('leaveDate', '>=', startDate), where('leaveDate', '<=', endDate), limit(1000)), type: 'lazy' },
         { key: 'salaryHistories', query: query(collection(db, 'SalaryHistories'), limit(500)), type: 'lazy' }
       ];
 
@@ -138,6 +164,13 @@ export default function App() {
         
         if (!hasSavedEmployee && !hasSavedAdmin) {
            return false; // Skip all automatic fetches on first screen to save reads, Login will query explicitly.
+        }
+
+        // NEW OPTIMIZATION: If ONLY employee is logged in, skip fetching heavy global admin lists on mount
+        if (hasSavedEmployee && !hasSavedAdmin) {
+           if (c.key === 'nhanViens' || c.key === 'admins' || c.key === 'planningGoals' || c.key === 'materialItems') {
+               return false;
+           }
         }
 
         return c.type !== 'lazy'; // Only fetch dynamic & static on start, ignore lazy
@@ -165,7 +198,11 @@ export default function App() {
       setHasInitialLoaded(true);
       return newData;
     } catch (error: any) {
-      console.error("Critical Fetch Error:", error);
+      if (error?.code === 'resource-exhausted' || error?.message?.includes('Quota')) {
+        console.warn("Critical Fetch Error (Quota exceeded):", error);
+      } else {
+        console.error("Critical Fetch Error:", error);
+      }
       setErrorDetails({ message: 'Sếp ơi, không lấy được dữ liệu! Vui lòng kiểm tra lại kết nối mạng hoặc Firebase Key.', code: error.code });
       throw error;
     } finally {
