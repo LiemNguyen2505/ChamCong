@@ -7,7 +7,7 @@ toast.error = () => {};
 import { useNavigate } from 'react-router-dom';
 import { db, auth } from '../../firebase';
 import { GoogleAuthProvider, signInWithPopup } from 'firebase/auth';
-import { collection, query, orderBy, onSnapshot, addDoc, serverTimestamp, deleteDoc, doc, updateDoc, getDocs, where, deleteField, getDoc, setDoc, increment, limit, writeBatch } from 'firebase/firestore';
+import { collection, query, orderBy, addDoc, serverTimestamp, deleteDoc, doc, updateDoc, getDocs, where, deleteField, getDoc, setDoc, increment, limit, writeBatch } from 'firebase/firestore';
 import { format } from 'date-fns';
 import { vi } from 'date-fns/locale';
 import { Search, Filter, LogOut, Users, Clock, Plus, Trash2, Edit2, ShieldCheck, Download, Calendar, CheckCircle, XCircle, AlertCircle, Eye, EyeOff, Bell, BellOff, TrendingUp, DollarSign, History as HistoryIcon, X, Key, Smartphone, CheckCircle2, RefreshCw, Undo2, ChevronLeft, Save, Settings2, ChevronDown, ChevronRight, ArrowLeft, Info, StickyNote, LayoutDashboard, AlertTriangle, TrendingDown, Activity, Banknote, Menu, Phone, MessageSquare, MoreVertical, User, Coffee, TableProperties, Wallet, MoreHorizontal, ChevronUp, Package, FileCheck } from 'lucide-react';
