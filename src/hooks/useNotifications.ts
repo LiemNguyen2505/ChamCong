@@ -6,7 +6,7 @@ import {
   where, 
   orderBy, 
   limit, 
-  onSnapshot, 
+  getDocs, 
   doc, 
   updateDoc, 
   addDoc, 
@@ -60,44 +60,51 @@ export const useNotifications = (
       );
     }
 
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      let fetched: AppNotification[] = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      } as AppNotification));
+    const fetchNotifications = async () => {
+      try {
+        const snapshot = await getDocs(q);
+        let fetched: AppNotification[] = snapshot.docs.map(doc => ({
+          id: doc.id,
+          ...(doc.data() as any)
+        } as AppNotification));
 
-      // Filter for Admin/SuperAdmin to only show notifications meant for them
-      if (role === 'SuperAdmin') {
-        fetched = fetched.filter(n => 
-          n.recipientId === 'SuperAdmin' ||
-          n.recipientId === 'all_admins' ||
-          n.recipientId === 'all' ||
-          n.recipientId === userId
-        );
-      } else if (role === 'Admin' || role === 'BranchAdmin') {
-        fetched = fetched.filter(n => 
-          n.recipientId === 'admin' || 
-          n.recipientId === 'all_admins' ||
-          n.recipientId === 'all' ||
-          n.recipientId === userId
-        );
+        // Filter for Admin/SuperAdmin to only show notifications meant for them
+        if (role === 'SuperAdmin') {
+          fetched = fetched.filter(n => 
+            n.recipientId === 'SuperAdmin' ||
+            n.recipientId === 'all_admins' ||
+            n.recipientId === 'all' ||
+            n.recipientId === userId
+          );
+        } else if (role === 'Admin' || role === 'BranchAdmin') {
+          fetched = fetched.filter(n => 
+            n.recipientId === 'admin' || 
+            n.recipientId === 'all_admins' ||
+            n.recipientId === 'all' ||
+            n.recipientId === userId
+          );
+        }
+
+        let processedNotifications = fetched.map(n => ({
+          ...n,
+          isRead: n.readBy ? n.readBy.includes(userId) : n.isRead
+        }));
+
+        // Bỏ các thông báo "Cập nhật bảng lương"
+        processedNotifications = processedNotifications.filter(n => n.title?.toLowerCase() !== 'cập nhật bảng lương');
+        
+        setNotifications(processedNotifications);
+        setUnreadCount(processedNotifications.filter(n => !n.isRead).length);
+      } catch (error: any) {
+        if (error?.code === 'resource-exhausted' || error?.message?.includes('Quota')) {
+           console.warn("Notification listener error (Quota exceeded).");
+        } else {
+           console.error("Notification listener error:", error);
+        }
       }
+    };
 
-      let processedNotifications = fetched.map(n => ({
-        ...n,
-        isRead: n.readBy ? n.readBy.includes(userId) : n.isRead
-      }));
-
-      // Bỏ các thông báo "Cập nhật bảng lương"
-      processedNotifications = processedNotifications.filter(n => n.title?.toLowerCase() !== 'cập nhật bảng lương');
-      
-      setNotifications(processedNotifications);
-      setUnreadCount(processedNotifications.filter(n => !n.isRead).length);
-    }, (error) => {
-      console.error("Notification listener error:", error);
-    });
-
-    return () => unsubscribe();
+    fetchNotifications();
   }, [role, userId, JSON.stringify(locationIds)]);
 
   const markAsRead = async (notificationId: string) => {
