@@ -40,7 +40,7 @@ export default function App() {
   const hasInitialLoadedRef = useRef(false);
   const isFetchingInProgress = useRef(false); // GLOBAL FETCH LOCK
 
-  const fetchInitialData = useCallback(async (monthYear?: string, force: boolean | string | string[] = false, options?: { empId?: string, docId?: string, onlyToday?: boolean, exactDate?: string, branchId?: string }) => {
+  const fetchInitialData = useCallback(async (monthYear?: string, force: boolean | string | string[] = false, options?: { empId?: string, docId?: string, onlyToday?: boolean, exactDate?: string, branchId?: string, isWeek?: boolean, weekStart?: string, weekEnd?: string }) => {
     const targetMonth = monthYear || format(new Date(), 'yyyy-MM');
     const cacheKey = `${targetMonth}_${options?.empId || 'all'}_${options?.exactDate || options?.onlyToday ? 'today' : 'month'}`;
     const now = Date.now();
@@ -79,23 +79,31 @@ export default function App() {
     
     try {
       console.log(`🚀 [App] Fetching data for: ${cacheKey}, force=${force}`);
-      const [year, month] = targetMonth.split('-').map(Number);
       
-      const rawStart = new Date(year, month - 1, 1);
-      const rawEnd = new Date(year, month, 0);
+      let startDate = "";
+      let endDate = "";
       
-      const bufferStart = new Date(rawStart); bufferStart.setDate(bufferStart.getDate() - 7);
-      const bufferEnd = new Date(rawEnd); bufferEnd.setDate(bufferEnd.getDate() + 7);
+      if (options?.isWeek && options.weekStart && options.weekEnd) {
+         startDate = options.weekStart;
+         endDate = options.weekEnd;
+      } else {
+         const [year, month] = targetMonth.split('-').map(Number);
+         const rawStart = new Date(year, month - 1, 1);
+         const rawEnd = new Date(year, month, 0);
+         
+         const bufferStart = new Date(rawStart); bufferStart.setDate(bufferStart.getDate() - 7);
+         const bufferEnd = new Date(rawEnd); bufferEnd.setDate(bufferEnd.getDate() + 7);
+         
+         const formatLocal = (d: Date) => {
+           const y = d.getFullYear();
+           const m = String(d.getMonth() + 1).padStart(2, '0');
+           const day = String(d.getDate()).padStart(2, '0');
+           return `${y}-${m}-${day}`;
+         };
+         startDate = formatLocal(bufferStart);
+         endDate = formatLocal(bufferEnd);
+      }
       
-      const formatLocal = (d: Date) => {
-        const y = d.getFullYear();
-        const m = String(d.getMonth() + 1).padStart(2, '0');
-        const day = String(d.getDate()).padStart(2, '0');
-        return `${y}-${m}-${day}`;
-      };
-      
-      const startDate = formatLocal(bufferStart);
-      const endDate = formatLocal(bufferEnd);
       const todayStr = format(new Date(), 'yyyy-MM-dd');
       
       let timesheetQuery = options?.empId 
@@ -188,8 +196,21 @@ export default function App() {
       });
 
       setGlobalData((prev: any) => {
-        // preserve the old data for keys we didn't fetch
-        const merged = { ...prev, ...newData, lastUpdated: new Date().toISOString() };
+        const merged = { ...prev };
+        
+        for (const [key, items] of Object.entries(newData)) {
+           if (Array.isArray(items) && (options?.isWeek || options?.exactDate) && prev[key]) {
+              const existingMap = new Map(prev[key].map((item: any) => [item.id, item]));
+              (items as any[]).forEach(item => {
+                 existingMap.set(item.id, item);
+              });
+              merged[key] = Array.from(existingMap.values());
+           } else {
+              merged[key] = items;
+           }
+        }
+        
+        merged.lastUpdated = new Date().toISOString();
         dataCacheRef.current[cacheKey] = merged;
         return merged;
       });
