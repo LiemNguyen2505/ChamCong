@@ -299,7 +299,8 @@ export function useAdminLogic(globalData: any, fetchInitialData: any, isLoading:
        keysToLoad.add('salaryAdvanceRecords');
     }
     else if (activeTab === 'lichlamviec') {
-       keysToLoad.add('lichLamViecs');
+       // lichLamViecs will be fetched via onDateChange week by week!
+       keysToLoad.add('planningGoals');
     }
     else if (activeTab === 'vipham') {
        keysToLoad.add('violations');
