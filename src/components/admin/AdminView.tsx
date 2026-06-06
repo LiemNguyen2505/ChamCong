@@ -67,7 +67,7 @@ export default function AdminView({
   isLoading: isGlobalLoading 
 }: { 
   globalData: any, 
-  fetchInitialData: (monthYear?: string, force?: any) => Promise<any>, 
+  fetchInitialData: (monthYear?: string, force?: any, options?: any) => Promise<any>, 
   isLoading: boolean 
 }) {
   const logic = useAdminLogic(globalData, fetchInitialData, isGlobalLoading);
@@ -599,6 +599,20 @@ export default function AdminView({
               fetchInitialData={fetchInitialData}
               exportToCSV={exportToCSV}
               BranchTabs={CommonBranchTabs}
+              onDateChange={(date) => {
+                 const [y, m, d] = date.split('-').map(Number);
+                 const dDate = new Date(y, m - 1, d);
+                 const wStart = new Date(dDate); wStart.setDate(wStart.getDate() - 3);
+                 const wEnd = new Date(dDate); wEnd.setDate(wEnd.getDate() + 10);
+                 const formatD = (dateObj: Date) => {
+                    return `${dateObj.getFullYear()}-${String(dateObj.getMonth() + 1).padStart(2, '0')}-${String(dateObj.getDate()).padStart(2, '0')}`;
+                 };
+                 fetchInitialData(undefined, ['lichLamViecs'], {
+                    isWeek: true,
+                    weekStart: formatD(wStart),
+                    weekEnd: formatD(wEnd)
+                 });
+              }}
             />
           )}
 
