@@ -12,15 +12,28 @@ interface ScheduleViewProps {
     planningGoals: any[];
     adminTheme: any;
     setIsScheduleModalOpen: (isOpen: boolean) => void;
-    fetchInitialData: (month?: string, force?: boolean) => Promise<any>;
+    fetchInitialData: (month?: string, force?: any, options?: any) => Promise<any>;
     exportToCSV: () => void;
     BranchTabs: React.ComponentType;
+    onDateChange?: (date: string) => void;
 }
 
 export const ScheduleView: React.FC<ScheduleViewProps> = ({
     nhanViens, lichLamViecs, filterBranch, filterMonth, currentAdmin, planningGoals, adminTheme,
-    setIsScheduleModalOpen, fetchInitialData, exportToCSV, BranchTabs
+    setIsScheduleModalOpen, fetchInitialData, exportToCSV, BranchTabs, onDateChange
 }) => {
+    const currentWeekDateRef = React.useRef<string | null>(null);
+
+    const handleRefetchWeek = async () => {
+        if (!currentWeekDateRef.current) return;
+        const date = currentWeekDateRef.current;
+        if (onDateChange) {
+           onDateChange(date); // This will trigger the week fetch via AdminView!
+        } else {
+           await fetchInitialData(filterMonth, ['lichLamViecs']);
+        }
+    };
+
     return (
         <div className="pt-0 px-1 md:p-6 h-full flex flex-col overflow-hidden">
             <div className="px-3 md:px-0 mb-1">
@@ -35,6 +48,10 @@ export const ScheduleView: React.FC<ScheduleViewProps> = ({
                 theme={adminTheme}
                 exportToCSV={exportToCSV}
                 filterMonth={filterMonth}
+                onDateChange={(date) => {
+                    currentWeekDateRef.current = date;
+                    if (onDateChange) onDateChange(date);
+                }}
                 onModalToggle={(isOpen) => setIsScheduleModalOpen(isOpen)}
                 onAddShift={async (shift) => {
                     try {
@@ -49,7 +66,7 @@ export const ScheduleView: React.FC<ScheduleViewProps> = ({
                             createdAt: serverTimestamp(),
                             updatedAt: serverTimestamp()
                         });
-                        await fetchInitialData(filterMonth, ['lichLamViecs']);
+                        await handleRefetchWeek();
                     } catch (error) {
                         console.error('Error adding shift:', error);
                     }
@@ -70,7 +87,7 @@ export const ScheduleView: React.FC<ScheduleViewProps> = ({
                             updatedAt: serverTimestamp()
                         }, { merge: true });
                         
-                        await fetchInitialData(filterMonth, ['lichLamViecs']);
+                        await handleRefetchWeek();
                     } catch (error) {
                         console.error('Error updating shift:', error);
                     }
@@ -78,7 +95,7 @@ export const ScheduleView: React.FC<ScheduleViewProps> = ({
                 onDeleteShift={async (id) => {
                     try {
                         await deleteDoc(doc(db, 'LichLamViec', id));
-                        await fetchInitialData(filterMonth, ['lichLamViecs']);
+                        await handleRefetchWeek();
                     } catch (error) {
                         console.error('Error deleting shift:', error);
                     }
@@ -90,7 +107,7 @@ export const ScheduleView: React.FC<ScheduleViewProps> = ({
                             batch.delete(doc(db, 'LichLamViec', id));
                         });
                         await batch.commit();
-                        await fetchInitialData(filterMonth, ['lichLamViecs']);
+                        await handleRefetchWeek();
                     } catch (error) {
                         console.error('Error batch deleting shifts:', error);
                     }
@@ -111,7 +128,7 @@ export const ScheduleView: React.FC<ScheduleViewProps> = ({
                             });
                         });
                         await batch.commit();
-                        await fetchInitialData(filterMonth, ['lichLamViecs']);
+                        await handleRefetchWeek();
                     } catch (error) {
                         console.error('Error batch saving shifts:', error);
                     }
@@ -140,7 +157,7 @@ export const ScheduleView: React.FC<ScheduleViewProps> = ({
                         });
                         
                         await batch.commit();
-                        await fetchInitialData(filterMonth, ['lichLamViecs']);
+                        await handleRefetchWeek();
                     } catch (error) {
                         console.error('Error syncing week shifts:', error);
                     }
