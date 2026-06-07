@@ -110,17 +110,25 @@ export default function App() {
         ? (options.onlyToday 
             ? query(collection(db, 'timesheets'), where('date', '==', todayStr), where('empId', '==', options.empId), limit(5)) 
             : query(collection(db, 'timesheets'), where('date', '>=', startDate), where('date', '<=', endDate), where('empId', '==', options.empId), limit(100))) 
-        : query(collection(db, 'timesheets'), where('date', '>=', startDate), where('date', '<=', endDate), limit(3000));
+        : (options?.onlyToday
+            ? query(collection(db, 'timesheets'), where('date', '==', todayStr), limit(200))
+            : query(collection(db, 'timesheets'), where('date', '>=', startDate), where('date', '<=', endDate), limit(3000)));
         
       if (options?.exactDate) {
-        timesheetQuery = query(collection(db, 'timesheets'), where('date', '==', options.exactDate), limit(200));
+        if (options?.empId) {
+           timesheetQuery = query(collection(db, 'timesheets'), where('date', '==', options.exactDate), where('empId', '==', options.empId), limit(5));
+        } else {
+           timesheetQuery = query(collection(db, 'timesheets'), where('date', '==', options.exactDate), limit(200));
+        }
       }
 
       let scheduleQuery = (options?.empId || options?.docId) 
         ? (options.onlyToday 
             ? query(collection(db, 'LichLamViec'), where('date', '==', todayStr), where('empId', '==', options.docId || options.empId), limit(5)) 
             : query(collection(db, 'LichLamViec'), where('date', '>=', startDate), where('date', '<=', endDate), where('empId', '==', options.docId || options.empId), limit(100))) 
-        : query(collection(db, 'LichLamViec'), where('date', '>=', startDate), where('date', '<=', endDate), limit(3000));
+        : (options?.onlyToday
+            ? query(collection(db, 'LichLamViec'), where('date', '==', todayStr), limit(200))
+            : query(collection(db, 'LichLamViec'), where('date', '>=', startDate), where('date', '<=', endDate), limit(3000)));
         
       if (options?.exactDate) {
          if (options?.branchId) {
@@ -128,6 +136,18 @@ export default function App() {
          } else {
              scheduleQuery = query(collection(db, 'LichLamViec'), where('date', '==', options.exactDate), limit(200));
          }
+      }
+
+      let leaveQuery = options?.empId 
+        ? query(collection(db, 'XinNghiPhep'), where('empId', '==', options.empId), where('leaveDate', '>=', startDate), where('leaveDate', '<=', endDate), limit(100)) 
+        : query(collection(db, 'XinNghiPhep'), where('leaveDate', '>=', startDate), where('leaveDate', '<=', endDate), limit(1000));
+        
+      if (options?.exactDate) {
+        if (options?.empId) {
+          leaveQuery = query(collection(db, 'XinNghiPhep'), where('empId', '==', options.empId), where('leaveDate', '==', options.exactDate), limit(5));
+        } else {
+          leaveQuery = query(collection(db, 'XinNghiPhep'), where('leaveDate', '==', options.exactDate), limit(200));
+        }
       }
 
       const config: { key: string; query: any; type: 'static' | 'dynamic' | 'lazy' }[] = [
@@ -148,9 +168,7 @@ export default function App() {
         { key: 'lichLamViecs', query: scheduleQuery, type: 'lazy' },
         { key: 'bulletinNotes', query: query(collection(db, 'BulletinBoard'), orderBy('isPinned', 'desc'), orderBy('createdAt', 'desc'), limit(100)), type: 'lazy' },
         { key: 'planningGoals', query: query(collection(db, 'PlanningGoals'), limit(100)), type: 'static' },
-        { key: 'xinNghiPheps', query: options?.empId 
-            ? query(collection(db, 'XinNghiPhep'), where('empId', '==', options.empId), where('leaveDate', '>=', startDate), where('leaveDate', '<=', endDate), limit(100)) 
-            : query(collection(db, 'XinNghiPhep'), where('leaveDate', '>=', startDate), where('leaveDate', '<=', endDate), limit(1000)), type: 'lazy' },
+        { key: 'xinNghiPheps', query: leaveQuery, type: 'lazy' },
         { key: 'salaryHistories', query: query(collection(db, 'SalaryHistories'), limit(500)), type: 'lazy' }
       ];
 
@@ -199,7 +217,7 @@ export default function App() {
         const merged = { ...prev };
         
         for (const [key, items] of Object.entries(newData)) {
-           if (Array.isArray(items) && (options?.isWeek || options?.exactDate) && prev[key]) {
+           if (Array.isArray(items) && (options?.isWeek || options?.exactDate || options?.onlyToday) && prev[key]) {
               const existingMap = new Map(prev[key].map((item: any) => [item.id, item]));
               (items as any[]).forEach(item => {
                  existingMap.set(item.id, item);
