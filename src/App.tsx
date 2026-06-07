@@ -218,7 +218,43 @@ export default function App() {
         
         for (const [key, items] of Object.entries(newData)) {
            if (Array.isArray(items) && (options?.isWeek || options?.exactDate || options?.onlyToday) && prev[key]) {
-              const existingMap = new Map(prev[key].map((item: any) => [item.id, item]));
+              let qStart = startDate;
+              let qEnd = endDate;
+              if (options?.exactDate) {
+                 qStart = options.exactDate;
+                 qEnd = options.exactDate;
+              } else if (options?.onlyToday) {
+                 qStart = format(new Date(), 'yyyy-MM-dd');
+                 qEnd = qStart;
+              }
+
+              const dateField = key === 'xinNghiPheps' ? 'leaveDate' : 'date';
+
+              const filteredPrev = prev[key].filter((item: any) => {
+                 const itemDate = item[dateField];
+                 if (!itemDate) return true;
+                 
+                 const inDateRange = itemDate >= qStart && itemDate <= qEnd;
+                 
+                 let inEmpScope = true;
+                 if (options?.empId || options?.docId) {
+                    inEmpScope = item.empId === (options.empId || options.docId);
+                 }
+                 
+                 let inBranchScope = true;
+                 if (options?.branchId && key === 'lichLamViecs') {
+                    inBranchScope = item.locationId === options.branchId;
+                 }
+                 
+                 // If the item matches the boundaries of our query, we drop it from the old cache
+                 // and rely purely on the newly fetched `items` to provide up-to-date data.
+                 if (inDateRange && inEmpScope && inBranchScope) {
+                    return false;
+                 }
+                 return true;
+              });
+
+              const existingMap = new Map(filteredPrev.map((item: any) => [item.id, item]));
               (items as any[]).forEach(item => {
                  existingMap.set(item.id, item);
               });
