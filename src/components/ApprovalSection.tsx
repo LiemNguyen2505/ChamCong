@@ -39,7 +39,7 @@ interface ApprovalSectionProps {
   setRequestTypeFilter: (filter: string) => void;
   currentAdmin: AdminAccount | null;
   nhanViens: Employee[];
-  fetchInitialData: (monthYear?: string, force?: any) => Promise<any>;
+  fetchInitialData: (monthYear?: string, force?: any, options?: any) => Promise<any>;
   logAction: (action: string, target: string, details: string) => Promise<void>;
   approvalHistory: ApprovalRequest[];
   openConfirmModal: (title: string, message: string, onConfirm: () => Promise<void>) => void;
@@ -63,6 +63,14 @@ export const ApprovalSection: React.FC<ApprovalSectionProps> = ({
   openConfirmModal,
   renderBranchTabs
 }) => {
+
+  const getKeysToRefresh = (req: any) => {
+    const keys = ['approvalRequests'];
+    if (req.type === 'off') keys.push('xinNghiPheps');
+    if (req.type === 'late_early' || req.type === 'forget_checkin_checkout' || req.type === 'checkin_early' || req.type === 'checkin_late' || req.type === 'checkout_different' || req.type === 'checkout_early' || req.type === 'extra_shift') keys.push('chamCongs');
+    if (req.type === 'salary_advance') keys.push('salaryAdvanceRecords');
+    return keys;
+  };
 
   const safeFormat = (date: any, formatStr: string) => {
     if (!date) return '-';
@@ -562,7 +570,7 @@ export const ApprovalSection: React.FC<ApprovalSectionProps> = ({
                               
                               await logAction('Duyệt yêu cầu', req.fullName, `Duyệt ${getRequestTypeLabel(req.type).label} cho ${req.fullName}`);
                               toast.success('Đã duyệt yêu cầu', { id: loadingToast });
-                              await fetchInitialData(undefined, ['approvalRequests', 'chamCongs', 'xinNghiPheps', 'payrollAdjustments', 'salaryAdvanceRecords']);
+                              await fetchInitialData(undefined, getKeysToRefresh(req), { exactDate: req.details?.requestDate });
                             } catch (error) {
                               toast.error('Lỗi khi duyệt', { id: loadingToast });
                             }
@@ -640,7 +648,7 @@ export const ApprovalSection: React.FC<ApprovalSectionProps> = ({
                               
                               await logAction('Từ chối yêu cầu', req.fullName, `Từ chối ${getRequestTypeLabel(req.type).label} cho ${req.fullName}`);
                               toast.success('Đã từ chối!', { id: loadingToast });
-                              await fetchInitialData(undefined, ['approvalRequests', 'chamCongs', 'xinNghiPheps', 'payrollAdjustments', 'salaryAdvanceRecords']);
+                              await fetchInitialData(undefined, getKeysToRefresh(req), { exactDate: req.details?.requestDate });
                             } catch (error) {
                               toast.error('Lỗi khi từ chối', { id: loadingToast });
                             }
@@ -862,7 +870,7 @@ export const ApprovalSection: React.FC<ApprovalSectionProps> = ({
                                     
                                     await logAction('Duyệt yêu cầu', req.fullName, `Duyệt ${getRequestTypeLabel(req.type).label} cho ${req.fullName}`);
                                     toast.success('Đã duyệt thành công!', { id: loadingToast });
-                                    await fetchInitialData(undefined, ['approvalRequests', 'chamCongs', 'xinNghiPheps', 'payrollAdjustments', 'salaryAdvanceRecords']);
+                                    await fetchInitialData(undefined, getKeysToRefresh(req), { exactDate: req.details?.requestDate });
                                   } catch (error) {
                                     toast.error('Lỗi khi duyệt', { id: loadingToast });
                                   }
@@ -941,7 +949,7 @@ export const ApprovalSection: React.FC<ApprovalSectionProps> = ({
                                     
                                     await logAction('Từ chối yêu cầu', req.fullName, `Từ chối yêu cầu cho ${req.fullName}`);
                                     toast.success('Đã từ chối!', { id: loadingToast });
-                                    await fetchInitialData(undefined, ['approvalRequests', 'chamCongs', 'xinNghiPheps', 'payrollAdjustments', 'salaryAdvanceRecords']);
+                                    await fetchInitialData(undefined, getKeysToRefresh(req), { exactDate: req.details?.requestDate });
                                   } catch (error) {
                                     toast.error('Lỗi khi từ chối', { id: loadingToast });
                                   }
@@ -1017,7 +1025,7 @@ export const ApprovalSection: React.FC<ApprovalSectionProps> = ({
                             try {
                               await updateDoc(doc(db, 'ApprovalRequests', req.id), { status: 'pending', adminId: deleteField(), processedAt: deleteField() });
                               toast.success('Đã hoàn tác');
-                              await fetchInitialData(undefined, ['approvalRequests', 'chamCongs', 'xinNghiPheps', 'payrollAdjustments', 'salaryAdvanceRecords']);
+                              await fetchInitialData(undefined, getKeysToRefresh(req), { exactDate: req.details?.requestDate });
                             } catch (error) { toast.error('Lỗi'); }
                           })}
                           className="p-2 bg-stone-100 text-stone-600 rounded-lg active:scale-90 transition-all border border-stone-200"
@@ -1080,7 +1088,7 @@ export const ApprovalSection: React.FC<ApprovalSectionProps> = ({
                                 try {
                                   await updateDoc(doc(db, 'ApprovalRequests', req.id), { status: 'pending', adminId: deleteField(), processedAt: deleteField() });
                                   toast.success('Đã hoàn tác');
-                                  await fetchInitialData(undefined, ['approvalRequests', 'chamCongs', 'xinNghiPheps', 'payrollAdjustments', 'salaryAdvanceRecords']);
+                                  await fetchInitialData(undefined, getKeysToRefresh(req), { exactDate: req.details?.requestDate });
                                 } catch (error) { toast.error('Lỗi'); }
                               })}
                               className="text-amber-600 hover:text-amber-700 text-[10px] font-bold flex items-center gap-1 justify-end ml-auto uppercase"
