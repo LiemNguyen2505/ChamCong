@@ -1039,7 +1039,7 @@ export function useAdminLogic(globalData: any, fetchInitialData: any, isLoading:
         plannedEndTime: newEndTime
       });
       toast.success('Đã cập nhật giờ ra ca dự kiến!', { id: loadingToast });
-      await fetchInitialData(filterMonth, ['lichLamViecs']); // Force refresh cache
+      await fetchInitialData(filterMonth, ['lichLamViecs'], { exactDate: selectedShift.date }); // Force refresh cache
       setShowAdjustModal(false);
     } catch (error) {
       toast.error('Lỗi khi cập nhật giờ ra ca', { id: loadingToast });
