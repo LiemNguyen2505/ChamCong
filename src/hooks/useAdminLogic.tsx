@@ -278,9 +278,11 @@ export function useAdminLogic(globalData: any, fetchInitialData: any, isLoading:
     
     // Load based on active Tab
     if (activeTab === 'dashboard') {
-       keysToLoad.add('chamCongs');
+       // OPTIMIZATION: Do not fetch entire month `chamCongs` and `lichLamViecs` on dashboard
+       // as that consumes thousands of reads on first load! We only fetch today's data for active shift tracking.
+       fetchInitialData(filterMonth, ['chamCongs', 'lichLamViecs'], { onlyToday: true })
+         .catch(e => console.error("Error fetching today dashboard data:", e));
        keysToLoad.add('xinNghiPheps');
-       keysToLoad.add('lichLamViecs'); // needed for matchSchedules
        keysToLoad.add('approvalRequests');
     }
     else if (activeTab === 'bangluong' || activeTab === 'bangcongthang') {
