@@ -871,8 +871,20 @@ export function useSmartScheduleBuilder(props: SmartScheduleBuilderProps) {
       const nextWeekEndStr = format(nextWeekEnd, 'yyyy-MM-dd');
 
       // 1. Find and clear ALL existing shifts in the TARGET week for the current scope
-      const nextWeekShiftsToDelete = schedules.filter(s => {
-        return s.date >= nextWeekStartStr && s.date <= nextWeekEndStr && (activeBranch === 'All' || s.locationId === activeBranch);
+      // We must query the database because `schedules` is limited to the current week
+      let existingNextWeekIds: string[] = [];
+      const dbBaseQuery = query(
+          collection(db, 'LichLamViec'), 
+          where('date', '>=', nextWeekStartStr),
+          where('date', '<=', nextWeekEndStr)
+      );
+      const snapshot = await getDocs(dbBaseQuery);
+      
+      snapshot.forEach(docSnap => {
+          const data = docSnap.data();
+          if (activeBranch === 'All' || data.locationId === activeBranch) {
+             existingNextWeekIds.push(docSnap.id);
+          }
       });
 
       // 2. Get shifts from CURRENT week
@@ -906,14 +918,14 @@ export function useSmartScheduleBuilder(props: SmartScheduleBuilderProps) {
       });
 
       if (onSyncWeekShifts) {
-        await onSyncWeekShifts(clonedShifts, nextWeekShiftsToDelete.map(s => s.id));
+        await onSyncWeekShifts(clonedShifts, existingNextWeekIds);
       } else {
-        if (nextWeekShiftsToDelete.length > 0) {
+        if (existingNextWeekIds.length > 0) {
           if (onBatchDeleteShifts) {
-            await onBatchDeleteShifts(nextWeekShiftsToDelete.map(s => s.id));
+            await onBatchDeleteShifts(existingNextWeekIds);
           } else {
-            for (const shift of nextWeekShiftsToDelete) {
-              await onDeleteShift(shift.id);
+            for (const id of existingNextWeekIds) {
+              await onDeleteShift(id);
             }
           }
         }
