@@ -131,7 +131,7 @@ const FinancialMetrics = React.memo(({
           <div className="flex flex-col">
             <div className="flex items-center gap-2">
               <h3 className={`font-black text-white ${adminTheme.accent} px-3 py-1.5 rounded-lg text-[13px] md:text-lg uppercase tracking-tight leading-none inline-block shadow-sm`}>
-                LƯƠNG TÍCH LŨY
+                LƯƠNG HÔM NAY
               </h3>
               <div className="flex items-center gap-1 text-emerald-600 font-black text-[8px] uppercase tracking-widest bg-emerald-50 px-1.5 py-0.5 rounded-lg border border-emerald-100">
                 <TrendingUp className="w-2.5 h-2.5" /> REAL-TIME
@@ -155,7 +155,7 @@ const FinancialMetrics = React.memo(({
       <div className="mb-4">
         <div className="bg-stone-50/50 rounded-2xl p-4 border border-stone-100">
           <div className="flex justify-between items-center mb-2">
-            <p className="text-[10px] md:text-sm font-black text-stone-400 uppercase tracking-widest italic">TỔNG GIỜ</p>
+            <p className="text-[10px] md:text-sm font-black text-stone-400 uppercase tracking-widest italic">GIỜ HÔM NAY</p>
             <div className="flex items-baseline gap-1">
               <span className="text-xl md:text-3xl font-black text-slate-900">{totalHoursMonth.toFixed(2)}</span>
               <span className="text-[12px] font-black text-slate-900">h</span>
