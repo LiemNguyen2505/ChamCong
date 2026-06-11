@@ -206,11 +206,42 @@ export default function App() {
           return {}; // Nothing to fetch
       }
 
-      const snapshots = await Promise.all(activeQueries.map(c => getDocs(c.query)));
+      const results = await Promise.all(activeQueries.map(c => {
+        const CACHE_TTL = 1000 * 60 * 60; // 1 hour cache to avoid staleness, but enough to survive the 5:30-6:00 rush
+        const cacheStoreKey = `db_cache_${c.key}`;
+        const cacheTimestampKey = `db_cache_time_${c.key}`;
+        
+        let shouldFetch = true;
+        if (!force && !forceKeys?.includes(c.key)) {
+           const savedTime = localStorage.getItem(cacheTimestampKey);
+           if (savedTime && (Date.now() - parseInt(savedTime)) < CACHE_TTL) {
+              const cachedData = localStorage.getItem(cacheStoreKey);
+              if (cachedData) {
+                 shouldFetch = false;
+                 try {
+                   return { key: c.key, data: JSON.parse(cachedData) };
+                 } catch(e) {}
+               }
+           }
+        }
+        
+        if (shouldFetch) {
+           return getDocs(c.query).then(snap => {
+              const data = snap.docs.map(doc => ({ id: doc.id, ...(doc.data() as any) }));
+              // Cache dynamic/static collections natively to save big morning rushes
+              if (c.type !== 'lazy') {
+                 localStorage.setItem(cacheStoreKey, JSON.stringify(data));
+                 localStorage.setItem(cacheTimestampKey, Date.now().toString());
+              }
+              return { key: c.key, data };
+           });
+        }
+        return Promise.resolve({ key: c.key, data: [] });
+      }));
       
       const newData: any = {};
-      activeQueries.forEach((c, index) => {
-        newData[c.key] = snapshots[index].docs.map(doc => ({ id: doc.id, ...(doc.data() as any) }));
+      results.forEach((res) => {
+        newData[res.key] = res.data;
       });
 
       setGlobalData((prev: any) => {
