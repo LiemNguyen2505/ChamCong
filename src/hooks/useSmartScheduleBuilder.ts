@@ -1,5 +1,7 @@
 import React, { useState, useMemo, useEffect, useRef, useCallback } from 'react';
 import { format, startOfWeek, addDays, parseISO, addWeeks, subWeeks, subDays, isSameDay } from 'date-fns';
+import { db } from '../firebase';
+import { collection, query, where, getDocs } from 'firebase/firestore';
 import { vi } from 'date-fns/locale';
 import { toast } from 'react-hot-toast';
 import { Employee, WorkSchedule, ShiftTask } from '../types/admin';
