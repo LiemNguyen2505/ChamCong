@@ -396,13 +396,6 @@ export function useAdminLogic(globalData: any, fetchInitialData: any, isLoading:
     return raw.filter(s => adminLocations.includes(s.locationId));
   }, [globalData.lichLamViecs, currentAdmin]);
 
-  const xinNghiPheps = useMemo(() => {
-    const raw = globalData.xinNghiPheps;
-    if (currentAdmin?.role === 'SuperAdmin') return raw;
-    const adminLocations = currentAdmin?.locationIds || [];
-    return raw.filter(r => adminLocations.includes(r.locationId));
-  }, [globalData.xinNghiPheps, currentAdmin]);
-
   const admins = useMemo(() => {
     const raw = globalData.admins;
     if (currentAdmin?.role === 'SuperAdmin') return raw;
