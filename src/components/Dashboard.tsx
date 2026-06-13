@@ -21,7 +21,6 @@ interface DashboardProps {
   formatCurrency: (val: number) => string;
   getPreviousMonthRates: (empId: string, monthYear: string, adjustments: PayrollAdjustment[]) => any;
   toast: any;
-  pendingRequests: ApprovalRequest[];
   BranchTabs: React.FC<any>;
 }
 
@@ -228,7 +227,6 @@ export const Dashboard: React.FC<DashboardProps> = ({
   formatCurrency,
   getPreviousMonthRates,
   toast,
-  pendingRequests,
   BranchTabs
 }) => {
   const [monthlyTargetHours, setMonthlyTargetHours] = React.useState(() => {
