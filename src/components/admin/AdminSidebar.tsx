@@ -13,7 +13,6 @@ export const AdminSidebar = ({
   adminTheme,
   currentAdmin,
   filteredChamCongs,
-  pendingRequests,
   canhBaos,
   notifications,
   setShowNotifications,
@@ -103,13 +102,6 @@ export const AdminSidebar = ({
             {(!isSidebarCollapsed || isMobileSidebarOpen) && (
               <p className="px-4 text-[10px] font-black text-slate-500 uppercase tracking-widest mb-4">Quản lý giờ công</p>
             )}
-            <SidebarItem 
-              icon={CheckCircle2} 
-              label="Chờ Duyệt" 
-              active={activeTab === 'duyetgio'} 
-              onClick={() => setActiveTab('duyetgio')}
-              badge={pendingRequests.length}
-            />
             <SidebarItem 
               icon={Calendar} 
               label="Lịch Làm Việc" 
