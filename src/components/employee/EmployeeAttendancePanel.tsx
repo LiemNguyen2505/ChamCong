@@ -1,6 +1,5 @@
 import React from 'react';
-import { Calendar, FileEdit, AlertTriangle, CheckCircle2, Clock, EyeOff, Eye, FileText, History, LogOut, ArrowRight, ShieldAlert } from 'lucide-react';
-import BulletinBoard from '../BulletinBoard';
+import { Calendar, FileEdit, AlertTriangle, CheckCircle2, Clock, EyeOff, Eye, FileText, History, LogOut, ArrowRight, ShieldAlert, Bell } from 'lucide-react';
 
 interface EmployeeAttendancePanelProps {
   loggedInEmployee: any;
@@ -14,22 +13,17 @@ interface EmployeeAttendancePanelProps {
   showStats: boolean;
   setShowStats: (val: boolean) => void;
   setShowWeeklySchedule: (val: boolean) => void;
-  setShowRequestModal: (val: boolean) => void;
   setShowViolationModal: (val: boolean) => void;
   setShowSalaryDetails: (val: boolean) => void;
   setShowHistory: (val: boolean) => void;
   handleActionClick: (type: 'check-in' | 'check-out') => void;
   handleToggleTask: (shiftId: string, taskId: string, isCompleted: boolean) => void;
-  setRequestType: (val: any) => void;
-  setRequestNote: (val: string) => void;
-  setSwapWithEmpId: (val: string) => void;
-  setRequestTime: (val: string) => void;
-  setRequestSubTime: (val: string) => void;
-  setRequestDate: (val: string) => void;
   format: (date: Date, str: string) => string;
   selectedMonth: string;
   globalData?: any;
   onRefresh?: () => void;
+  notifications?: any[];
+  onShowNotifications?: () => void;
 }
 
 export const EmployeeAttendancePanel: React.FC<EmployeeAttendancePanelProps> = ({
@@ -44,38 +38,36 @@ export const EmployeeAttendancePanel: React.FC<EmployeeAttendancePanelProps> = (
   showStats,
   setShowStats,
   setShowWeeklySchedule,
-  setShowRequestModal,
   setShowViolationModal,
   setShowSalaryDetails,
   setShowHistory,
   handleActionClick,
   handleToggleTask,
-  setRequestType,
-  setRequestNote,
-  setSwapWithEmpId,
-  setRequestTime,
-  setRequestSubTime,
-  setRequestDate,
   format,
   selectedMonth,
   globalData,
-  onRefresh
+  onRefresh,
+  notifications,
+  onShowNotifications
 }) => {
   return (
     <div className="space-y-2">
-      {/* Bulletin Board */}
-      <BulletinBoard 
-        currentEmployee={loggedInEmployee} 
-        locationId={kioskBranch || loggedInEmployee.locationId || ''} 
-        isAdmin={loggedInEmployee.empId.toUpperCase() === 'ADMIN' || admins.some(a => a.email === loggedInEmployee.fullName)}
-        theme={theme}
-        employees={employees}
-        globalData={globalData}
-        onRefresh={onRefresh}
-      />
+      {/* Notifications Button */}
+      <button
+        onClick={onShowNotifications}
+        className={`w-full py-2.5 rounded-2xl flex items-center justify-center gap-2 transition-all active:scale-[0.95] ${theme.bg} border ${theme.border} hover:bg-stone-50 relative`}
+      >
+        <Bell className={`w-5 h-5 ${theme.text}`} />
+        <span className={`font-black text-xs uppercase tracking-widest ${theme.text}`}>Thông báo</span>
+        {notifications && notifications.some(n => !n.isRead) && (
+          <span className="absolute top-2 right-2 w-4 h-4 bg-red-500 rounded-full flex items-center justify-center text-[8px] font-bold text-white shadow-sm border border-white">
+            {notifications.filter(n => !n.isRead).length}
+          </span>
+        )}
+      </button>
 
       {/* New Menu Buttons - Side by Side */}
-      <div className="grid grid-cols-3 gap-2">
+      <div className="grid grid-cols-2 gap-2">
         <button 
           onClick={() => setShowWeeklySchedule(true)}
           className={`flex flex-col items-center justify-center p-2.5 ${theme.bg} ${theme.border} rounded-2xl shadow-sm border hover:border-stone-300 active:scale-[0.95] transition-all group`}
@@ -94,24 +86,6 @@ export const EmployeeAttendancePanel: React.FC<EmployeeAttendancePanelProps> = (
             <ShieldAlert strokeWidth={1.5} className="w-5 h-5" />
           </div>
           <span className={`font-black ${theme.text} text-[9px] uppercase tracking-wider text-center opacity-80 leading-tight`}>Trách Nhiệm</span>
-        </button>
-
-        <button 
-          onClick={() => {
-            setRequestType(null);
-            setRequestNote('');
-            setSwapWithEmpId('');
-            setRequestTime('');
-            setRequestSubTime('');
-            setRequestDate(format(new Date(), 'yyyy-MM-dd'));
-            setShowRequestModal(true);
-          }}
-          className={`flex flex-col items-center justify-center p-2.5 ${theme.bg} ${theme.border} rounded-2xl shadow-sm border hover:border-stone-300 active:scale-[0.95] transition-all group`}
-        >
-          <div className={`p-2 ${theme.accent} text-white rounded-2xl mb-1.5 shadow-sm`}>
-            <FileEdit strokeWidth={1.5} className="w-5 h-5" />
-          </div>
-          <span className={`font-black ${theme.text} text-[9px] uppercase tracking-wider text-center opacity-80 leading-tight`}>Yêu cầu & Hỗ trợ</span>
         </button>
       </div>
 
@@ -230,39 +204,41 @@ export const EmployeeAttendancePanel: React.FC<EmployeeAttendancePanelProps> = (
       </div>
 
       {/* Bottom Buttons */}
-      <div className="grid grid-cols-2 gap-3 pt-1">
-        <button
-          onClick={() => handleActionClick('check-in')}
-          disabled={!!(latestLog && !latestLog.checkOutTime)}
-          className={`w-full py-3 rounded-2xl shadow-lg flex flex-col items-center justify-center gap-2 transition-all active:scale-[0.95] ${
-            !!(latestLog && !latestLog.checkOutTime)
-              ? 'bg-stone-100 text-stone-300 cursor-not-allowed shadow-none'
-              : 'bg-emerald-500 hover:bg-emerald-600 text-white shadow-emerald-500/20'
-          }`}
-        >
-          <div className={`p-2.5 rounded-2xl ${!!(latestLog && !latestLog.checkOutTime) ? 'bg-stone-200' : 'bg-white/20'}`}>
-            <div className="relative">
-              <Clock strokeWidth={1.5} className="w-6 h-6" />
-              <ArrowRight strokeWidth={2} className="w-3.5 h-3.5 absolute -right-1.5 -bottom-1.5 bg-emerald-500 rounded-full border-2 border-white" />
+      <div className="flex flex-col gap-3 pt-1">
+        <div className="grid grid-cols-2 gap-3">
+          <button
+            onClick={() => handleActionClick('check-in')}
+            disabled={!!(latestLog && !latestLog.checkOutTime)}
+            className={`py-3 rounded-2xl shadow-lg flex flex-col items-center justify-center gap-2 transition-all active:scale-[0.95] ${
+              !!(latestLog && !latestLog.checkOutTime)
+                ? 'bg-stone-100 text-stone-300 cursor-not-allowed shadow-none'
+                : 'bg-emerald-500 hover:bg-emerald-600 text-white shadow-emerald-500/20'
+            }`}
+          >
+            <div className={`p-2.5 rounded-2xl ${!!(latestLog && !latestLog.checkOutTime) ? 'bg-stone-200' : 'bg-white/20'}`}>
+              <div className="relative">
+                <Clock strokeWidth={1.5} className="w-6 h-6" />
+                <ArrowRight strokeWidth={2} className="w-3.5 h-3.5 absolute -right-1.5 -bottom-1.5 bg-emerald-500 rounded-full border-2 border-white" />
+              </div>
             </div>
-          </div>
-          <span className="font-black text-xs uppercase tracking-widest">VÀO CA</span>
-        </button>
-        
-        <button
-          onClick={() => handleActionClick('check-out')}
-          disabled={!latestLog || !!latestLog.checkOutTime}
-          className={`w-full py-3 rounded-2xl shadow-lg flex flex-col items-center justify-center gap-2 transition-all active:scale-[0.95] ${
-            !latestLog || !!latestLog.checkOutTime
-              ? 'bg-stone-100 text-stone-300 cursor-not-allowed shadow-none'
-              : 'bg-rose-500 hover:bg-rose-600 text-white shadow-rose-500/20'
-          }`}
-        >
-          <div className={`p-2.5 rounded-2xl ${!latestLog || latestLog.checkOutTime ? 'bg-stone-200' : 'bg-white/20'}`}>
-            <LogOut strokeWidth={1.5} className="w-6 h-6" />
-          </div>
-          <span className="font-black text-xs uppercase tracking-widest">RA CA</span>
-        </button>
+            <span className="font-black text-xs uppercase tracking-widest">VÀO CA</span>
+          </button>
+          
+          <button
+            onClick={() => handleActionClick('check-out')}
+            disabled={!latestLog || !!latestLog.checkOutTime}
+            className={`py-3 rounded-2xl shadow-lg flex flex-col items-center justify-center gap-2 transition-all active:scale-[0.95] ${
+              !latestLog || !!latestLog.checkOutTime
+                ? 'bg-stone-100 text-stone-300 cursor-not-allowed shadow-none'
+                : 'bg-rose-500 hover:bg-rose-600 text-white shadow-rose-500/20'
+            }`}
+          >
+            <div className={`p-2.5 rounded-2xl ${!latestLog || latestLog.checkOutTime ? 'bg-stone-200' : 'bg-white/20'}`}>
+              <LogOut strokeWidth={1.5} className="w-6 h-6" />
+            </div>
+            <span className="font-black text-xs uppercase tracking-widest">RA CA</span>
+          </button>
+        </div>
       </div>
     </div>
   );
