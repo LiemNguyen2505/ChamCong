@@ -88,7 +88,7 @@ export function useAdminLogic(globalData: any, fetchInitialData: any, isLoading:
 
   const [openMenuEmpId, setOpenMenuEmpId] = useState<string | null>(null);
   
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'nhanvien' | 'lichlamviec' | 'xinnghiphep' | 'admins' | 'canhbao' | 'lichsu' | 'duyetgio' | 'bangluong' | 'vipham' | 'bangcongthang'>('dashboard');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'nhanvien' | 'lichlamviec' | 'admins' | 'canhbao' | 'lichsu' | 'bangluong' | 'vipham' | 'bangcongthang'>('dashboard');
   const [filterMonth, setFilterMonth] = useState(format(new Date(), 'yyyy-MM'));
   const [initializedTabs, setInitializedTabs] = useState<string[]>([]);
   const [historyDay, setHistoryDay] = useState<string | null>(null);
@@ -282,8 +282,6 @@ export function useAdminLogic(globalData: any, fetchInitialData: any, isLoading:
        // as that consumes thousands of reads on first load! We only fetch today's data for active shift tracking.
        fetchInitialData(filterMonth, ['chamCongs', 'lichLamViecs'], { onlyToday: true })
          .catch(e => console.error("Error fetching today dashboard data:", e));
-       keysToLoad.add('xinNghiPheps');
-       keysToLoad.add('approvalRequests');
     }
     else if (activeTab === 'bangluong' || activeTab === 'bangcongthang') {
        keysToLoad.add('chamCongs');
@@ -291,14 +289,6 @@ export function useAdminLogic(globalData: any, fetchInitialData: any, isLoading:
        keysToLoad.add('payrollAdjustments');
        keysToLoad.add('violations');
        keysToLoad.add('holidays');
-       keysToLoad.add('salaryAdvanceRecords');
-    }
-    else if (activeTab === 'xinnghiphep' || activeTab === 'duyetgio') {
-       keysToLoad.add('approvalRequests');
-       keysToLoad.add('xinNghiPheps');
-       keysToLoad.add('chamCongs');
-       keysToLoad.add('lichLamViecs');
-       keysToLoad.add('salaryAdvanceRecords');
     }
     else if (activeTab === 'lichlamviec') {
        // lichLamViecs will be fetched via onDateChange week by week!
@@ -438,13 +428,6 @@ export function useAdminLogic(globalData: any, fetchInitialData: any, isLoading:
     const adminLocations = currentAdmin?.locationIds || [];
     return raw.filter(n => n.locationId === 'All' || adminLocations.includes(n.locationId));
   }, [globalData.notifications, currentAdmin]);
-
-  const approvalRequests = useMemo(() => {
-    const raw = globalData.approvalRequests;
-    if (currentAdmin?.role === 'SuperAdmin') return raw;
-    const adminLocations = currentAdmin?.locationIds || [];
-    return raw.filter(r => adminLocations.includes(r.locationId));
-  }, [globalData.approvalRequests, currentAdmin]);
 
   const payrollAdjustments = useMemo(() => {
     const raw = globalData.payrollAdjustments;
@@ -589,58 +572,7 @@ export function useAdminLogic(globalData: any, fetchInitialData: any, isLoading:
     return lichLamViecs.filter(s => s.locationId === filterBranch);
   }, [lichLamViecs, filterBranch]);
 
-  const filteredXinNghiPheps = useMemo(() => {
-    if (filterBranch === 'All') return xinNghiPheps;
-    return xinNghiPheps.filter(r => r.locationId === filterBranch);
-  }, [xinNghiPheps, filterBranch]);
-
-  const filteredApprovalRequests = useMemo(() => {
-    let requests = approvalRequests;
-    if (filterBranch !== 'All') {
-      requests = requests.filter(r => r.locationId === filterBranch);
-    }
-    
-    if (requestTypeFilter !== 'All') {
-      requests = requests.filter(r => r.type === requestTypeFilter);
-    }
-    
-    return requests;
-  }, [approvalRequests, filterBranch, requestTypeFilter]);
-
   const historySearchTermLower = useMemo(() => removeAccents(historySearchTerm), [historySearchTerm]);
-
-  const approvalHistory = useMemo(() => {
-    let filtered = filteredApprovalRequests.filter(r => r.status !== 'pending');
-    
-    if (historySearchTermLower) {
-      filtered = filtered.filter(r => 
-        removeAccents(r.fullName || '').includes(historySearchTermLower) || 
-        removeAccents(r.adminId || '').includes(historySearchTermLower)
-      );
-    }
-
-    return filtered.sort((a: any, b: any) => {
-        const createA = a.timestamp?.toMillis ? a.timestamp.toMillis() : (a.timestamp?.toDate ? a.timestamp.toDate().getTime() : (a.timestamp ? new Date(a.timestamp).getTime() : 0));
-        const createB = b.timestamp?.toMillis ? b.timestamp.toMillis() : (b.timestamp?.toDate ? b.timestamp.toDate().getTime() : (b.timestamp ? new Date(b.timestamp).getTime() : 0));
-        return createB - createA;
-      });
-  }, [filteredApprovalRequests, historySearchTermLower]);
-
-  const pendingRequests = useMemo(() => {
-    let filtered = filteredApprovalRequests.filter(r => r.status === 'pending');
-
-    if (historySearchTermLower) {
-      filtered = filtered.filter(r => 
-        removeAccents(r.fullName || '').includes(historySearchTermLower)
-      );
-    }
-
-    return filtered.sort((a: any, b: any) => {
-        const createA = a.timestamp?.toMillis ? a.timestamp.toMillis() : (a.timestamp?.toDate ? a.timestamp.toDate().getTime() : (a.timestamp ? new Date(a.timestamp).getTime() : 0));
-        const createB = b.timestamp?.toMillis ? b.timestamp.toMillis() : (b.timestamp?.toDate ? b.timestamp.toDate().getTime() : (b.timestamp ? new Date(b.timestamp).getTime() : 0));
-        return createA - createB;
-      });
-  }, [filteredApprovalRequests, historySearchTermLower]);
 
 // Moved helpers to components where applicable or kept as utility props
 
@@ -1234,10 +1166,6 @@ export function useAdminLogic(globalData: any, fetchInitialData: any, isLoading:
     setFilterMonth,
     initializedTabs,
     setInitializedTabs,
-    requestTypeFilter,
-    setRequestTypeFilter,
-    approvalSubTab,
-    setApprovalSubTab,
     historySearchTerm,
     setHistorySearchTerm,
     showNotifications,
@@ -1390,28 +1318,21 @@ export function useAdminLogic(globalData: any, fetchInitialData: any, isLoading:
     adminDisplayName,
     chamCongs,
     lichLamViecs,
-    xinNghiPheps,
     admins,
     canhBaos,
     notifications,
-    approvalRequests,
     payrollAdjustments,
     salaryHistories,
     planningGoals,
     filteredChamCongs,
     filteredLichLamViecs,
-    filteredXinNghiPheps,
-    filteredApprovalRequests,
     historySearchTermLower,
-    approvalHistory,
-    pendingRequests,
     allEmployeeSalaryStatsMap,
     adminTheme,
     calculateEmployeeSalaryStats,
     auditLogs,
     materialLossLogs: globalData.materialLossLogs || [],
     retainedSalaryRecords: globalData.retainedSalaryRecords || [],
-    salaryAdvanceRecords: globalData.salaryAdvanceRecords || [],
     materialItems,
     holidays
   };
