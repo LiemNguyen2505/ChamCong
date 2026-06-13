@@ -51,7 +51,7 @@ export const EmployeeHistory: React.FC<EmployeeHistoryProps> = ({
     const targetStr = format(target, 'yyyy-MM');
     
     setSelectedMonth(targetStr);
-    await fetchInitialData(targetStr, ['holidays', 'chamCongs', 'lichLamViecs', 'xinNghiPheps', 'payrollAdjustments', 'violations', 'salaryAdvanceRecords'], { empId: loggedInEmployee.empId, docId: loggedInEmployee.id });
+    await fetchInitialData(targetStr, ['holidays', 'chamCongs', 'lichLamViecs', 'payrollAdjustments', 'violations'], { empId: loggedInEmployee.empId, docId: loggedInEmployee.id });
   };
   
   const shouldUseTabs = branches.length > 1;
