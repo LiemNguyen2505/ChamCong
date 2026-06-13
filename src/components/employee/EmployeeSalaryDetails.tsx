@@ -54,7 +54,7 @@ export const EmployeeSalaryDetails: React.FC<EmployeeSalaryDetailsProps> = ({
     const targetStr = format(target, 'yyyy-MM');
     
     setSelectedMonth(targetStr);
-    await fetchInitialData(targetStr, ['holidays', 'chamCongs', 'lichLamViecs', 'xinNghiPheps', 'payrollAdjustments', 'violations', 'salaryAdvanceRecords'], { empId: loggedInEmployee.empId, docId: loggedInEmployee.id });
+    await fetchInitialData(targetStr, ['holidays', 'chamCongs', 'lichLamViecs', 'payrollAdjustments', 'violations'], { empId: loggedInEmployee.empId, docId: loggedInEmployee.id });
   };
   
   // Determine which stats to use based on tabs
