@@ -14,21 +14,17 @@ export default function App() {
     admins: [],
     chamCongs: [],
     lichLamViecs: [],
-    xinNghiPheps: [],
     canhBaos: [],
     notifications: [],
     salaryHistories: [],
     auditLogs: [],
-    approvalRequests: [],
     holidays: [],
     materialItems: [],
     payrollAdjustments: [],
     planningGoals: [],
     violations: [],
-    bulletinNotes: [],
     materialLossLogs: [],
-    retainedSalaryRecords: [],
-    salaryAdvanceRecords: []
+    retainedSalaryRecords: []
   });
 
   const [dataCache, setDataCache] = useState<Record<string, any>>({});
@@ -156,19 +152,15 @@ export default function App() {
         { key: 'canhBaos', query: query(collection(db, 'CanhBao'), orderBy('timestamp', 'desc'), limit(30)), type: 'lazy' },
         { key: 'notifications', query: query(collection(db, 'Notifications'), orderBy('createdAt', 'desc'), limit(30)), type: 'lazy' },
         { key: 'auditLogs', query: query(collection(db, 'AuditLogs'), orderBy('timestamp', 'desc'), limit(15)), type: 'lazy' },
-        { key: 'approvalRequests', query: query(collection(db, 'ApprovalRequests'), orderBy('createdAt', 'desc'), limit(200)), type: 'lazy' },
         { key: 'holidays', query: query(collection(db, 'Holidays'), limit(50)), type: 'static' },
         { key: 'materialItems', query: query(collection(db, 'MaterialItems'), limit(50)), type: 'static' },
         { key: 'payrollAdjustments', query: options?.empId ? query(collection(db, 'PayrollAdjustments'), where('monthYear', '==', targetMonth), where('empId', '==', options.empId)) : query(collection(db, 'PayrollAdjustments'), where('monthYear', '==', targetMonth)), type: 'lazy' },
         { key: 'violations', query: options?.empId ? query(collection(db, 'Violations'), where('monthYear', '==', targetMonth), where('empId', '==', options.empId)) : query(collection(db, 'Violations'), where('monthYear', '==', targetMonth)), type: 'lazy' },
         { key: 'materialLossLogs', query: query(collection(db, 'MaterialLossLogs'), where('monthYear', '==', targetMonth), orderBy('processedAt', 'desc'), limit(100)), type: 'lazy' },
         { key: 'retainedSalaryRecords', query: query(collection(db, 'RetainedSalaryRecords'), orderBy('createdAt', 'desc'), limit(500)), type: 'lazy' },
-        { key: 'salaryAdvanceRecords', query: options?.empId ? query(collection(db, 'SalaryAdvanceRecords'), where('monthYear', '==', targetMonth), where('empId', '==', options.empId), orderBy('createdAt', 'desc')) : query(collection(db, 'SalaryAdvanceRecords'), where('monthYear', '==', targetMonth), orderBy('createdAt', 'desc')), type: 'lazy' },
         { key: 'chamCongs', query: timesheetQuery, type: 'lazy' },
         { key: 'lichLamViecs', query: scheduleQuery, type: 'lazy' },
-        { key: 'bulletinNotes', query: query(collection(db, 'BulletinBoard'), orderBy('isPinned', 'desc'), orderBy('createdAt', 'desc'), limit(100)), type: 'lazy' },
         { key: 'planningGoals', query: query(collection(db, 'PlanningGoals'), limit(100)), type: 'static' },
-        { key: 'xinNghiPheps', query: leaveQuery, type: 'lazy' },
         { key: 'salaryHistories', query: query(collection(db, 'SalaryHistories'), limit(500)), type: 'lazy' }
       ];
 
@@ -212,7 +204,7 @@ export default function App() {
         const cacheTimestampKey = `db_cache_time_${c.key}`;
         
         let shouldFetch = true;
-        if (!force && !forceKeys?.includes(c.key)) {
+        if (force !== true) {
            const savedTime = localStorage.getItem(cacheTimestampKey);
            if (savedTime && (Date.now() - parseInt(savedTime)) < CACHE_TTL) {
               const cachedData = localStorage.getItem(cacheStoreKey);
