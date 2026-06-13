@@ -38,7 +38,6 @@ import { motion, AnimatePresence } from 'motion/react';
 import { calculateNetSalary, calculateTtnPenalty, getPreviousMonthRates, roundToUnit } from '../../utils/salaryCalculator';
 
 import { Employee, AdminAccount, ApprovalRequest, PlanningGoal, SalaryHistory, AuditLog, Timesheet, ShiftTask, WorkSchedule, LeaveRequest, Alert, AppNotification, PayrollAdjustment, HolidayConfig } from '../../types/admin';
-import { ApprovalSection } from '../ApprovalSection';
 import { AdminLogin } from './AdminLogin';
 import { AdminSidebar } from './AdminSidebar';
 import { BottomNav } from './AdminNavigation';
@@ -116,10 +115,6 @@ export default function AdminView({
     setFilterMonth,
     initializedTabs,
     setInitializedTabs,
-    requestTypeFilter,
-    setRequestTypeFilter,
-    approvalSubTab,
-    setApprovalSubTab,
     historySearchTerm,
     setHistorySearchTerm,
     showNotifications,
@@ -268,21 +263,15 @@ export default function AdminView({
     adminDisplayName,
     chamCongs,
     lichLamViecs,
-    xinNghiPheps,
     admins,
     canhBaos,
     notifications,
-    approvalRequests,
     payrollAdjustments,
     salaryHistories,
     planningGoals,
     filteredChamCongs,
     filteredLichLamViecs,
-    filteredXinNghiPheps,
-    filteredApprovalRequests,
     historySearchTermLower,
-    approvalHistory,
-    pendingRequests,
     allEmployeeSalaryStatsMap,
     adminTheme,
     navigate,
@@ -346,7 +335,7 @@ export default function AdminView({
       />
 
       {/* Main Content Area */}
-      <div className={`flex-1 flex flex-col min-w-0 w-full max-w-full overflow-x-hidden ${(!selectedEmployeeForSalaryDetails && !isScheduleModalOpen && ['dashboard', 'bangcongthang', 'duyetgio', 'lichlamviec', 'bangluong'].includes(activeTab)) ? 'pb-16' : 'pb-0'} md:pb-0 ml-0`}>
+      <div className={`flex-1 flex flex-col min-w-0 w-full max-w-full overflow-x-hidden ${(!selectedEmployeeForSalaryDetails && !isScheduleModalOpen && ['dashboard', 'bangcongthang', 'lichlamviec', 'bangluong'].includes(activeTab)) ? 'pb-16' : 'pb-0'} md:pb-0 ml-0`}>
         {/* Optimized Header */}
         <header className={`h-auto whitespace-nowrap ${adminTheme.header} grid grid-cols-[auto_1fr_auto] items-center px-4 md:px-8 flex-none z-40 shadow-md w-full left-0 transition-colors duration-500 pt-4 pb-1 md:py-4`}>
           <div className="flex items-center">
@@ -443,29 +432,6 @@ export default function AdminView({
                 pendingRequests={pendingRequests}
                 BranchTabs={CommonBranchTabs}
               />
-
-              {activeTab === 'duyetgio' && (
-            <ApprovalSection
-              adminTheme={adminTheme}
-              approvalSubTab={approvalSubTab}
-              setApprovalSubTab={setApprovalSubTab}
-              pendingRequests={pendingRequests}
-              historySearchTerm={historySearchTerm}
-              setHistorySearchTerm={setHistorySearchTerm}
-              requestTypeFilter={requestTypeFilter}
-              setRequestTypeFilter={setRequestTypeFilter}
-              currentAdmin={currentAdmin}
-              nhanViens={nhanViens}
-              fetchInitialData={fetchInitialData}
-              logAction={logAction}
-              approvalHistory={approvalHistory}
-              openConfirmModal={openConfirmModal}
-              renderBranchTabs={() => (
-                <CommonBranchTabs />
-              )}
-            />
-          )}
-
 
           <AttendanceTab
             activeTab={activeTab}
@@ -843,7 +809,7 @@ export default function AdminView({
        !showChangeAdminPinModal && 
        !showConfirmModal && 
        !isScheduleModalOpen &&
-       ['dashboard', 'bangcongthang', 'duyetgio', 'lichlamviec', 'bangluong'].includes(activeTab) && (
+       ['dashboard', 'bangcongthang', 'lichlamviec', 'bangluong'].includes(activeTab) && (
          <BottomNav 
            adminTheme={adminTheme} 
            activeTab={activeTab} 
