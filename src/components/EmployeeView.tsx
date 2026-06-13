@@ -10,7 +10,6 @@ import confetti from 'canvas-confetti';
 
 import { EmployeeClock } from './employee/EmployeeClock';
 import { SmartScheduleBuilder } from './SmartScheduleBuilder';
-import { EmployeeRequests } from './employee/EmployeeRequests';
 import { EmployeeHistory } from './employee/EmployeeHistory';
 import { EmployeeSalaryDetails } from './employee/EmployeeSalaryDetails';
 import { ChangePinModal, ResetPinModal, DeviceSecurityModal } from './employee/EmployeeAuthModals';
@@ -141,17 +140,9 @@ export default function EmployeeView({
   const {
     showWeeklySchedule, setShowWeeklySchedule,
     showStats, setShowStats,
-    showRequestModal, setShowRequestModal,
     showSalaryDetails, setShowSalaryDetails,
     showHistory, setShowHistory,
     showViolationModal, setShowViolationModal,
-    requestType, setRequestType,
-    requestNote, setRequestNote,
-    advanceAmount, setAdvanceAmount,
-    swapWithEmpId, setSwapWithEmpId,
-    requestTime, setRequestTime,
-    requestDate, setRequestDate,
-    requestSubTime, setRequestSubTime,
     selectedCalendarDate, setSelectedCalendarDate,
     scheduleViewMode, setScheduleViewMode,
     teamScheduleBranch, setTeamScheduleBranch
@@ -175,7 +166,7 @@ export default function EmployeeView({
       const lockKey = `${loggedInEmployee.empId}-${selectedMonth}-details`;
       if (employeeHasFetchedMonthRef.current !== lockKey) {
          employeeHasFetchedMonthRef.current = lockKey;
-         fetchInitialData(selectedMonth, ['holidays', 'chamCongs', 'lichLamViecs', 'xinNghiPheps', 'payrollAdjustments', 'violations', 'salaryAdvanceRecords'], { empId: loggedInEmployee.empId, docId: loggedInEmployee.id });
+         fetchInitialData(selectedMonth, ['holidays', 'chamCongs', 'lichLamViecs', 'payrollAdjustments', 'violations'], { empId: loggedInEmployee.empId, docId: loggedInEmployee.id });
       }
     }
   }, [showHistory, showSalaryDetails, showStats, selectedMonth, loggedInEmployee, fetchInitialData]);
@@ -188,16 +179,6 @@ export default function EmployeeView({
       fetchInitialData(undefined, ['nhanViens']);
     }
   }, [showWeeklySchedule, loggedInEmployee, fetchInitialData]);
-
-  // 4. Fetch full nhanViens when opening request modal (for shift swapping)
-  const hasFetchedNhanViensForRequestRef = useRef<boolean>(false);
-  useEffect(() => {
-    if (loggedInEmployee && showRequestModal && !hasFetchedNhanViensForRequestRef.current) {
-      hasFetchedNhanViensForRequestRef.current = true;
-      // Fetch employees for the request modal so they can pick people to swap with ONLY. No need to fetch all schedules.
-      fetchInitialData(undefined, ['nhanViens']);
-    }
-  }, [showRequestModal, selectedMonth, loggedInEmployee, fetchInitialData]);
 
   const employeeTodayShifts = useMemo(() => {
     if (!loggedInEmployee) return [];
@@ -362,22 +343,17 @@ export default function EmployeeView({
                 showStats={showStats}
                 setShowStats={setShowStats}
                 setShowWeeklySchedule={setShowWeeklySchedule}
-                setShowRequestModal={setShowRequestModal}
                 setShowSalaryDetails={setShowSalaryDetails}
                 setShowHistory={setShowHistory}
                 setShowViolationModal={setShowViolationModal}
+                notifications={navNotifications}
+                onShowNotifications={() => setShowNotifications(true)}
                 handleActionClick={handleActionClick}
                 handleToggleTask={handleToggleTask}
-                setRequestType={setRequestType}
-                setRequestNote={setRequestNote}
-                setSwapWithEmpId={setSwapWithEmpId}
-                setRequestTime={setRequestTime}
-                setRequestSubTime={setRequestSubTime}
-                setRequestDate={setRequestDate}
                 format={format}
                 selectedMonth={selectedMonth}
                 globalData={globalData}
-                onRefresh={() => fetchInitialData(undefined, ['bulletinNotes', 'chamCongs', 'lichLamViecs'], { empId: loggedInEmployee?.empId, docId: loggedInEmployee?.id, onlyToday: true })}
+                onRefresh={() => fetchInitialData(undefined, ['chamCongs', 'lichLamViecs'], { empId: loggedInEmployee?.empId, docId: loggedInEmployee?.id, onlyToday: true })}
               />
             )
           ) : (
@@ -426,8 +402,8 @@ export default function EmployeeView({
                   const schTotal = schH * 60 + schM;
                   const nowTotal = now.getHours() * 60 + now.getMinutes();
 
-                  if (selTotal < schTotal - 30) {
-                    setCheckinWarningStep(1); // Sớm hơn 30p
+                  if (selTotal < schTotal - 60) {
+                    setCheckinWarningStep(1); // Sớm hơn 60p
                     return;
                   } else if (selTotal > schTotal) {
                     setCheckinWarningStep(2); // Trễ
@@ -674,30 +650,6 @@ export default function EmployeeView({
           </div>
         </div>
       )}
-
-      <EmployeeRequests
-        showRequestModal={showRequestModal}
-        setShowRequestModal={setShowRequestModal}
-        loggedInEmployee={loggedInEmployee}
-        theme={theme}
-        employees={employees || []}
-        allSchedules={globalData.lichLamViecs || []}
-        kioskBranch={kioskBranch}
-        requestType={requestType}
-        setRequestType={setRequestType}
-        requestNote={requestNote}
-        setRequestNote={setRequestNote}
-        advanceAmount={advanceAmount}
-        setAdvanceAmount={setAdvanceAmount}
-        swapWithEmpId={swapWithEmpId}
-        setSwapWithEmpId={setSwapWithEmpId}
-        requestDate={requestDate}
-        setRequestDate={setRequestDate}
-        requestTime={requestTime}
-        setRequestTime={setRequestTime}
-        requestSubTime={requestSubTime}
-        setRequestSubTime={setRequestSubTime}
-      />
 
       <CheckinWarningModal
         checkinWarningStep={checkinWarningStep}
