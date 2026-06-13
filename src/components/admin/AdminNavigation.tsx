@@ -8,10 +8,10 @@ export const BottomNav = ({
   setActiveTab 
 }: any) => {
   const navConfig = [
-    { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, path: 'dashboard', isCenter: false, badgeCount: 0 },
-    { id: 'bangcong', label: 'Chấm Công', icon: TableProperties, path: 'bangcongthang', isCenter: false, badgeCount: 0 },
-    { id: 'lichlamviec', label: 'Lịch Làm Việc', icon: Calendar, path: 'lichlamviec', isCenter: true, badgeCount: 0 },
-    { id: 'bangluong', label: 'Bảng lương', icon: DollarSign, path: 'bangluong', isCenter: false, badgeCount: 0 },
+    { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, path: 'dashboard', badgeCount: 0 },
+    { id: 'bangcong', label: 'Chấm Công', icon: TableProperties, path: 'bangcongthang', badgeCount: 0 },
+    { id: 'lichlamviec', label: 'Lịch Làm Việc', icon: Calendar, path: 'lichlamviec', badgeCount: 0 },
+    { id: 'bangluong', label: 'Bảng lương', icon: DollarSign, path: 'bangluong', badgeCount: 0 },
   ];
 
   return (
@@ -19,40 +19,6 @@ export const BottomNav = ({
       {navConfig.map((item) => {
         const Icon = item.icon;
         const isActive = activeTab === item.path;
-        
-        if (item.isCenter) {
-          return (
-            <motion.button
-              key={item.id}
-              whileTap={{ 
-                scale: 0.9,
-                x: [0, -2, 2, -2, 2, 0],
-                transition: { duration: 0.2 }
-              }}
-              onClick={() => setActiveTab(item.path as any)}
-              className={`relative -top-2 flex flex-col items-center justify-center w-16 h-16 bg-white rounded-full shadow-[0_8px_20px_rgba(0,0,0,0.3)] border-4 border-white/20 transition-all`}
-            >
-              <Icon className={`w-7 h-7 ${adminTheme.text}`} />
-              <span className={`text-[8px] font-black mt-0.5 ${adminTheme.text} uppercase tracking-tighter`}>Chờ duyệt</span>
-              {item.badgeCount > 0 && (
-                <motion.span 
-                  animate={{ 
-                    scale: [1, 1.2, 1],
-                    rotate: [0, -10, 10, -10, 10, 0]
-                  }}
-                  transition={{ 
-                    repeat: Infinity, 
-                    duration: 2,
-                    repeatDelay: 1
-                  }}
-                  className="absolute top-0 right-0 w-5 h-5 bg-red-600 text-white text-[10px] font-black rounded-full flex items-center justify-center border-2 border-white shadow-sm"
-                >
-                  {item.badgeCount}
-                </motion.span>
-              )}
-            </motion.button>
-          );
-        }
 
         return (
           <button
