@@ -251,7 +251,7 @@ export default function App() {
                  qEnd = qStart;
               }
 
-              const dateField = key === 'xinNghiPheps' ? 'leaveDate' : 'date';
+              const dateField = 'date';
 
               const filteredPrev = prev[key].filter((item: any) => {
                  const itemDate = item[dateField];
