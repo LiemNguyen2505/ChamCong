@@ -5,15 +5,12 @@ import { LayoutDashboard, TableProperties, CheckCircle2, Calendar, DollarSign } 
 export const BottomNav = ({ 
   adminTheme, 
   activeTab, 
-  setActiveTab, 
-  pendingRequestsCount, 
-  xinNghiPhepsCount 
+  setActiveTab 
 }: any) => {
   const navConfig = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, path: 'dashboard', isCenter: false, badgeCount: 0 },
-    { id: 'bangcong', label: 'Bảng Chấm Công', icon: TableProperties, path: 'bangcongthang', isCenter: false, badgeCount: 0 },
-    { id: 'duyetgio', label: 'Duyệt công', icon: CheckCircle2, path: 'duyetgio', isCenter: true, badgeCount: pendingRequestsCount },
-    { id: 'lichlamviec', label: 'Lịch Làm Việc', icon: Calendar, path: 'lichlamviec', isCenter: false, badgeCount: xinNghiPhepsCount },
+    { id: 'bangcong', label: 'Chấm Công', icon: TableProperties, path: 'bangcongthang', isCenter: false, badgeCount: 0 },
+    { id: 'lichlamviec', label: 'Lịch Làm Việc', icon: Calendar, path: 'lichlamviec', isCenter: true, badgeCount: 0 },
     { id: 'bangluong', label: 'Bảng lương', icon: DollarSign, path: 'bangluong', isCenter: false, badgeCount: 0 },
   ];
 
