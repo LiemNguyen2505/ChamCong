@@ -325,7 +325,6 @@ export default function AdminView({
         adminTheme={adminTheme}
         currentAdmin={currentAdmin}
         filteredChamCongs={filteredChamCongs}
-        pendingRequests={pendingRequests}
         canhBaos={canhBaos}
         notifications={navNotifications}
         setShowNotifications={setShowNotifications}
@@ -429,7 +428,6 @@ export default function AdminView({
                 formatCurrency={formatCurrency}
                 getPreviousMonthRates={getPreviousMonthRates}
                 toast={toast}
-                pendingRequests={pendingRequests}
                 BranchTabs={CommonBranchTabs}
               />
 
@@ -814,8 +812,6 @@ export default function AdminView({
            adminTheme={adminTheme} 
            activeTab={activeTab} 
            setActiveTab={setActiveTab} 
-           pendingRequestsCount={pendingRequests.length} 
-           xinNghiPhepsCount={xinNghiPheps.filter(x => x.status === 'cho_duyet').length} 
          />
        )}
       <NotificationModal 
