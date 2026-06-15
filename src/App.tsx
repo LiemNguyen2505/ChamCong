@@ -105,26 +105,26 @@ export default function App() {
       let timesheetQuery = options?.empId 
         ? (options.onlyToday 
             ? query(collection(db, 'timesheets'), where('date', '==', todayStr), where('empId', '==', options.empId), limit(5)) 
-            : query(collection(db, 'timesheets'), where('date', '>=', startDate), where('date', '<=', endDate), where('empId', '==', options.empId), limit(100))) 
+            : query(collection(db, 'timesheets'), where('date', '>=', startDate), where('date', '<=', endDate), where('empId', '==', options.empId), limit(35))) 
         : (options?.onlyToday
-            ? query(collection(db, 'timesheets'), where('date', '==', todayStr), limit(200))
-            : query(collection(db, 'timesheets'), where('date', '>=', startDate), where('date', '<=', endDate), limit(3000)));
+            ? query(collection(db, 'timesheets'), where('date', '==', todayStr), limit(150))
+            : query(collection(db, 'timesheets'), where('date', '>=', startDate), where('date', '<=', endDate), limit(1000)));
         
       if (options?.exactDate) {
         if (options?.empId) {
            timesheetQuery = query(collection(db, 'timesheets'), where('date', '==', options.exactDate), where('empId', '==', options.empId), limit(5));
         } else {
-           timesheetQuery = query(collection(db, 'timesheets'), where('date', '==', options.exactDate), limit(200));
+           timesheetQuery = query(collection(db, 'timesheets'), where('date', '==', options.exactDate), limit(150));
         }
       }
 
       let scheduleQuery = (options?.empId || options?.docId) 
         ? (options.onlyToday 
             ? query(collection(db, 'LichLamViec'), where('date', '==', todayStr), where('empId', '==', options.docId || options.empId), limit(5)) 
-            : query(collection(db, 'LichLamViec'), where('date', '>=', startDate), where('date', '<=', endDate), where('empId', '==', options.docId || options.empId), limit(100))) 
+            : query(collection(db, 'LichLamViec'), where('date', '>=', startDate), where('date', '<=', endDate), where('empId', '==', options.docId || options.empId), limit(35))) 
         : (options?.onlyToday
-            ? query(collection(db, 'LichLamViec'), where('date', '==', todayStr), limit(200))
-            : query(collection(db, 'LichLamViec'), where('date', '>=', startDate), where('date', '<=', endDate), limit(3000)));
+            ? query(collection(db, 'LichLamViec'), where('date', '==', todayStr), limit(150))
+            : query(collection(db, 'LichLamViec'), where('date', '>=', startDate), where('date', '<=', endDate), limit(1000)));
         
       if (options?.exactDate) {
          if (options?.branchId) {
@@ -199,12 +199,18 @@ export default function App() {
       }
 
       const results = await Promise.all(activeQueries.map(c => {
-        const CACHE_TTL = 1000 * 60 * 60; // 1 hour cache to avoid staleness, but enough to survive the 5:30-6:00 rush
-        const cacheStoreKey = `db_cache_${c.key}`;
-        const cacheTimestampKey = `db_cache_time_${c.key}`;
+        // ALWAYS CACHE EVERYTHING TO PREVENT QUOTA EXHAUSTION
+        // Admin: cache is extremely aggressive. Employee: use smaller cache slices.
+        const CACHE_TTL = 1000 * 60 * 60 * 4; // 4 hours for Admins / Users unless forced
+        const cacheStoreKey = `db_cache_${c.key}_${options?.empId || 'all'}_${targetMonth}`;
+        const cacheTimestampKey = `db_cache_time_${c.key}_${options?.empId || 'all'}_${targetMonth}`;
         
+        // Ensure Admin has total cutoff of read quota if F5
         let shouldFetch = true;
-        if (force !== true) {
+        // If force is passed as an array, and this key is in the array, we MUST fetch!
+        const isForcedForThisKey = force === true || (Array.isArray(force) && force.includes(c.key)) || force === c.key;
+        
+        if (!isForcedForThisKey) {
            const savedTime = localStorage.getItem(cacheTimestampKey);
            if (savedTime && (Date.now() - parseInt(savedTime)) < CACHE_TTL) {
               const cachedData = localStorage.getItem(cacheStoreKey);
@@ -220,10 +226,19 @@ export default function App() {
         if (shouldFetch) {
            return getDocs(c.query).then(snap => {
               const data = snap.docs.map(doc => ({ id: doc.id, ...(doc.data() as any) }));
-              // Cache dynamic/static collections natively to save big morning rushes
-              if (c.type !== 'lazy') {
+              // Cache ALL collections natively to save big morning rushes and comply with strict prompt instructions
+              try {
                  localStorage.setItem(cacheStoreKey, JSON.stringify(data));
                  localStorage.setItem(cacheTimestampKey, Date.now().toString());
+              } catch (e) {
+                 console.warn("LocalStorage full, skipping cache for", c.key);
+                 // If storage is full, we can try to clear old keys
+                 for (let i = 0; i < localStorage.length; i++) {
+                     const key = localStorage.key(i);
+                     if (key && key.startsWith('db_cache_')) {
+                         localStorage.removeItem(key);
+                     }
+                 }
               }
               return { key: c.key, data };
            });
@@ -371,6 +386,7 @@ export default function App() {
               element={
                 <AdminView 
                   globalData={globalData} 
+                  setGlobalData={setGlobalData}
                   fetchInitialData={fetchInitialData} 
                   isLoading={isLoading} 
                 />
