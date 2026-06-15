@@ -28,6 +28,7 @@ export interface SmartScheduleBuilderProps {
   theme?: any;
   planningGoals?: any[];
   isReadOnly?: boolean;
+  onDateChange?: (date: string) => void;
 }
 
 export const SmartScheduleBuilder: React.FC<SmartScheduleBuilderProps> = (props) => {
@@ -280,12 +281,16 @@ export const SmartScheduleBuilder: React.FC<SmartScheduleBuilderProps> = (props)
       if (role === 'BOTH') roleLabel = 'PV & Q';
 
       let locLabel = '';
-      if (shiftLocId && activeBranch !== 'All' && shiftLocId !== activeBranch) {
-         // Emphasize shifts happening at another branch (if not hiding them)
-         locLabel = shiftLocId.split(' ').map(w => w[0]).join('').toUpperCase();
-      } else if (shiftLocId && empLocId && shiftLocId !== empLocId && shiftLocId !== 'All') {
-         // Create abbr: "Góc Phố" -> "GP"
-         locLabel = empLocId.split(' ').map(w => w[0]).join('').toUpperCase();
+      if (activeBranch !== 'All') {
+        if (shiftLocId && shiftLocId !== activeBranch && shiftLocId !== 'All') {
+           // Emphasize shifts happening at another branch
+           locLabel = shiftLocId.split(' ').map(w => w[0]).join('').toUpperCase();
+        }
+      } else {
+        if (shiftLocId && empLocId && shiftLocId !== empLocId && shiftLocId !== 'All') {
+           // When viewing All, show shift branch if it differs from home branch
+           locLabel = shiftLocId.split(' ').map(w => w[0]).join('').toUpperCase();
+        }
       }
 
       if (locLabel && roleLabel) return `${locLabel}-${roleLabel}`;
@@ -417,8 +422,21 @@ export const SmartScheduleBuilder: React.FC<SmartScheduleBuilderProps> = (props)
             </h2>
             
             <div className="flex items-center gap-1 bg-slate-100 p-0.5 rounded-lg scale-90 md:scale-100 transform-gpu">
-              <button onClick={handlePrevWeek} className="p-1.5 rounded hover:bg-white hover:shadow-sm text-slate-600 transition-all">
-                <ChevronLeft className="w-4 h-4" />
+              <button onClick={() => {
+                  if (isReadOnly) {
+                      const today = new Date();
+                      const currentWeekStart = new Date(today);
+                      currentWeekStart.setDate(today.getDate() - (today.getDay() === 0 ? 6 : today.getDay() - 1));
+                      const newWeekStart = new Date(weekStart);
+                      newWeekStart.setDate(newWeekStart.getDate() - 7);
+                      if (newWeekStart < currentWeekStart) {
+                          toast.error('Tuyệt đối không cho phép xem lịch tuần trước.');
+                          return;
+                      }
+                  }
+                  handlePrevWeek();
+              }} className={`p-1.5 rounded hover:bg-white hover:shadow-sm transition-all ${isReadOnly ? 'text-transparent' : 'text-slate-600'}`}>
+                {isReadOnly ? null : <ChevronLeft className="w-4 h-4" />}
               </button>
               <span className="font-black text-slate-700 min-w-[100px] md:min-w-[130px] text-center text-[13px] md:text-xs uppercase tracking-tight py-1 px-1 leading-none flex items-center justify-center">
                 {format(weekStart, 'dd/MM')} - {format(weekDays[6], 'dd/MM/yyyy')}
