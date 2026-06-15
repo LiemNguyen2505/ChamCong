@@ -62,10 +62,12 @@ import { NotificationModal } from '../NotificationModal';
 
 export default function AdminView({ 
   globalData, 
+  setGlobalData,
   fetchInitialData, 
   isLoading: isGlobalLoading 
 }: { 
   globalData: any, 
+  setGlobalData?: any,
   fetchInitialData: (monthYear?: string, force?: any, options?: any) => Promise<any>, 
   isLoading: boolean 
 }) {
@@ -556,6 +558,7 @@ export default function AdminView({
               lichLamViecs={globalData.lichLamViecs}
               filterBranch={filterBranch}
               filterMonth={filterMonth}
+              setGlobalData={setGlobalData}
               currentAdmin={currentAdmin}
               planningGoals={planningGoals}
               adminTheme={adminTheme}
