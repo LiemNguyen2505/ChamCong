@@ -8,6 +8,7 @@ interface ScheduleViewProps {
     lichLamViecs: any[];
     filterBranch: string;
     filterMonth: string;
+    setGlobalData?: any;
     currentAdmin: any;
     planningGoals: any[];
     adminTheme: any;
@@ -19,19 +20,15 @@ interface ScheduleViewProps {
 }
 
 export const ScheduleView: React.FC<ScheduleViewProps> = ({
-    nhanViens, lichLamViecs, filterBranch, filterMonth, currentAdmin, planningGoals, adminTheme,
+    nhanViens, lichLamViecs, filterBranch, filterMonth, setGlobalData, currentAdmin, planningGoals, adminTheme,
     setIsScheduleModalOpen, fetchInitialData, exportToCSV, BranchTabs, onDateChange
 }) => {
     const currentWeekDateRef = React.useRef<string | null>(null);
 
     const handleRefetchWeek = async () => {
-        if (!currentWeekDateRef.current) return;
-        const date = currentWeekDateRef.current;
-        if (onDateChange) {
-           onDateChange(date); // This will trigger the week fetch via AdminView!
-        } else {
-           await fetchInitialData(filterMonth, ['lichLamViecs']);
-        }
+        // Do not fetch! The UI will be updated via setGlobalData locally
+        // to strictly follow instructions: "CHỈ đẩy phần dữ liệu... lên database"
+        return;
     };
 
     return (
@@ -58,15 +55,26 @@ export const ScheduleView: React.FC<ScheduleViewProps> = ({
                         const emp = nhanViens.find(e => e.id === shift.empId);
                         const shiftId = (shift as any).id || doc(collection(db, 'LichLamViec')).id;
                         
-                        await setDoc(doc(db, 'LichLamViec', shiftId), {
+                        const newShift = {
                             ...shift,
+                            id: shiftId,
                             empName: emp?.fullName || '',
                             shiftName: `${shift.startTime} - ${shift.endTime}`,
                             status: 'scheduled',
                             createdAt: serverTimestamp(),
                             updatedAt: serverTimestamp()
-                        });
-                        await handleRefetchWeek();
+                        };
+                        
+                        // Push to DB
+                        await setDoc(doc(db, 'LichLamViec', shiftId), newShift as any);
+                        
+                        // Mutate locally instead of fetching
+                        if (setGlobalData) {
+                            setGlobalData((prev: any) => ({
+                                ...prev,
+                                lichLamViecs: [...prev.lichLamViecs, newShift]
+                            }));
+                        }
                     } catch (error) {
                         console.error('Error adding shift:', error);
                     }
@@ -82,20 +90,36 @@ export const ScheduleView: React.FC<ScheduleViewProps> = ({
                         if (updateData.startTime && updateData.endTime) {
                             updateData.shiftName = `${updateData.startTime} - ${updateData.endTime}`;
                         }
+                        
+                        // Push to DB
                         await setDoc(doc(db, 'LichLamViec', id), {
                             ...updateData,
                             updatedAt: serverTimestamp()
                         }, { merge: true });
                         
-                        await handleRefetchWeek();
+                        // Mutate locally
+                        if (setGlobalData) {
+                            setGlobalData((prev: any) => ({
+                                ...prev,
+                                lichLamViecs: prev.lichLamViecs.map((item: any) => item.id === id ? { ...item, ...updateData } : item)
+                            }));
+                        }
                     } catch (error) {
                         console.error('Error updating shift:', error);
                     }
                 }}
                 onDeleteShift={async (id) => {
                     try {
+                        // Push to DB
                         await deleteDoc(doc(db, 'LichLamViec', id));
-                        await handleRefetchWeek();
+                        
+                        // Mutate locally
+                        if (setGlobalData) {
+                            setGlobalData((prev: any) => ({
+                                ...prev,
+                                lichLamViecs: prev.lichLamViecs.filter((item: any) => item.id !== id)
+                            }));
+                        }
                     } catch (error) {
                         console.error('Error deleting shift:', error);
                     }
