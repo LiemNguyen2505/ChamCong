@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { X, ChevronLeft, ChevronRight, Calendar } from 'lucide-react';
 import { format, parseISO, subMonths, addMonths } from 'date-fns';
+import { toast } from 'react-hot-toast';
 import SalaryDetailContent from '../SalaryDetailContent';
 
 interface EmployeeSalaryDetailsProps {
@@ -49,9 +50,17 @@ export const EmployeeSalaryDetails: React.FC<EmployeeSalaryDetailsProps> = ({
   if (!showSalaryDetails || !loggedInEmployee) return null;
 
   const navigateMonth = async (direction: 'prev' | 'next') => {
+    const today = new Date();
+    const currentMonthStr = format(today, 'yyyy-MM');
     const current = parseISO(selectedMonth + '-01');
     const target = direction === 'prev' ? subMonths(current, 1) : addMonths(current, 1);
     const targetStr = format(target, 'yyyy-MM');
+    
+    // Limits
+    if (targetStr !== currentMonthStr) {
+      toast.error('Chỉ được xem bảng lương tháng hiện tại');
+      return;
+    }
     
     setSelectedMonth(targetStr);
     await fetchInitialData(targetStr, ['holidays', 'chamCongs', 'lichLamViecs', 'payrollAdjustments', 'violations'], { empId: loggedInEmployee.empId, docId: loggedInEmployee.id });
