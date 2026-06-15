@@ -150,12 +150,29 @@ export default function EmployeeView({
 
   const [selectedMonth, setSelectedMonth] = useState(format(new Date(), 'yyyy-MM'));
 
-  // 1. Fetch only today's data on login
+  // 1. Fetch only current week's data on login
   const hasFetchedTodayRef = useRef<string | null>(null);
   useEffect(() => {
     if (loggedInEmployee && hasFetchedTodayRef.current !== loggedInEmployee.empId) {
       hasFetchedTodayRef.current = loggedInEmployee.empId;
-      fetchInitialData(undefined, ['admins', 'chamCongs', 'lichLamViecs'], { empId: loggedInEmployee.empId, docId: loggedInEmployee.id, onlyToday: true });
+      
+      const today = new Date();
+      // Ensure we always fetch at least from monday to sunday
+      const monday = new Date(today);
+      monday.setDate(monday.getDate() - (monday.getDay() === 0 ? 6 : monday.getDay() - 1));
+      const sunday = new Date(monday);
+      sunday.setDate(monday.getDate() + 6);
+      
+      const weekStart = format(monday, 'yyyy-MM-dd');
+      const weekEnd = format(sunday, 'yyyy-MM-dd');
+      
+      fetchInitialData(undefined, ['admins', 'chamCongs', 'lichLamViecs'], { 
+        empId: loggedInEmployee.empId, 
+        docId: loggedInEmployee.id, 
+        isWeek: true,
+        weekStart,
+        weekEnd 
+      });
     }
   }, [loggedInEmployee, fetchInitialData]);
 
