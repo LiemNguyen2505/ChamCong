@@ -31,17 +31,42 @@ export const SmartScheduleMobile: React.FC<SmartScheduleMobileProps> = ({
   activeBranch,
   renderCell
 }) => {
+  const handlePrevDayClick = () => {
+    if (isReadOnly) {
+      const today = new Date();
+      const currentWeekStart = new Date(today);
+      currentWeekStart.setDate(today.getDate() - (today.getDay() === 0 ? 6 : today.getDay() - 1));
+      const newDate = new Date(parseISO(mobileSelectedDate));
+      newDate.setDate(newDate.getDate() - 1);
+      if (newDate < currentWeekStart) {
+        return;
+      }
+    }
+    handlePrevDay();
+  };
+
   return (
       <div className="md:hidden flex-1 overflow-y-auto bg-slate-50">
          <div className="bg-white rounded-t-xl shadow-sm border-t border-slate-100 overflow-hidden mb-2">
             <div className="px-1.5 py-2 border-b border-slate-50 bg-white flex items-center sticky top-0 z-10 shadow-sm gap-1.5">
                 <div className="flex-1 min-w-0 flex items-center justify-between">
-                  <button 
-                    onClick={handlePrevDay} 
-                    className="p-1 px-[2px] bg-slate-50 text-slate-400 rounded-lg active:bg-slate-100 transition-colors h-8 flex items-center justify-center outline-none"
-                  >
-                    <ChevronLeft size={20} strokeWidth={1.5} />
-                  </button>
+                  {(!isReadOnly || (() => {
+                      const today = new Date();
+                      const currentWeekStart = new Date(today);
+                      currentWeekStart.setDate(today.getDate() - (today.getDay() === 0 ? 6 : today.getDay() - 1));
+                      const newDate = new Date(parseISO(mobileSelectedDate));
+                      newDate.setDate(newDate.getDate() - 1);
+                      return newDate >= currentWeekStart;
+                  })()) ? (
+                      <button 
+                        onClick={handlePrevDay} 
+                        className="p-1 px-[2px] bg-slate-50 text-slate-400 rounded-lg active:bg-slate-100 transition-colors h-8 flex items-center justify-center outline-none"
+                      >
+                        <ChevronLeft size={20} strokeWidth={1.5} />
+                      </button>
+                  ) : (
+                      <div className="p-1 px-[2px] w-[24px]" />
+                  )}
                   
                   <div className="flex-1 flex justify-center relative min-w-max">
                     <div className="text-center">
@@ -54,6 +79,12 @@ export const SmartScheduleMobile: React.FC<SmartScheduleMobileProps> = ({
                       <input 
                         type="date"
                         value={mobileSelectedDate}
+                        min={isReadOnly ? (() => {
+                            const today = new Date();
+                            const currentWeekStart = new Date(today);
+                            currentWeekStart.setDate(today.getDate() - (today.getDay() === 0 ? 6 : today.getDay() - 1));
+                            return format(currentWeekStart, 'yyyy-MM-dd');
+                        })() : undefined}
                         onChange={(e) => {
                           setMobileSelectedDate(e.target.value);
                           setCurrentDate(parseISO(e.target.value));
