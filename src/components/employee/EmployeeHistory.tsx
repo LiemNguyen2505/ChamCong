@@ -46,9 +46,22 @@ export const EmployeeHistory: React.FC<EmployeeHistoryProps> = ({
   if (!showHistory || !loggedInEmployee) return null;
 
   const navigateMonth = async (direction: 'prev' | 'next') => {
+    const today = new Date();
+    const currentMonthStr = format(today, 'yyyy-MM');
+    const allowPrev = today.getDate() <= 7;
     const current = parseISO(selectedMonth + '-01');
     const target = direction === 'prev' ? subMonths(current, 1) : addMonths(current, 1);
     const targetStr = format(target, 'yyyy-MM');
+    
+    // Limits
+    if (!isSubjectAdmin) {
+      if (direction === 'next' && targetStr > currentMonthStr) return;
+      if (direction === 'prev') {
+        const prevAllowedMonthStr = format(subMonths(today, 1), 'yyyy-MM');
+        if (!allowPrev && targetStr < currentMonthStr) return;
+        if (allowPrev && targetStr < prevAllowedMonthStr) return;
+      }
+    }
     
     setSelectedMonth(targetStr);
     await fetchInitialData(targetStr, ['holidays', 'chamCongs', 'lichLamViecs', 'payrollAdjustments', 'violations'], { empId: loggedInEmployee.empId, docId: loggedInEmployee.id });
