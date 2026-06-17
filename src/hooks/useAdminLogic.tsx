@@ -313,7 +313,7 @@ export function useAdminLogic(globalData: any, fetchInitialData: any, isLoading:
       
       const loadData = async () => {
         try {
-          await fetchInitialData(filterMonth, newKeysToFetch);
+          await fetchInitialData(filterMonth, false, { targetedKeys: newKeysToFetch });
         } catch (err) {
           console.error("Failed to load data for keys:", newKeysToFetch, err);
         }
