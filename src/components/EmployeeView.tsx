@@ -166,7 +166,8 @@ export default function EmployeeView({
       const weekStart = format(monday, 'yyyy-MM-dd');
       const weekEnd = format(sunday, 'yyyy-MM-dd');
       
-      fetchInitialData(undefined, ['admins', 'chamCongs', 'lichLamViecs'], { 
+      fetchInitialData(undefined, false, { 
+        targetedKeys: ['admins', 'chamCongs', 'lichLamViecs'],
         empId: loggedInEmployee.empId, 
         docId: loggedInEmployee.id, 
         isWeek: true,
@@ -183,7 +184,7 @@ export default function EmployeeView({
       const lockKey = `${loggedInEmployee.empId}-${selectedMonth}-details`;
       if (employeeHasFetchedMonthRef.current !== lockKey) {
          employeeHasFetchedMonthRef.current = lockKey;
-         fetchInitialData(selectedMonth, ['holidays', 'chamCongs', 'lichLamViecs', 'payrollAdjustments', 'violations'], { empId: loggedInEmployee.empId, docId: loggedInEmployee.id });
+         fetchInitialData(selectedMonth, false, { targetedKeys: ['holidays', 'chamCongs', 'lichLamViecs', 'payrollAdjustments', 'violations'], empId: loggedInEmployee.empId, docId: loggedInEmployee.id });
       }
     }
   }, [showHistory, showSalaryDetails, showStats, selectedMonth, loggedInEmployee, fetchInitialData]);
@@ -193,7 +194,7 @@ export default function EmployeeView({
   useEffect(() => {
     if (loggedInEmployee && showWeeklySchedule && !hasFetchedScheduleMonthRef.current) {
       hasFetchedScheduleMonthRef.current = true;
-      fetchInitialData(undefined, ['nhanViens']);
+      fetchInitialData(undefined, false, { targetedKeys: ['nhanViens'] });
     }
   }, [showWeeklySchedule, loggedInEmployee, fetchInitialData]);
 
@@ -661,7 +662,7 @@ export default function EmployeeView({
               isReadOnly={true}
               planningGoals={[]}
               onDateChange={(date) => {
-                fetchInitialData(undefined, ['lichLamViecs'], { exactDate: date, branchId: teamScheduleBranch === 'All' ? loggedInEmployee?.locationId : teamScheduleBranch });
+                fetchInitialData(undefined, false, { targetedKeys: ['lichLamViecs'], exactDate: date, branchId: teamScheduleBranch === 'All' ? Object.keys(branchStats)[0] || 'Góc Phố' : teamScheduleBranch });
               }}
             />
           </div>
