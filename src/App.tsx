@@ -36,7 +36,7 @@ export default function App() {
   const hasInitialLoadedRef = useRef(false);
   const isFetchingInProgress = useRef(false); // GLOBAL FETCH LOCK
 
-  const fetchInitialData = useCallback(async (monthYear?: string, force: boolean | string | string[] = false, options?: { empId?: string, docId?: string, onlyToday?: boolean, exactDate?: string, branchId?: string, isWeek?: boolean, weekStart?: string, weekEnd?: string }) => {
+  const fetchInitialData = useCallback(async (monthYear?: string, force: boolean | string | string[] = false, options?: { empId?: string, docId?: string, onlyToday?: boolean, exactDate?: string, branchId?: string, isWeek?: boolean, weekStart?: string, weekEnd?: string, targetedKeys?: string[] }) => {
     const targetMonth = monthYear || format(new Date(), 'yyyy-MM');
     const cacheKey = `${targetMonth}_${options?.empId || 'all'}_${options?.exactDate || options?.onlyToday ? 'today' : 'month'}`;
     const now = Date.now();
@@ -165,7 +165,7 @@ export default function App() {
       ];
 
       // If force is a targeted array/string, ONLY fetch those queries
-      const forceKeys = Array.isArray(force) ? force : (typeof force === 'string' ? [force] : null);
+      const forceKeys = force && force !== false ? (Array.isArray(force) ? force : [force as string]) : (options?.targetedKeys || null);
       
       const activeQueries = config.filter(c => {
         if (forceKeys) {
@@ -207,8 +207,8 @@ export default function App() {
         
         // Ensure Admin has total cutoff of read quota if F5
         let shouldFetch = true;
-        // If force is passed as an array, and this key is in the array, we MUST fetch!
-        const isForcedForThisKey = force === true || (Array.isArray(force) && force.includes(c.key)) || force === c.key;
+        // Only bypass cache if force is truthy and not using targetedKeys
+        const isForcedForThisKey = force === true || (force && force !== false && (Array.isArray(force) ? force.includes(c.key) : force === c.key));
         
         if (!isForcedForThisKey) {
            const savedTime = localStorage.getItem(cacheTimestampKey);
