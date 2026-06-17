@@ -574,7 +574,8 @@ export default function AdminView({
                  const formatD = (dateObj: Date) => {
                     return `${dateObj.getFullYear()}-${String(dateObj.getMonth() + 1).padStart(2, '0')}-${String(dateObj.getDate()).padStart(2, '0')}`;
                  };
-                 fetchInitialData(undefined, ['lichLamViecs'], {
+                 fetchInitialData(undefined, false, {
+                    targetedKeys: ['lichLamViecs'],
                     isWeek: true,
                     weekStart: formatD(wStart),
                     weekEnd: formatD(wEnd)
