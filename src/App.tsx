@@ -52,19 +52,20 @@ export default function App() {
     }
 
     // 1. CACHE CHECK
-    if (!force && dataCacheRef.current[cacheKey]) {
+    // If targetedKeys is specified, we must bypass this broad in-memory cache check and rely on the granular localStorage check per-key below.
+    if (!force && !options?.targetedKeys && dataCacheRef.current[cacheKey]) {
       setGlobalData((prev: any) => ({ ...prev, ...dataCacheRef.current[cacheKey], lastUpdated: new Date().toISOString() }));
       return dataCacheRef.current[cacheKey];
     }
 
     // 2. GLOBAL FETCH LOCK (Only apply if force is completely false)
-    if (isFetchingInProgress.current && !force) {
+    if (isFetchingInProgress.current && !force && !options?.targetedKeys && !options?.onlyToday && !options?.isWeek) {
       return;
     }
 
     // 3. THROTTLE (2 seconds) - allow targeted force updates
     const lastFetch = (window as any).lastGlobalFetchTime || 0;
-    if (!force && (now - lastFetch < 2000)) {
+    if (!force && !options?.targetedKeys && !options?.onlyToday && !options?.isWeek && (now - lastFetch < 2000)) {
        return;
     }
     (window as any).lastGlobalFetchTime = now;
@@ -116,6 +117,12 @@ export default function App() {
         } else {
            timesheetQuery = query(collection(db, 'timesheets'), where('date', '==', options.exactDate), limit(150));
         }
+      } else if (options?.isWeek && options?.weekStart && options?.weekEnd) {
+        if (options?.empId) {
+           timesheetQuery = query(collection(db, 'timesheets'), where('date', '>=', options.weekStart), where('date', '<=', options.weekEnd), where('empId', '==', options.empId), limit(50));
+        } else {
+           timesheetQuery = query(collection(db, 'timesheets'), where('date', '>=', options.weekStart), where('date', '<=', options.weekEnd), limit(500));
+        }
       }
 
       let scheduleQuery = (options?.empId || options?.docId) 
@@ -131,6 +138,12 @@ export default function App() {
              scheduleQuery = query(collection(db, 'LichLamViec'), where('date', '==', options.exactDate), where('locationId', '==', options.branchId), limit(200));
          } else {
              scheduleQuery = query(collection(db, 'LichLamViec'), where('date', '==', options.exactDate), limit(200));
+         }
+      } else if (options?.isWeek && options?.weekStart && options?.weekEnd) {
+         if (options?.branchId) {
+             scheduleQuery = query(collection(db, 'LichLamViec'), where('date', '>=', options.weekStart), where('date', '<=', options.weekEnd), where('locationId', '==', options.branchId), limit(500));
+         } else {
+             scheduleQuery = query(collection(db, 'LichLamViec'), where('date', '>=', options.weekStart), where('date', '<=', options.weekEnd), limit(1000));
          }
       }
 
@@ -165,7 +178,7 @@ export default function App() {
       ];
 
       // If force is a targeted array/string, ONLY fetch those queries
-      const forceKeys = force && force !== false ? (Array.isArray(force) ? force : [force as string]) : (options?.targetedKeys || null);
+      const forceKeys = force && force !== true ? (Array.isArray(force) ? force : [force as string]) : (options?.targetedKeys || null);
       
       const activeQueries = config.filter(c => {
         if (forceKeys) {
@@ -208,7 +221,7 @@ export default function App() {
         // Ensure Admin has total cutoff of read quota if F5
         let shouldFetch = true;
         // Only bypass cache if force is truthy and not using targetedKeys
-        const isForcedForThisKey = force === true || (force && force !== false && (Array.isArray(force) ? force.includes(c.key) : force === c.key));
+        const isForcedForThisKey = force === true || (typeof force !== 'boolean' && force && (Array.isArray(force) ? force.includes(c.key) : force === c.key));
         
         if (!isForcedForThisKey) {
            const savedTime = localStorage.getItem(cacheTimestampKey);
@@ -227,17 +240,70 @@ export default function App() {
            return getDocs(c.query).then(snap => {
               const data = snap.docs.map(doc => ({ id: doc.id, ...(doc.data() as any) }));
               // Cache ALL collections natively to save big morning rushes and comply with strict prompt instructions
+              
+              let finalDataToCache = data;
+              if (options?.isWeek || options?.exactDate || options?.onlyToday) {
+                 const cachedDataStr = localStorage.getItem(cacheStoreKey);
+                 if (cachedDataStr) {
+                    try {
+                        const parsedCache = JSON.parse(cachedDataStr);
+                        if (Array.isArray(parsedCache)) {
+                           let qStart = startDate;
+                           let qEnd = endDate;
+                           if (options?.exactDate) {
+                              qStart = options.exactDate;
+                              qEnd = options.exactDate;
+                           } else if (options?.onlyToday) {
+                              qStart = format(new Date(), 'yyyy-MM-dd');
+                              qEnd = qStart;
+                           } else if (options?.isWeek && options?.weekStart && options?.weekEnd) {
+                              qStart = options.weekStart;
+                              qEnd = options.weekEnd;
+                           }
+                           const dateField = 'date';
+                           
+                           const filteredPrev = parsedCache.filter((item: any) => {
+                               const itemDate = item[dateField];
+                               if (!itemDate) return true;
+                               const inDateRange = itemDate >= qStart && itemDate <= qEnd;
+                               return !inDateRange;
+                           });
+                           
+                           const existingMap = new Map(filteredPrev.map((item: any) => [item.id, item]));
+                           (data as any[]).forEach(item => {
+                              existingMap.set(item.id, item);
+                           });
+                           finalDataToCache = Array.from(existingMap.values());
+                        }
+                    } catch(e) {}
+                 }
+              }
+
               try {
-                 localStorage.setItem(cacheStoreKey, JSON.stringify(data));
-                 localStorage.setItem(cacheTimestampKey, Date.now().toString());
+                 localStorage.setItem(cacheStoreKey, JSON.stringify(finalDataToCache));
+                 if (!options?.isWeek && !options?.exactDate && !options?.onlyToday) {
+                    localStorage.setItem(cacheTimestampKey, Date.now().toString());
+                 }
               } catch (e) {
-                 console.warn("LocalStorage full, skipping cache for", c.key);
-                 // If storage is full, we can try to clear old keys
+                 console.warn("LocalStorage full, clearing old caches and retrying...");
+                 // If storage is full, we clear ALL cache keys to free space
+                 const keysToRemove = [];
                  for (let i = 0; i < localStorage.length; i++) {
                      const key = localStorage.key(i);
                      if (key && key.startsWith('db_cache_')) {
-                         localStorage.removeItem(key);
+                         keysToRemove.push(key);
                      }
+                 }
+                 keysToRemove.forEach(k => localStorage.removeItem(k));
+                 
+                  // Retry once
+                 try {
+                     localStorage.setItem(cacheStoreKey, JSON.stringify(finalDataToCache));
+                     if (!options?.isWeek && !options?.exactDate && !options?.onlyToday) {
+                        localStorage.setItem(cacheTimestampKey, Date.now().toString());
+                     }
+                 } catch (e2) {
+                     console.warn("LocalStorage still full after clearing, giving up.");
                  }
               }
               return { key: c.key, data };
@@ -264,6 +330,9 @@ export default function App() {
               } else if (options?.onlyToday) {
                  qStart = format(new Date(), 'yyyy-MM-dd');
                  qEnd = qStart;
+              } else if (options?.isWeek && options?.weekStart && options?.weekEnd) {
+                 qStart = options.weekStart;
+                 qEnd = options.weekEnd;
               }
 
               const dateField = 'date';
