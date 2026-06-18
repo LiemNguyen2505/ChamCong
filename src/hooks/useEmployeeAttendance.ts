@@ -12,7 +12,7 @@ export const useEmployeeAttendance = (
   kioskBranch: string | null,
   workSchedules: any[],
   latestLog: any,
-  fetchInitialData: (monthYear?: string, force?: any, options?: {empId?: string, docId?: string, onlyToday?: boolean}) => Promise<any>,
+  fetchInitialData: (monthYear?: string, force?: any, options?: {empId?: string, docId?: string, onlyToday?: boolean, exactDate?: string, branchId?: string, isWeek?: boolean, weekStart?: string, weekEnd?: string, targetedKeys?: string[]}) => Promise<any>,
   admins: any[]
 ) => {
   const [actionType, setActionType] = useState<'check-in' | 'check-out' | null>(null);
@@ -65,19 +65,43 @@ export const useEmployeeAttendance = (
 
     let matchedShift = todayShifts.length > 0 ? todayShifts[0] : null;
     if (todayShifts.length > 0) {
-      // Find the shift that is closest to current time, or where current time is within or right before the shift
-      for (const shift of todayShifts) {
-        const [schH, schM] = shift.startTime.split(':').map(Number);
-        const [endH, endM] = shift.endTime.split(':').map(Number);
-        const schTotal = schH * 60 + schM;
-        const endTotal = endH * 60 + endM;
-        // If current time is less than endTime, we can consider this shift!
-        if (nowTotal <= endTotal + 60) { // allow up to 1 hour after shift ends to still select it (though unlikely to checkin)
-           matchedShift = shift;
-           // If we are somewhat close to the start time (e.g. within 2 hours before or currently during it)
-           if (nowTotal >= schTotal - 120 && nowTotal <= endTotal + 60) {
-             break; // Perfect match
+      if (type === 'check-in') {
+        // First, see if current time falls exactly within a shift's window
+        for (const shift of todayShifts) {
+          const [schH, schM] = shift.startTime.split(':').map(Number);
+          const [endH, endM] = shift.endTime.split(':').map(Number);
+          const schTotal = schH * 60 + schM;
+          const endTotal = endH * 60 + endM;
+          if (nowTotal >= schTotal && nowTotal <= endTotal) {
+            matchedShift = shift;
+            break;
+          }
+        }
+        
+        // If not in any shift's window, find the closest start time
+        if (!matchedShift || (nowTotal < matchedShift.startTime.split(':').map(Number)[0] * 60 + matchedShift.startTime.split(':').map(Number)[1] || nowTotal > matchedShift.endTime.split(':').map(Number)[0] * 60 + matchedShift.endTime.split(':').map(Number)[1])) {
+           let minDiff = Infinity;
+           for (const shift of todayShifts) {
+             const [schH, schM] = shift.startTime.split(':').map(Number);
+             const schTotal = schH * 60 + schM;
+             const diff = Math.abs(nowTotal - schTotal);
+             if (diff < minDiff) {
+               minDiff = diff;
+               matchedShift = shift;
+             }
            }
+        }
+      } else {
+        // For check-out fallback, use similar logic but against endTime
+        let minDiff = Infinity;
+        for (const shift of todayShifts) {
+          const [endH, endM] = shift.endTime.split(':').map(Number);
+          const endTotal = endH * 60 + endM;
+          const diff = Math.abs(nowTotal - endTotal);
+          if (diff < minDiff) {
+            minDiff = diff;
+            matchedShift = shift;
+          }
         }
       }
     }
@@ -136,8 +160,8 @@ export const useEmployeeAttendance = (
             }
           } else if (selTotal < schTotal) {
             const earlyMinutes = schTotal - selTotal;
-            if (earlyMinutes > 30 && !isAdmin) {
-              isExtraShift = true; // Early more than 30 mins
+            if (earlyMinutes > 60 && !isAdmin) {
+              isExtraShift = true; // Early more than 60 mins
             }
           }
         }
@@ -244,7 +268,7 @@ export const useEmployeeAttendance = (
       }
       setActionType(null);
       setPhotoData(null);
-      await fetchInitialData(undefined, ['chamCongs'], { empId: loggedInEmployee?.empId, docId: loggedInEmployee?.id, onlyToday: true });
+      await fetchInitialData(undefined, true, { targetedKeys: ['chamCongs'], empId: loggedInEmployee?.empId, docId: loggedInEmployee?.id, onlyToday: true });
     } catch (error) {
       toast.error('Lỗi khi lưu dữ liệu');
     } finally {
