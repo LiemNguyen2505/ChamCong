@@ -280,7 +280,7 @@ export function useAdminLogic(globalData: any, fetchInitialData: any, isLoading:
     if (activeTab === 'dashboard') {
        // OPTIMIZATION: Do not fetch entire month `chamCongs` and `lichLamViecs` on dashboard
        // as that consumes thousands of reads on first load! We only fetch today's data for active shift tracking.
-       fetchInitialData(filterMonth, ['chamCongs', 'lichLamViecs'], { onlyToday: true })
+       fetchInitialData(filterMonth, false, { targetedKeys: ['chamCongs', 'lichLamViecs'], onlyToday: true })
          .catch(e => console.error("Error fetching today dashboard data:", e));
     }
     else if (activeTab === 'bangluong' || activeTab === 'bangcongthang') {
@@ -486,7 +486,7 @@ export function useAdminLogic(globalData: any, fetchInitialData: any, isLoading:
         position,
         goalShifts: Number(goalShifts)
       }, { merge: true });
-      await fetchInitialData(filterMonth, ['planningGoals']);
+      await fetchInitialData(filterMonth, true, { targetedKeys: ['planningGoals'] });
       toast.success('Đã cập nhật mục tiêu', { id: loadingToast });
     } catch (error) {
       console.error('Error updating planning goal:', error);
@@ -966,7 +966,7 @@ export function useAdminLogic(globalData: any, fetchInitialData: any, isLoading:
         plannedEndTime: newEndTime
       });
       toast.success('Đã cập nhật giờ ra ca dự kiến!', { id: loadingToast });
-      await fetchInitialData(filterMonth, ['lichLamViecs'], { exactDate: selectedShift.date }); // Force refresh cache
+      await fetchInitialData(filterMonth, true, { targetedKeys: ['lichLamViecs'], exactDate: selectedShift.date }); // Force refresh cache
       setShowAdjustModal(false);
     } catch (error) {
       toast.error('Lỗi khi cập nhật giờ ra ca', { id: loadingToast });
@@ -1092,7 +1092,7 @@ export function useAdminLogic(globalData: any, fetchInitialData: any, isLoading:
       });
       setCurrentAdmin({ ...currentAdmin, notificationSettings: newSettings });
       toast.success(`Đã ${newSettings.enabled ? 'bật' : 'tắt'} thông báo`, { id: loadingToast });
-      await fetchInitialData(filterMonth, ['admins']);
+      await fetchInitialData(filterMonth, true, { targetedKeys: ['admins'] });
     } catch (error) {
       toast.error('Lỗi khi cập nhật cài đặt', { id: loadingToast });
     }
