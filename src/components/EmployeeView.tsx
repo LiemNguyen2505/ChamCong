@@ -44,7 +44,7 @@ export default function EmployeeView({
   isLoading
 }: {
   globalData: any,
-  fetchInitialData: (monthYear?: string, force?: any | string | string[], options?: { empId?: string, docId?: string, onlyToday?: boolean, exactDate?: string, branchId?: string }) => Promise<any>,
+  fetchInitialData: (monthYear?: string, force?: any | string | string[], options?: { empId?: string, docId?: string, onlyToday?: boolean, exactDate?: string, branchId?: string, isWeek?: boolean, weekStart?: string, weekEnd?: string, targetedKeys?: string[] }) => Promise<any>,
   isLoading: boolean
 }) {
   const navigate = useNavigate();
@@ -662,7 +662,21 @@ export default function EmployeeView({
               isReadOnly={true}
               planningGoals={[]}
               onDateChange={(date) => {
-                fetchInitialData(undefined, false, { targetedKeys: ['lichLamViecs'], exactDate: date, branchId: teamScheduleBranch === 'All' ? Object.keys(branchStats)[0] || 'Góc Phố' : teamScheduleBranch });
+                const [y, m, d] = date.split('-').map(Number);
+                const dDate = new Date(y, m - 1, d);
+                const wStart = new Date(dDate); wStart.setDate(wStart.getDate() - 3);
+                const wEnd = new Date(dDate); wEnd.setDate(wEnd.getDate() + 10);
+                const formatD = (dateObj: Date) => {
+                   return `${dateObj.getFullYear()}-${String(dateObj.getMonth() + 1).padStart(2, '0')}-${String(dateObj.getDate()).padStart(2, '0')}`;
+                };
+
+                fetchInitialData(undefined, false, { 
+                  targetedKeys: ['lichLamViecs'], 
+                  isWeek: true,
+                  weekStart: formatD(wStart),
+                  weekEnd: formatD(wEnd),
+                  branchId: teamScheduleBranch === 'All' ? Object.keys(branchStats)[0] || 'Góc Phố' : teamScheduleBranch 
+                });
               }}
             />
           </div>
