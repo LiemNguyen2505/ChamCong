@@ -26,9 +26,22 @@ export const ScheduleView: React.FC<ScheduleViewProps> = ({
     const currentWeekDateRef = React.useRef<string | null>(null);
 
     const handleRefetchWeek = async () => {
-        // Do not fetch! The UI will be updated via setGlobalData locally
-        // to strictly follow instructions: "CHỈ đẩy phần dữ liệu... lên database"
-        return;
+        if (currentWeekDateRef.current) {
+            const [y, m, d] = currentWeekDateRef.current.split('-').map(Number);
+            const dDate = new Date(y, m - 1, d);
+            const wStart = new Date(dDate); wStart.setDate(wStart.getDate() - 3);
+            const wEnd = new Date(dDate); wEnd.setDate(wEnd.getDate() + 10);
+            const formatD = (dateObj: Date) => {
+                return `${dateObj.getFullYear()}-${String(dateObj.getMonth() + 1).padStart(2, '0')}-${String(dateObj.getDate()).padStart(2, '0')}`;
+            };
+            
+            await fetchInitialData(undefined, true, {
+                targetedKeys: ['lichLamViecs'],
+                isWeek: true,
+                weekStart: formatD(wStart),
+                weekEnd: formatD(wEnd)
+            });
+        }
     };
 
     return (
@@ -68,7 +81,6 @@ export const ScheduleView: React.FC<ScheduleViewProps> = ({
                         // Push to DB
                         await setDoc(doc(db, 'LichLamViec', shiftId), newShift as any);
                         
-                        // Mutate locally instead of fetching
                         if (setGlobalData) {
                             setGlobalData((prev: any) => ({
                                 ...prev,
@@ -97,7 +109,6 @@ export const ScheduleView: React.FC<ScheduleViewProps> = ({
                             updatedAt: serverTimestamp()
                         }, { merge: true });
                         
-                        // Mutate locally
                         if (setGlobalData) {
                             setGlobalData((prev: any) => ({
                                 ...prev,
@@ -113,7 +124,6 @@ export const ScheduleView: React.FC<ScheduleViewProps> = ({
                         // Push to DB
                         await deleteDoc(doc(db, 'LichLamViec', id));
                         
-                        // Mutate locally
                         if (setGlobalData) {
                             setGlobalData((prev: any) => ({
                                 ...prev,
@@ -131,7 +141,12 @@ export const ScheduleView: React.FC<ScheduleViewProps> = ({
                             batch.delete(doc(db, 'LichLamViec', id));
                         });
                         await batch.commit();
-                        await handleRefetchWeek();
+                        if (setGlobalData) {
+                            setGlobalData((prev: any) => ({
+                                ...prev,
+                                lichLamViecs: prev.lichLamViecs.filter((item: any) => !ids.includes(item.id))
+                            }));
+                        }
                     } catch (error) {
                         console.error('Error batch deleting shifts:', error);
                     }
@@ -139,20 +154,30 @@ export const ScheduleView: React.FC<ScheduleViewProps> = ({
                 onBatchSaveShifts={async (shifts) => {
                     try {
                         const batch = writeBatch(db);
+                        const localShifts: any[] = [];
                         shifts.forEach(shift => {
                             const emp = nhanViens.find(e => e.id === shift.empId);
                             const shiftId = (shift as any).id || doc(collection(db, 'LichLamViec')).id;
-                            batch.set(doc(db, 'LichLamViec', shiftId), {
+                            const shiftDoc = {
                                 ...shift,
+                                id: shiftId,
                                 empName: emp?.fullName || '',
                                 shiftName: `${shift.startTime} - ${shift.endTime}`,
                                 status: 'scheduled',
                                 createdAt: serverTimestamp(),
                                 updatedAt: serverTimestamp()
-                            });
+                            };
+                            batch.set(doc(db, 'LichLamViec', shiftId), shiftDoc);
+                            localShifts.push(shiftDoc);
                         });
                         await batch.commit();
-                        await handleRefetchWeek();
+                        if (setGlobalData) {
+                            setGlobalData((prev: any) => {
+                                const newIds = new Set(localShifts.map(s => s.id));
+                                const filtered = prev.lichLamViecs.filter((s: any) => !newIds.has(s.id));
+                                return { ...prev, lichLamViecs: [...filtered, ...localShifts] };
+                            });
+                        }
                     } catch (error) {
                         console.error('Error batch saving shifts:', error);
                     }
@@ -167,21 +192,32 @@ export const ScheduleView: React.FC<ScheduleViewProps> = ({
                         });
 
                         // Add new shifts
+                        const localShifts: any[] = [];
                         shiftsToSave.forEach(shift => {
                             const emp = nhanViens.find(e => e.id === shift.empId);
                             const shiftId = (shift as any).id || doc(collection(db, 'LichLamViec')).id;
-                            batch.set(doc(db, 'LichLamViec', shiftId), {
+                            const shiftDoc = {
                                 ...shift,
+                                id: shiftId,
                                 empName: emp?.fullName || '',
                                 shiftName: `${shift.startTime} - ${shift.endTime}`,
                                 status: 'scheduled',
                                 createdAt: serverTimestamp(),
                                 updatedAt: serverTimestamp()
-                            });
+                            };
+                            batch.set(doc(db, 'LichLamViec', shiftId), shiftDoc);
+                            localShifts.push(shiftDoc);
                         });
                         
                         await batch.commit();
-                        await handleRefetchWeek();
+                        if (setGlobalData) {
+                            setGlobalData((prev: any) => {
+                                const filtered = prev.lichLamViecs.filter((s: any) => !idsToDelete.includes(s.id));
+                                const newIds = new Set(localShifts.map(s => s.id));
+                                const doubleFiltered = filtered.filter((s: any) => !newIds.has(s.id));
+                                return { ...prev, lichLamViecs: [...doubleFiltered, ...localShifts] };
+                            });
+                        }
                     } catch (error) {
                         console.error('Error syncing week shifts:', error);
                     }
