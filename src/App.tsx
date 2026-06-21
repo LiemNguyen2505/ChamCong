@@ -177,10 +177,55 @@ export default function App() {
         { key: 'salaryHistories', query: query(collection(db, 'SalaryHistories'), limit(500)), type: 'lazy' }
       ];
 
+      // Security Limits for Employees to prevent Read Spikes
+      if (options?.empId) {
+          const todayDate = new Date();
+          const currentYear = todayDate.getFullYear();
+          const currentMonthInt = todayDate.getMonth() + 1; // 1-12
+          const currentDay = todayDate.getDate();
+
+          const validMonths = [`${currentYear}-${String(currentMonthInt).padStart(2, '0')}`];
+          if (currentDay <= 10) {
+             const prevMonthDate = new Date(currentYear, currentMonthInt - 2, 1);
+             validMonths.push(`${prevMonthDate.getFullYear()}-${String(prevMonthDate.getMonth() + 1).padStart(2, '0')}`);
+          }
+          
+          const isInvalidMonthRequest = targetMonth && !validMonths.includes(targetMonth);
+          
+          const mondayThisWeek = new Date(todayDate);
+          mondayThisWeek.setDate(todayDate.getDate() - (todayDate.getDay() === 0 ? 6 : todayDate.getDay() - 1));
+          const sundayNextWeek = new Date(mondayThisWeek);
+          sundayNextWeek.setDate(mondayThisWeek.getDate() + 13);
+          
+          const formatLocal = (d: Date) => {
+            const y = d.getFullYear();
+            const m = String(d.getMonth() + 1).padStart(2, '0');
+            const day = String(d.getDate()).padStart(2, '0');
+            return `${y}-${m}-${day}`;
+          };
+          const validSchedStart = formatLocal(mondayThisWeek);
+          const validSchedEnd = formatLocal(sundayNextWeek);
+
+          const isInvalidScheduleRequest = options?.isWeek && options?.weekStart && (options.weekStart < validSchedStart || options.weekEnd! > validSchedEnd);
+          
+          for (const c of config) {
+              if (['payrollAdjustments', 'violations', 'chamCongs', 'salaryHistories'].includes(c.key)) {
+                  if (isInvalidMonthRequest) c.query = null;
+              }
+              if (c.key === 'lichLamViecs') {
+                  const isInvalidMonthSched = !options?.isWeek && !options?.onlyToday && !options?.exactDate && isInvalidMonthRequest;
+                  if (isInvalidScheduleRequest || isInvalidMonthSched) {
+                      c.query = null;
+                  }
+              }
+          }
+      }
+
       // If force is a targeted array/string, ONLY fetch those queries
       const forceKeys = force && force !== true ? (Array.isArray(force) ? force : [force as string]) : (options?.targetedKeys || null);
       
       const activeQueries = config.filter(c => {
+        if (c.query === null) return false;
         if (forceKeys) {
           return forceKeys.includes(c.key);
         }
