@@ -25,7 +25,6 @@ import { useEmployeeAuth } from '../hooks/useEmployeeAuth';
 import { matchSchedulesForTimesheet } from '../utils/adminHelpers';
 import { useEmployeeAttendance } from '../hooks/useEmployeeAttendance';
 import { useEmployeeUI } from '../hooks/useEmployeeUI';
-import { useAntiSlacking } from '../hooks/useAntiSlacking';
 import { useEmployeeSalary } from '../hooks/useEmployeeSalary';
 
 import { getBranchTheme } from '../utils/theme';
@@ -209,8 +208,6 @@ export default function EmployeeView({
                          admins.some((a: any) => a.email === loggedInEmployee?.fullName);
                          
   const { monthlyStats, branchStats, activeBranches } = useEmployeeSalary(loggedInEmployee, monthTimesheets, payrollAdjustments, holidays, selectedMonth, globalData.violations, isSubjectAdmin);
-
-  useAntiSlacking(loggedInEmployee, latestLog, admins, kioskBranch);
 
   const handleSecretTap = () => {
     setTapCount(prev => prev + 1);
