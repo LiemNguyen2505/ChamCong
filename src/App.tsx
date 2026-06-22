@@ -36,9 +36,28 @@ export default function App() {
   const hasInitialLoadedRef = useRef(false);
   const isFetchingInProgress = useRef(false); // GLOBAL FETCH LOCK
 
-  const fetchInitialData = useCallback(async (monthYear?: string, force: boolean | string | string[] = false, options?: { empId?: string, docId?: string, onlyToday?: boolean, exactDate?: string, branchId?: string, isWeek?: boolean, weekStart?: string, weekEnd?: string, targetedKeys?: string[] }) => {
+  const fetchInitialData = useCallback(async (monthYear?: string, force: boolean | string | string[] = false, baseOptions?: { empId?: string, docId?: string, onlyToday?: boolean, exactDate?: string, branchId?: string, isWeek?: boolean, weekStart?: string, weekEnd?: string, targetedKeys?: string[] }) => {
+    
+    // Inject empId from localStorage if employee is logged in and no admin is logged in
+    let options = baseOptions ? { ...baseOptions } : {};
+    const savedEmpStr = localStorage.getItem('loggedInEmployee');
+    const savedAdminStr = localStorage.getItem('currentAdmin');
+    const hasSavedAdmin = !!savedAdminStr;
+    const hasSavedEmployee = !!savedEmpStr;
+
+    if (!hasSavedAdmin && hasSavedEmployee) {
+       try {
+          const emp = JSON.parse(savedEmpStr);
+          if (!options.empId && emp.empId) {
+              options.empId = emp.empId;
+              options.docId = emp.id;
+          }
+       } catch(e){}
+    }
+
     const targetMonth = monthYear || format(new Date(), 'yyyy-MM');
-    const cacheKey = `${targetMonth}_${options?.empId || 'all'}_${options?.exactDate || options?.onlyToday ? 'today' : 'month'}`;
+    const routeSuffix = options.isWeek ? '_week' : (options.onlyToday ? '_today' : (options.exactDate ? `_${options.exactDate}` : ''));
+    const cacheKey = `${targetMonth}_${options.empId || 'all'}_${options.exactDate || options.onlyToday ? 'today' : 'month'}${routeSuffix}`;
     const now = Date.now();
     
     // 0. AVOID FLOODING DURING CRASHES
@@ -53,19 +72,19 @@ export default function App() {
 
     // 1. CACHE CHECK
     // If targetedKeys is specified, we must bypass this broad in-memory cache check and rely on the granular localStorage check per-key below.
-    if (!force && !options?.targetedKeys && dataCacheRef.current[cacheKey]) {
+    if (!force && !options.targetedKeys && dataCacheRef.current[cacheKey]) {
       setGlobalData((prev: any) => ({ ...prev, ...dataCacheRef.current[cacheKey], lastUpdated: new Date().toISOString() }));
       return dataCacheRef.current[cacheKey];
     }
 
     // 2. GLOBAL FETCH LOCK (Only apply if force is completely false)
-    if (isFetchingInProgress.current && !force && !options?.targetedKeys && !options?.onlyToday && !options?.isWeek) {
+    if (isFetchingInProgress.current && !force && !options.targetedKeys && !options.onlyToday && !options.isWeek) {
       return;
     }
 
     // 3. THROTTLE (2 seconds) - allow targeted force updates
     const lastFetch = (window as any).lastGlobalFetchTime || 0;
-    if (!force && !options?.targetedKeys && !options?.onlyToday && !options?.isWeek && (now - lastFetch < 2000)) {
+    if (!force && !options.targetedKeys && !options.onlyToday && !options.isWeek && (now - lastFetch < 2000)) {
        return;
     }
     (window as any).lastGlobalFetchTime = now;
@@ -80,7 +99,7 @@ export default function App() {
       let startDate = "";
       let endDate = "";
       
-      if (options?.isWeek && options.weekStart && options.weekEnd) {
+      if (options.isWeek && options.weekStart && options.weekEnd) {
          startDate = options.weekStart;
          endDate = options.weekEnd;
       } else {
@@ -103,56 +122,56 @@ export default function App() {
       
       const todayStr = format(new Date(), 'yyyy-MM-dd');
       
-      let timesheetQuery = options?.empId 
+      let timesheetQuery = options.empId 
         ? (options.onlyToday 
             ? query(collection(db, 'timesheets'), where('date', '==', todayStr), where('empId', '==', options.empId), limit(5)) 
             : query(collection(db, 'timesheets'), where('date', '>=', startDate), where('date', '<=', endDate), where('empId', '==', options.empId), limit(35))) 
-        : (options?.onlyToday
+        : (options.onlyToday
             ? query(collection(db, 'timesheets'), where('date', '==', todayStr), limit(150))
             : query(collection(db, 'timesheets'), where('date', '>=', startDate), where('date', '<=', endDate), limit(1000)));
         
-      if (options?.exactDate) {
-        if (options?.empId) {
+      if (options.exactDate) {
+        if (options.empId) {
            timesheetQuery = query(collection(db, 'timesheets'), where('date', '==', options.exactDate), where('empId', '==', options.empId), limit(5));
         } else {
            timesheetQuery = query(collection(db, 'timesheets'), where('date', '==', options.exactDate), limit(150));
         }
-      } else if (options?.isWeek && options?.weekStart && options?.weekEnd) {
-        if (options?.empId) {
+      } else if (options.isWeek && options.weekStart && options.weekEnd) {
+        if (options.empId) {
            timesheetQuery = query(collection(db, 'timesheets'), where('date', '>=', options.weekStart), where('date', '<=', options.weekEnd), where('empId', '==', options.empId), limit(50));
         } else {
            timesheetQuery = query(collection(db, 'timesheets'), where('date', '>=', options.weekStart), where('date', '<=', options.weekEnd), limit(500));
         }
       }
 
-      let scheduleQuery = (options?.empId || options?.docId) 
+      let scheduleQuery = (options.empId || options.docId) 
         ? (options.onlyToday 
             ? query(collection(db, 'LichLamViec'), where('date', '==', todayStr), where('empId', '==', options.docId || options.empId), limit(5)) 
             : query(collection(db, 'LichLamViec'), where('date', '>=', startDate), where('date', '<=', endDate), where('empId', '==', options.docId || options.empId), limit(35))) 
-        : (options?.onlyToday
+        : (options.onlyToday
             ? query(collection(db, 'LichLamViec'), where('date', '==', todayStr), limit(150))
             : query(collection(db, 'LichLamViec'), where('date', '>=', startDate), where('date', '<=', endDate), limit(1000)));
         
-      if (options?.exactDate) {
-         if (options?.branchId) {
+      if (options.exactDate) {
+         if (options.branchId) {
              scheduleQuery = query(collection(db, 'LichLamViec'), where('date', '==', options.exactDate), where('locationId', '==', options.branchId), limit(200));
          } else {
              scheduleQuery = query(collection(db, 'LichLamViec'), where('date', '==', options.exactDate), limit(200));
          }
-      } else if (options?.isWeek && options?.weekStart && options?.weekEnd) {
-         if (options?.branchId) {
+      } else if (options.isWeek && options.weekStart && options.weekEnd) {
+         if (options.branchId) {
              scheduleQuery = query(collection(db, 'LichLamViec'), where('date', '>=', options.weekStart), where('date', '<=', options.weekEnd), where('locationId', '==', options.branchId), limit(500));
          } else {
              scheduleQuery = query(collection(db, 'LichLamViec'), where('date', '>=', options.weekStart), where('date', '<=', options.weekEnd), limit(1000));
          }
       }
 
-      let leaveQuery = options?.empId 
+      let leaveQuery = options.empId 
         ? query(collection(db, 'XinNghiPhep'), where('empId', '==', options.empId), where('leaveDate', '>=', startDate), where('leaveDate', '<=', endDate), limit(100)) 
         : query(collection(db, 'XinNghiPhep'), where('leaveDate', '>=', startDate), where('leaveDate', '<=', endDate), limit(1000));
         
-      if (options?.exactDate) {
-        if (options?.empId) {
+      if (options.exactDate) {
+        if (options.empId) {
           leaveQuery = query(collection(db, 'XinNghiPhep'), where('empId', '==', options.empId), where('leaveDate', '==', options.exactDate), limit(5));
         } else {
           leaveQuery = query(collection(db, 'XinNghiPhep'), where('leaveDate', '==', options.exactDate), limit(200));
@@ -167,8 +186,8 @@ export default function App() {
         { key: 'auditLogs', query: query(collection(db, 'AuditLogs'), orderBy('timestamp', 'desc'), limit(15)), type: 'lazy' },
         { key: 'holidays', query: query(collection(db, 'Holidays'), limit(50)), type: 'static' },
         { key: 'materialItems', query: query(collection(db, 'MaterialItems'), limit(50)), type: 'static' },
-        { key: 'payrollAdjustments', query: options?.empId ? query(collection(db, 'PayrollAdjustments'), where('monthYear', '==', targetMonth), where('empId', '==', options.empId)) : query(collection(db, 'PayrollAdjustments'), where('monthYear', '==', targetMonth)), type: 'lazy' },
-        { key: 'violations', query: options?.empId ? query(collection(db, 'Violations'), where('monthYear', '==', targetMonth), where('empId', '==', options.empId)) : query(collection(db, 'Violations'), where('monthYear', '==', targetMonth)), type: 'lazy' },
+        { key: 'payrollAdjustments', query: options.empId ? query(collection(db, 'PayrollAdjustments'), where('monthYear', '==', targetMonth), where('empId', '==', options.empId)) : query(collection(db, 'PayrollAdjustments'), where('monthYear', '==', targetMonth)), type: 'lazy' },
+        { key: 'violations', query: options.empId ? query(collection(db, 'Violations'), where('monthYear', '==', targetMonth), where('empId', '==', options.empId)) : query(collection(db, 'Violations'), where('monthYear', '==', targetMonth)), type: 'lazy' },
         { key: 'materialLossLogs', query: query(collection(db, 'MaterialLossLogs'), where('monthYear', '==', targetMonth), orderBy('processedAt', 'desc'), limit(100)), type: 'lazy' },
         { key: 'retainedSalaryRecords', query: query(collection(db, 'RetainedSalaryRecords'), orderBy('createdAt', 'desc'), limit(500)), type: 'lazy' },
         { key: 'chamCongs', query: timesheetQuery, type: 'lazy' },
@@ -178,7 +197,7 @@ export default function App() {
       ];
 
       // Security Limits for Employees to prevent Read Spikes
-      if (options?.empId) {
+      if (options.empId) {
           const todayDate = new Date();
           const currentYear = todayDate.getFullYear();
           const currentMonthInt = todayDate.getMonth() + 1; // 1-12
@@ -206,14 +225,14 @@ export default function App() {
           const validSchedStart = formatLocal(mondayThisWeek);
           const validSchedEnd = formatLocal(sundayNextWeek);
 
-          const isInvalidScheduleRequest = options?.isWeek && options?.weekStart && (options.weekStart < validSchedStart || options.weekEnd! > validSchedEnd);
+          const isInvalidScheduleRequest = options.isWeek && options.weekStart && (options.weekStart < validSchedStart || options.weekEnd! > validSchedEnd);
           
           for (const c of config) {
               if (['payrollAdjustments', 'violations', 'chamCongs', 'salaryHistories'].includes(c.key)) {
                   if (isInvalidMonthRequest) c.query = null;
               }
               if (c.key === 'lichLamViecs') {
-                  const isInvalidMonthSched = !options?.isWeek && !options?.onlyToday && !options?.exactDate && isInvalidMonthRequest;
+                  const isInvalidMonthSched = !options.isWeek && !options.onlyToday && !options.exactDate && isInvalidMonthRequest;
                   if (isInvalidScheduleRequest || isInvalidMonthSched) {
                       c.query = null;
                   }
@@ -222,7 +241,7 @@ export default function App() {
       }
 
       // If force is a targeted array/string, ONLY fetch those queries
-      const forceKeys = force && force !== true ? (Array.isArray(force) ? force : [force as string]) : (options?.targetedKeys || null);
+      const forceKeys = force && force !== true ? (Array.isArray(force) ? force : [force as string]) : (options.targetedKeys || null);
       
       const activeQueries = config.filter(c => {
         if (c.query === null) return false;
@@ -235,9 +254,6 @@ export default function App() {
         if (hasInitialLoadedRef.current) return false; // Initial load only fetches types: dynamic & static
         
         // OPTIMIZATION: If no one is logged in, don't fetch heavy global lists on mount!
-        const hasSavedEmployee = !!localStorage.getItem('loggedInEmployee');
-        const hasSavedAdmin = !!localStorage.getItem('currentAdmin');
-        
         if (!hasSavedEmployee && !hasSavedAdmin) {
            return false; // Skip all automatic fetches on first screen to save reads, Login will query explicitly.
         }
@@ -260,8 +276,8 @@ export default function App() {
         // ALWAYS CACHE EVERYTHING TO PREVENT QUOTA EXHAUSTION
         // Admin: cache is extremely aggressive. Employee: use smaller cache slices.
         const CACHE_TTL = 1000 * 60 * 60 * 4; // 4 hours for Admins / Users unless forced
-        const cacheStoreKey = `db_cache_${c.key}_${options?.empId || 'all'}_${targetMonth}`;
-        const cacheTimestampKey = `db_cache_time_${c.key}_${options?.empId || 'all'}_${targetMonth}`;
+        const cacheStoreKey = `db_cache_${c.key}_${options.empId || 'all'}_${targetMonth}${routeSuffix}`;
+        const cacheTimestampKey = `db_cache_time_${c.key}_${options.empId || 'all'}_${targetMonth}${routeSuffix}`;
         
         // Ensure Admin has total cutoff of read quota if F5
         let shouldFetch = true;
@@ -287,7 +303,7 @@ export default function App() {
               // Cache ALL collections natively to save big morning rushes and comply with strict prompt instructions
               
               let finalDataToCache = data;
-              if (options?.isWeek || options?.exactDate || options?.onlyToday) {
+              if (options.isWeek || options.exactDate || options.onlyToday) {
                  const cachedDataStr = localStorage.getItem(cacheStoreKey);
                  if (cachedDataStr) {
                     try {
@@ -295,13 +311,13 @@ export default function App() {
                         if (Array.isArray(parsedCache)) {
                            let qStart = startDate;
                            let qEnd = endDate;
-                           if (options?.exactDate) {
+                           if (options.exactDate) {
                               qStart = options.exactDate;
                               qEnd = options.exactDate;
-                           } else if (options?.onlyToday) {
+                           } else if (options.onlyToday) {
                               qStart = format(new Date(), 'yyyy-MM-dd');
                               qEnd = qStart;
-                           } else if (options?.isWeek && options?.weekStart && options?.weekEnd) {
+                           } else if (options.isWeek && options.weekStart && options.weekEnd) {
                               qStart = options.weekStart;
                               qEnd = options.weekEnd;
                            }
@@ -326,7 +342,7 @@ export default function App() {
 
               try {
                  localStorage.setItem(cacheStoreKey, JSON.stringify(finalDataToCache));
-                 if (!options?.isWeek && !options?.exactDate && !options?.onlyToday) {
+                 if (!options.isWeek && !options.exactDate && !options.onlyToday) {
                     localStorage.setItem(cacheTimestampKey, Date.now().toString());
                  }
               } catch (e) {
@@ -344,7 +360,7 @@ export default function App() {
                   // Retry once
                  try {
                      localStorage.setItem(cacheStoreKey, JSON.stringify(finalDataToCache));
-                     if (!options?.isWeek && !options?.exactDate && !options?.onlyToday) {
+                     if (!options.isWeek && !options.exactDate && !options.onlyToday) {
                         localStorage.setItem(cacheTimestampKey, Date.now().toString());
                      }
                  } catch (e2) {
@@ -366,16 +382,16 @@ export default function App() {
         const merged = { ...prev };
         
         for (const [key, items] of Object.entries(newData)) {
-           if (Array.isArray(items) && (options?.isWeek || options?.exactDate || options?.onlyToday) && prev[key]) {
+           if (Array.isArray(items) && (options.isWeek || options.exactDate || options.onlyToday) && prev[key]) {
               let qStart = startDate;
               let qEnd = endDate;
-              if (options?.exactDate) {
+              if (options.exactDate) {
                  qStart = options.exactDate;
                  qEnd = options.exactDate;
-              } else if (options?.onlyToday) {
+              } else if (options.onlyToday) {
                  qStart = format(new Date(), 'yyyy-MM-dd');
                  qEnd = qStart;
-              } else if (options?.isWeek && options?.weekStart && options?.weekEnd) {
+              } else if (options.isWeek && options.weekStart && options.weekEnd) {
                  qStart = options.weekStart;
                  qEnd = options.weekEnd;
               }
@@ -389,12 +405,12 @@ export default function App() {
                  const inDateRange = itemDate >= qStart && itemDate <= qEnd;
                  
                  let inEmpScope = true;
-                 if (options?.empId || options?.docId) {
+                 if (options.empId || options.docId) {
                     inEmpScope = item.empId === (options.empId || options.docId);
                  }
                  
                  let inBranchScope = true;
-                 if (options?.branchId && key === 'lichLamViecs') {
+                 if (options.branchId && key === 'lichLamViecs') {
                     inBranchScope = item.locationId === options.branchId;
                  }
                  
