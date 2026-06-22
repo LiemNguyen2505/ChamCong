@@ -280,7 +280,11 @@ export function useAdminLogic(globalData: any, fetchInitialData: any, isLoading:
     if (activeTab === 'dashboard') {
        // OPTIMIZATION: Do not fetch entire month `chamCongs` and `lichLamViecs` on dashboard
        // as that consumes thousands of reads on first load! We only fetch today's data for active shift tracking.
-       fetchInitialData(filterMonth, false, { targetedKeys: ['chamCongs', 'lichLamViecs'], onlyToday: true })
+       fetchInitialData(filterMonth, false, { 
+         targetedKeys: ['chamCongs', 'lichLamViecs'], 
+         onlyToday: true,
+         branchId: filterBranch !== 'All' ? filterBranch : undefined 
+       })
          .catch(e => console.error("Error fetching today dashboard data:", e));
     }
     else if (activeTab === 'bangluong' || activeTab === 'bangcongthang') {
@@ -313,7 +317,10 @@ export function useAdminLogic(globalData: any, fetchInitialData: any, isLoading:
       
       const loadData = async () => {
         try {
-          await fetchInitialData(filterMonth, false, { targetedKeys: newKeysToFetch });
+          await fetchInitialData(filterMonth, false, { 
+             targetedKeys: newKeysToFetch,
+             branchId: filterBranch !== 'All' ? filterBranch : undefined
+          });
         } catch (err) {
           console.error("Failed to load data for keys:", newKeysToFetch, err);
         }
