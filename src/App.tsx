@@ -56,7 +56,8 @@ export default function App() {
     }
 
     const targetMonth = monthYear || format(new Date(), 'yyyy-MM');
-    const routeSuffix = options.isWeek ? '_week' : (options.onlyToday ? '_today' : (options.exactDate ? `_${options.exactDate}` : ''));
+    const todayLiteral = format(new Date(), 'yyyy-MM-dd');
+    const routeSuffix = options.isWeek ? `_week_${options.weekStart}` : (options.onlyToday ? `_today_${todayLiteral}` : (options.exactDate ? `_${options.exactDate}` : ''));
     const cacheKey = `${targetMonth}_${options.empId || 'all'}_${options.exactDate || options.onlyToday ? 'today' : 'month'}${routeSuffix}`;
     const now = Date.now();
     
@@ -127,18 +128,22 @@ export default function App() {
             ? query(collection(db, 'timesheets'), where('date', '==', todayStr), where('empId', '==', options.empId), limit(5)) 
             : query(collection(db, 'timesheets'), where('date', '>=', startDate), where('date', '<=', endDate), where('empId', '==', options.empId), limit(35))) 
         : (options.onlyToday
-            ? query(collection(db, 'timesheets'), where('date', '==', todayStr), limit(150))
-            : query(collection(db, 'timesheets'), where('date', '>=', startDate), where('date', '<=', endDate), limit(1000)));
+            ? (options.branchId ? query(collection(db, 'timesheets'), where('date', '==', todayStr), where('locationId', '==', options.branchId), limit(150)) : query(collection(db, 'timesheets'), where('date', '==', todayStr), limit(150)))
+            : (options.branchId ? query(collection(db, 'timesheets'), where('date', '>=', startDate), where('date', '<=', endDate), where('locationId', '==', options.branchId), limit(500)) : query(collection(db, 'timesheets'), where('date', '>=', startDate), where('date', '<=', endDate), limit(1000))));
         
       if (options.exactDate) {
         if (options.empId) {
            timesheetQuery = query(collection(db, 'timesheets'), where('date', '==', options.exactDate), where('empId', '==', options.empId), limit(5));
+        } else if (options.branchId) {
+           timesheetQuery = query(collection(db, 'timesheets'), where('date', '==', options.exactDate), where('locationId', '==', options.branchId), limit(150));
         } else {
            timesheetQuery = query(collection(db, 'timesheets'), where('date', '==', options.exactDate), limit(150));
         }
       } else if (options.isWeek && options.weekStart && options.weekEnd) {
         if (options.empId) {
            timesheetQuery = query(collection(db, 'timesheets'), where('date', '>=', options.weekStart), where('date', '<=', options.weekEnd), where('empId', '==', options.empId), limit(50));
+        } else if (options.branchId) {
+           timesheetQuery = query(collection(db, 'timesheets'), where('date', '>=', options.weekStart), where('date', '<=', options.weekEnd), where('locationId', '==', options.branchId), limit(250));
         } else {
            timesheetQuery = query(collection(db, 'timesheets'), where('date', '>=', options.weekStart), where('date', '<=', options.weekEnd), limit(500));
         }
@@ -342,9 +347,7 @@ export default function App() {
 
               try {
                  localStorage.setItem(cacheStoreKey, JSON.stringify(finalDataToCache));
-                 if (!options.isWeek && !options.exactDate && !options.onlyToday) {
-                    localStorage.setItem(cacheTimestampKey, Date.now().toString());
-                 }
+                 localStorage.setItem(cacheTimestampKey, Date.now().toString());
               } catch (e) {
                  console.warn("LocalStorage full, clearing old caches and retrying...");
                  // If storage is full, we clear ALL cache keys to free space
@@ -360,9 +363,7 @@ export default function App() {
                   // Retry once
                  try {
                      localStorage.setItem(cacheStoreKey, JSON.stringify(finalDataToCache));
-                     if (!options.isWeek && !options.exactDate && !options.onlyToday) {
-                        localStorage.setItem(cacheTimestampKey, Date.now().toString());
-                     }
+                     localStorage.setItem(cacheTimestampKey, Date.now().toString());
                  } catch (e2) {
                      console.warn("LocalStorage still full after clearing, giving up.");
                  }
