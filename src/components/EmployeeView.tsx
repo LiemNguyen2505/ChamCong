@@ -43,7 +43,7 @@ export default function EmployeeView({
   isLoading
 }: {
   globalData: any,
-  fetchInitialData: (monthYear?: string, force?: any | string | string[], options?: { empId?: string, docId?: string, onlyToday?: boolean, exactDate?: string, branchId?: string, isWeek?: boolean, weekStart?: string, weekEnd?: string, targetedKeys?: string[] }) => Promise<any>,
+  fetchInitialData: (monthYear?: string, force?: any | string | string[], options?: { empId?: string, docId?: string, onlyToday?: boolean, exactDate?: string, branchId?: string, isWeek?: boolean, weekStart?: string, weekEnd?: string, targetedKeys?: string[], ignoreEmpIdInjection?: boolean }) => Promise<any>,
   isLoading: boolean
 }) {
   const navigate = useNavigate();
@@ -672,7 +672,8 @@ export default function EmployeeView({
                   isWeek: true,
                   weekStart: formatD(wStart),
                   weekEnd: formatD(wEnd),
-                  branchId: teamScheduleBranch === 'All' ? Object.keys(branchStats)[0] || 'Góc Phố' : teamScheduleBranch 
+                  branchId: teamScheduleBranch === 'All' ? Object.keys(branchStats)[0] || 'Góc Phố' : teamScheduleBranch,
+                  ignoreEmpIdInjection: true
                 });
               }}
             />
