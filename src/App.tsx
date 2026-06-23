@@ -36,7 +36,7 @@ export default function App() {
   const hasInitialLoadedRef = useRef(false);
   const isFetchingInProgress = useRef(false); // GLOBAL FETCH LOCK
 
-  const fetchInitialData = useCallback(async (monthYear?: string, force: boolean | string | string[] = false, baseOptions?: { empId?: string, docId?: string, onlyToday?: boolean, exactDate?: string, branchId?: string, isWeek?: boolean, weekStart?: string, weekEnd?: string, targetedKeys?: string[] }) => {
+  const fetchInitialData = useCallback(async (monthYear?: string, force: boolean | string | string[] = false, baseOptions?: { empId?: string, docId?: string, onlyToday?: boolean, exactDate?: string, branchId?: string, isWeek?: boolean, weekStart?: string, weekEnd?: string, targetedKeys?: string[], ignoreEmpIdInjection?: boolean }) => {
     
     // Inject empId from localStorage if employee is logged in and no admin is logged in
     let options = baseOptions ? { ...baseOptions } : {};
@@ -48,8 +48,8 @@ export default function App() {
     if (!hasSavedAdmin && hasSavedEmployee) {
        try {
           const emp = JSON.parse(savedEmpStr);
-          if (!options.empId && emp.empId) {
-              options.empId = emp.empId;
+          if (!options.empId && (emp.empId || emp.id) && !options.ignoreEmpIdInjection) {
+              options.empId = emp.empId || emp.id;
               options.docId = emp.id;
           }
        } catch(e){}
@@ -123,25 +123,25 @@ export default function App() {
       
       const todayStr = format(new Date(), 'yyyy-MM-dd');
       
-      let timesheetQuery = options.empId 
+      let timesheetQuery = (options.empId || options.docId) 
         ? (options.onlyToday 
-            ? query(collection(db, 'timesheets'), where('date', '==', todayStr), where('empId', '==', options.empId), limit(5)) 
-            : query(collection(db, 'timesheets'), where('date', '>=', startDate), where('date', '<=', endDate), where('empId', '==', options.empId), limit(35))) 
+            ? query(collection(db, 'timesheets'), where('date', '==', todayStr), where('empId', '==', options.docId || options.empId), limit(5)) 
+            : query(collection(db, 'timesheets'), where('date', '>=', startDate), where('date', '<=', endDate), where('empId', '==', options.docId || options.empId), limit(35))) 
         : (options.onlyToday
             ? (options.branchId ? query(collection(db, 'timesheets'), where('date', '==', todayStr), where('locationId', '==', options.branchId), limit(150)) : query(collection(db, 'timesheets'), where('date', '==', todayStr), limit(150)))
             : (options.branchId ? query(collection(db, 'timesheets'), where('date', '>=', startDate), where('date', '<=', endDate), where('locationId', '==', options.branchId), limit(500)) : query(collection(db, 'timesheets'), where('date', '>=', startDate), where('date', '<=', endDate), limit(1000))));
         
       if (options.exactDate) {
-        if (options.empId) {
-           timesheetQuery = query(collection(db, 'timesheets'), where('date', '==', options.exactDate), where('empId', '==', options.empId), limit(5));
+        if (options.empId || options.docId) {
+           timesheetQuery = query(collection(db, 'timesheets'), where('date', '==', options.exactDate), where('empId', '==', options.docId || options.empId), limit(5));
         } else if (options.branchId) {
            timesheetQuery = query(collection(db, 'timesheets'), where('date', '==', options.exactDate), where('locationId', '==', options.branchId), limit(150));
         } else {
            timesheetQuery = query(collection(db, 'timesheets'), where('date', '==', options.exactDate), limit(150));
         }
       } else if (options.isWeek && options.weekStart && options.weekEnd) {
-        if (options.empId) {
-           timesheetQuery = query(collection(db, 'timesheets'), where('date', '>=', options.weekStart), where('date', '<=', options.weekEnd), where('empId', '==', options.empId), limit(50));
+        if (options.empId || options.docId) {
+           timesheetQuery = query(collection(db, 'timesheets'), where('date', '>=', options.weekStart), where('date', '<=', options.weekEnd), where('empId', '==', options.docId || options.empId), limit(50));
         } else if (options.branchId) {
            timesheetQuery = query(collection(db, 'timesheets'), where('date', '>=', options.weekStart), where('date', '<=', options.weekEnd), where('locationId', '==', options.branchId), limit(250));
         } else {
@@ -164,22 +164,24 @@ export default function App() {
              scheduleQuery = query(collection(db, 'LichLamViec'), where('date', '==', options.exactDate), limit(200));
          }
       } else if (options.isWeek && options.weekStart && options.weekEnd) {
-         if (options.branchId) {
+         if (options.empId) {
+             scheduleQuery = query(collection(db, 'LichLamViec'), where('date', '>=', options.weekStart), where('date', '<=', options.weekEnd), where('empId', '==', options.docId || options.empId), limit(50));
+         } else if (options.branchId) {
              scheduleQuery = query(collection(db, 'LichLamViec'), where('date', '>=', options.weekStart), where('date', '<=', options.weekEnd), where('locationId', '==', options.branchId), limit(500));
          } else {
              scheduleQuery = query(collection(db, 'LichLamViec'), where('date', '>=', options.weekStart), where('date', '<=', options.weekEnd), limit(1000));
          }
       }
 
-      let leaveQuery = options.empId 
-        ? query(collection(db, 'XinNghiPhep'), where('empId', '==', options.empId), where('leaveDate', '>=', startDate), where('leaveDate', '<=', endDate), limit(100)) 
+      let leaveQuery = (options.empId || options.docId) 
+        ? query(collection(db, 'XinNghiPhep'), where('empId', '==', options.docId || options.empId), where('leaveDate', '>=', startDate), where('leaveDate', '<=', endDate), limit(100)) 
         : query(collection(db, 'XinNghiPhep'), where('leaveDate', '>=', startDate), where('leaveDate', '<=', endDate), limit(1000));
         
       if (options.exactDate) {
-        if (options.empId) {
-          leaveQuery = query(collection(db, 'XinNghiPhep'), where('empId', '==', options.empId), where('leaveDate', '==', options.exactDate), limit(5));
+        if (options.empId || options.docId) {
+           leaveQuery = query(collection(db, 'XinNghiPhep'), where('empId', '==', options.docId || options.empId), where('leaveDate', '==', options.exactDate), limit(5));
         } else {
-          leaveQuery = query(collection(db, 'XinNghiPhep'), where('leaveDate', '==', options.exactDate), limit(200));
+           leaveQuery = query(collection(db, 'XinNghiPhep'), where('leaveDate', '==', options.exactDate), limit(200));
         }
       }
 
@@ -191,8 +193,8 @@ export default function App() {
         { key: 'auditLogs', query: query(collection(db, 'AuditLogs'), orderBy('timestamp', 'desc'), limit(15)), type: 'lazy' },
         { key: 'holidays', query: query(collection(db, 'Holidays'), limit(50)), type: 'static' },
         { key: 'materialItems', query: query(collection(db, 'MaterialItems'), limit(50)), type: 'static' },
-        { key: 'payrollAdjustments', query: options.empId ? query(collection(db, 'PayrollAdjustments'), where('monthYear', '==', targetMonth), where('empId', '==', options.empId)) : query(collection(db, 'PayrollAdjustments'), where('monthYear', '==', targetMonth)), type: 'lazy' },
-        { key: 'violations', query: options.empId ? query(collection(db, 'Violations'), where('monthYear', '==', targetMonth), where('empId', '==', options.empId)) : query(collection(db, 'Violations'), where('monthYear', '==', targetMonth)), type: 'lazy' },
+        { key: 'payrollAdjustments', query: (options.empId || options.docId) ? query(collection(db, 'PayrollAdjustments'), where('monthYear', '==', targetMonth), where('empId', '==', options.docId || options.empId)) : query(collection(db, 'PayrollAdjustments'), where('monthYear', '==', targetMonth)), type: 'lazy' },
+        { key: 'violations', query: (options.empId || options.docId) ? query(collection(db, 'Violations'), where('monthYear', '==', targetMonth), where('empId', '==', options.docId || options.empId)) : query(collection(db, 'Violations'), where('monthYear', '==', targetMonth)), type: 'lazy' },
         { key: 'materialLossLogs', query: query(collection(db, 'MaterialLossLogs'), where('monthYear', '==', targetMonth), orderBy('processedAt', 'desc'), limit(100)), type: 'lazy' },
         { key: 'retainedSalaryRecords', query: query(collection(db, 'RetainedSalaryRecords'), orderBy('createdAt', 'desc'), limit(500)), type: 'lazy' },
         { key: 'chamCongs', query: timesheetQuery, type: 'lazy' },
@@ -281,8 +283,16 @@ export default function App() {
         // ALWAYS CACHE EVERYTHING TO PREVENT QUOTA EXHAUSTION
         // Admin: cache is extremely aggressive. Employee: use smaller cache slices.
         const CACHE_TTL = 1000 * 60 * 60 * 4; // 4 hours for Admins / Users unless forced
-        const cacheStoreKey = `db_cache_${c.key}_${options.empId || 'all'}_${targetMonth}${routeSuffix}`;
-        const cacheTimestampKey = `db_cache_time_${c.key}_${options.empId || 'all'}_${targetMonth}${routeSuffix}`;
+        
+        // SECURITY/PERFORMANCE: Global collections MUST NOT include empId in cache key, 
+        // otherwise 50 employees sharing an iPad will create 50 identical cache sets and 50x read spike!
+        const isGlobalCollection = ['nhanViens', 'admins', 'holidays', 'planningGoals', 'AppNotifications', 'materialItems'].includes(c.key);
+        const cacheEmpScope = isGlobalCollection ? 'all' : (options.empId || 'all');
+        const branchSuffix = options.branchId ? `_br_${options.branchId}` : '';
+        const realRouteSuffix = routeSuffix + branchSuffix;
+        
+        const cacheStoreKey = `db_cache_${c.key}_${cacheEmpScope}_${targetMonth}${realRouteSuffix}`;
+        const cacheTimestampKey = `db_cache_time_${c.key}_${cacheEmpScope}_${targetMonth}${realRouteSuffix}`;
         
         // Ensure Admin has total cutoff of read quota if F5
         let shouldFetch = true;
