@@ -12,7 +12,7 @@ export const useEmployeeAttendance = (
   kioskBranch: string | null,
   workSchedules: any[],
   latestLog: any,
-  fetchInitialData: (monthYear?: string, force?: any, options?: {empId?: string, docId?: string, onlyToday?: boolean, exactDate?: string, branchId?: string, isWeek?: boolean, weekStart?: string, weekEnd?: string, targetedKeys?: string[]}) => Promise<any>,
+  fetchInitialData: (monthYear?: string, force?: any, options?: {empId?: string, docId?: string, onlyToday?: boolean, exactDate?: string, branchId?: string, isWeek?: boolean, weekStart?: string, weekEnd?: string, targetedKeys?: string[], ignoreEmpIdInjection?: boolean}) => Promise<any>,
   admins: any[]
 ) => {
   const [actionType, setActionType] = useState<'check-in' | 'check-out' | null>(null);
