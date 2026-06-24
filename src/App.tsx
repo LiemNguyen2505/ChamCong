@@ -55,6 +55,12 @@ export default function App() {
        } catch(e){}
     }
 
+    const empId = options.empId || options.docId;
+    if (!hasSavedAdmin && (!empId || empId === 'undefined' || empId === null)) {
+       console.warn("⛔ KILL SWITCH TRIGGERED: fetchInitialData blocked because empId is not resolved yet.");
+       return;
+    }
+
     const targetMonth = monthYear || format(new Date(), 'yyyy-MM');
     const todayLiteral = format(new Date(), 'yyyy-MM-dd');
     const routeSuffix = options.isWeek ? `_week_${options.weekStart}` : (options.onlyToday ? `_today_${todayLiteral}` : (options.exactDate ? `_${options.exactDate}` : ''));
