@@ -472,8 +472,9 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    // Always fetch data on mount so we have data for login screen
-    fetchInitialData();
+    // Only fetch minimal required data (nhanViens, admins) on mount for the login screen.
+    // Dashboard and individual views will fetch their own heavy collections like chamCongs on demand.
+    fetchInitialData(undefined, false, { targetedKeys: ['nhanViens', 'admins'] });
 
     const unsubscribe = onAuthStateChanged(auth, (user) => {
       setCurrentUser(user);
