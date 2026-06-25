@@ -26,8 +26,7 @@ export function useSmartScheduleBuilder(props: SmartScheduleBuilderProps) {
   exportToCSV,
   theme,
   planningGoals = [],
-  isReadOnly = false,
-  onDateChange
+  isReadOnly = false
   } = props;
 
 
@@ -162,17 +161,6 @@ export function useSmartScheduleBuilder(props: SmartScheduleBuilderProps) {
   const [isQuickEditMode, setIsQuickEditMode] = useState(false);
   const [selectedQuickShift, setSelectedQuickShift] = useState<'Sáng' | 'Trưa' | 'Tối' | 'OFF' | null>(null);
   const [mobileSelectedDate, setMobileSelectedDate] = useState(format(new Date(), 'yyyy-MM-dd'));
-
-  const onDateChangeRef = useRef(onDateChange);
-  useEffect(() => {
-    onDateChangeRef.current = onDateChange;
-  }, [onDateChange]);
-
-  useEffect(() => {
-    if (onDateChangeRef.current) {
-      onDateChangeRef.current(mobileSelectedDate);
-    }
-  }, [mobileSelectedDate]);
 
   // Local state for batch saving
   const [localSchedules, setLocalSchedules] = useState<WorkSchedule[]>(schedules);
