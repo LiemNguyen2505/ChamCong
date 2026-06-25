@@ -281,7 +281,6 @@ export default function AdminView({
     auditLogs,
     materialLossLogs,
     retainedSalaryRecords,
-    salaryAdvanceRecords,
     materialItems,
     holidays
   } = logic;
@@ -566,21 +565,6 @@ export default function AdminView({
               fetchInitialData={fetchInitialData}
               exportToCSV={exportToCSV}
               BranchTabs={CommonBranchTabs}
-              onDateChange={(date) => {
-                 const [y, m, d] = date.split('-').map(Number);
-                 const dDate = new Date(y, m - 1, d);
-                 const wStart = new Date(dDate); wStart.setDate(wStart.getDate() - 3);
-                 const wEnd = new Date(dDate); wEnd.setDate(wEnd.getDate() + 10);
-                 const formatD = (dateObj: Date) => {
-                    return `${dateObj.getFullYear()}-${String(dateObj.getMonth() + 1).padStart(2, '0')}-${String(dateObj.getDate()).padStart(2, '0')}`;
-                 };
-                 fetchInitialData(undefined, false, {
-                    targetedKeys: ['lichLamViecs'],
-                    isWeek: true,
-                    weekStart: formatD(wStart),
-                    weekEnd: formatD(wEnd)
-                 });
-              }}
             />
           )}
 
@@ -719,7 +703,7 @@ export default function AdminView({
           monthYear={editingAdjustment.monthYear}
           empId={editingAdjustment.empId}
           onClose={() => setEditingAdjustment(null)}
-          onSave={() => { setEditingAdjustment(null); fetchInitialData(filterMonth, ['payrollAdjustments']); }}
+          onSave={() => { setEditingAdjustment(null); fetchInitialData(filterMonth, true, { targetedKeys: ['payrollAdjustments'] }); }}
           adminTheme={adminTheme}
         />
       )}
@@ -793,7 +777,6 @@ export default function AdminView({
         handlePayrollChange={handlePayrollChange}
         currentAdmin={currentAdmin}
         retainedSalaryRecords={retainedSalaryRecords}
-        salaryAdvanceRecords={salaryAdvanceRecords}
       />
 
             </div>
