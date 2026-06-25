@@ -67,6 +67,14 @@ export default function App() {
     const cacheKey = `${targetMonth}_${options.empId || 'all'}_${options.exactDate || options.onlyToday ? 'today' : 'month'}${routeSuffix}`;
     const now = Date.now();
     
+    if (!hasSavedAdmin && hasSavedEmployee && cacheKey === `${targetMonth}_all_month`) {
+       const keysToCheck = options.targetedKeys || (Array.isArray(force) ? force : []);
+       if (!keysToCheck.length || keysToCheck.some(k => ['chamCongs', 'lichLamViecs', 'violations', 'payrollAdjustments'].includes(k))) {
+           console.warn(`⛔ [SECURITY] Blocked Employee from fetching heavy global data: ${cacheKey}`);
+           return;
+       }
+    }
+    
     // 0. AVOID FLOODING DURING CRASHES
     if ((window as any).isCriticalErrorLock) return;
     (window as any).fetchCallCount = ((window as any).fetchCallCount || 0) + 1;
@@ -316,6 +324,37 @@ export default function App() {
                  } catch(e) {}
                }
            }
+           
+           // CRITICAL OPTIMIZATION: If requesting today/week, check if we already have the FULL MONTH cached
+           if (shouldFetch && routeSuffix !== '_month') {
+               const monthStoreKey = `db_cache_${c.key}_${cacheEmpScope}_${targetMonth}_month${branchSuffix}`;
+               const monthTimeKey = `db_cache_time_${c.key}_${cacheEmpScope}_${targetMonth}_month${branchSuffix}`;
+               const monthSavedTime = localStorage.getItem(monthTimeKey);
+               if (monthSavedTime && (Date.now() - parseInt(monthSavedTime)) < CACHE_TTL) {
+                  const monthDataStr = localStorage.getItem(monthStoreKey);
+                  if (monthDataStr) {
+                     try {
+                        const monthData = JSON.parse(monthDataStr);
+                        if (Array.isArray(monthData)) {
+                            let qStart = startDate;
+                            let qEnd = endDate;
+                            if (options.exactDate) { qStart = options.exactDate; qEnd = options.exactDate; }
+                            else if (options.onlyToday) { qStart = format(new Date(), 'yyyy-MM-dd'); qEnd = qStart; }
+                            else if (options.isWeek && options.weekStart && options.weekEnd) { qStart = options.weekStart; qEnd = options.weekEnd; }
+                            
+                            const dateField = 'date';
+                            const filtered = monthData.filter((item: any) => {
+                                const itemDate = item[dateField];
+                                if (!itemDate) return true;
+                                return itemDate >= qStart && itemDate <= qEnd;
+                            });
+                            console.log(`✅ [CACHE HIT] Found full month for ${c.key}, filtering locally for ${qStart} to ${qEnd}`);
+                            return { key: c.key, data: filtered };
+                        }
+                     } catch(e) {}
+                  }
+               }
+           }
         }
         
         if (shouldFetch) {
@@ -472,6 +511,9 @@ export default function App() {
   }, []);
 
   useEffect(() => {
+    if (hasInitialLoadedRef.current) return;
+    hasInitialLoadedRef.current = true;
+
     // Only fetch minimal required data (nhanViens, admins) on mount for the login screen.
     // Dashboard and individual views will fetch their own heavy collections like chamCongs on demand.
     fetchInitialData(undefined, false, { targetedKeys: ['nhanViens', 'admins'] });
@@ -483,7 +525,7 @@ export default function App() {
     return () => {
       unsubscribe();
     };
-  }, [fetchInitialData]);
+  }, []);
 
   return (
     <Router>
