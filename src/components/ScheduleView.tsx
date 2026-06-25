@@ -16,34 +16,12 @@ interface ScheduleViewProps {
     fetchInitialData: (month?: string, force?: any, options?: any) => Promise<any>;
     exportToCSV: () => void;
     BranchTabs: React.ComponentType;
-    onDateChange?: (date: string) => void;
 }
 
 export const ScheduleView: React.FC<ScheduleViewProps> = ({
     nhanViens, lichLamViecs, filterBranch, filterMonth, setGlobalData, currentAdmin, planningGoals, adminTheme,
-    setIsScheduleModalOpen, fetchInitialData, exportToCSV, BranchTabs, onDateChange
+    setIsScheduleModalOpen, fetchInitialData, exportToCSV, BranchTabs
 }) => {
-    const currentWeekDateRef = React.useRef<string | null>(null);
-
-    const handleRefetchWeek = async () => {
-        if (currentWeekDateRef.current) {
-            const [y, m, d] = currentWeekDateRef.current.split('-').map(Number);
-            const dDate = new Date(y, m - 1, d);
-            const wStart = new Date(dDate); wStart.setDate(wStart.getDate() - 3);
-            const wEnd = new Date(dDate); wEnd.setDate(wEnd.getDate() + 10);
-            const formatD = (dateObj: Date) => {
-                return `${dateObj.getFullYear()}-${String(dateObj.getMonth() + 1).padStart(2, '0')}-${String(dateObj.getDate()).padStart(2, '0')}`;
-            };
-            
-            await fetchInitialData(undefined, true, {
-                targetedKeys: ['lichLamViecs'],
-                isWeek: true,
-                weekStart: formatD(wStart),
-                weekEnd: formatD(wEnd)
-            });
-        }
-    };
-
     return (
         <div className="pt-0 px-1 md:p-6 h-full flex flex-col overflow-hidden">
             <div className="px-3 md:px-0 mb-1">
@@ -58,10 +36,6 @@ export const ScheduleView: React.FC<ScheduleViewProps> = ({
                 theme={adminTheme}
                 exportToCSV={exportToCSV}
                 filterMonth={filterMonth}
-                onDateChange={(date) => {
-                    currentWeekDateRef.current = date;
-                    if (onDateChange) onDateChange(date);
-                }}
                 onModalToggle={(isOpen) => setIsScheduleModalOpen(isOpen)}
                 onAddShift={async (shift) => {
                     try {
