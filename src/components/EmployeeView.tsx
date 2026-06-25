@@ -658,24 +658,6 @@ export default function EmployeeView({
               onDeleteShift={async () => {}}
               isReadOnly={true}
               planningGoals={[]}
-              onDateChange={(date) => {
-                const [y, m, d] = date.split('-').map(Number);
-                const dDate = new Date(y, m - 1, d);
-                const wStart = new Date(dDate); wStart.setDate(wStart.getDate() - 3);
-                const wEnd = new Date(dDate); wEnd.setDate(wEnd.getDate() + 10);
-                const formatD = (dateObj: Date) => {
-                   return `${dateObj.getFullYear()}-${String(dateObj.getMonth() + 1).padStart(2, '0')}-${String(dateObj.getDate()).padStart(2, '0')}`;
-                };
-
-                fetchInitialData(undefined, false, { 
-                  targetedKeys: ['lichLamViecs'], 
-                  isWeek: true,
-                  weekStart: formatD(wStart),
-                  weekEnd: formatD(wEnd),
-                  branchId: teamScheduleBranch === 'All' ? Object.keys(branchStats)[0] || 'Góc Phố' : teamScheduleBranch,
-                  ignoreEmpIdInjection: true
-                });
-              }}
             />
           </div>
         </div>
