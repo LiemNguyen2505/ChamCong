@@ -28,7 +28,6 @@ export interface SmartScheduleBuilderProps {
   theme?: any;
   planningGoals?: any[];
   isReadOnly?: boolean;
-  onDateChange?: (date: string) => void;
 }
 
 export const SmartScheduleBuilder: React.FC<SmartScheduleBuilderProps> = (props) => {
