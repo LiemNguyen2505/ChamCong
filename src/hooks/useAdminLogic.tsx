@@ -295,7 +295,7 @@ export function useAdminLogic(globalData: any, fetchInitialData: any, isLoading:
        keysToLoad.add('holidays');
     }
     else if (activeTab === 'lichlamviec') {
-       // lichLamViecs will be fetched via onDateChange week by week!
+       keysToLoad.add('lichLamViecs');
        keysToLoad.add('planningGoals');
     }
     else if (activeTab === 'vipham') {
