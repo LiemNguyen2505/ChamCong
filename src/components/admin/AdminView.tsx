@@ -430,6 +430,12 @@ export default function AdminView({
                 getPreviousMonthRates={getPreviousMonthRates}
                 toast={toast}
                 BranchTabs={CommonBranchTabs}
+                onRefresh={() => {
+                   fetchInitialData(filterMonth, true, { 
+                     targetedKeys: ['chamCongs', 'lichLamViecs', 'payrollAdjustments', 'violations', 'holidays'], 
+                     branchId: filterBranch !== 'All' ? filterBranch : undefined 
+                   }).then(() => toast.success('Đã cập nhật dữ liệu Dashboard mới nhất!'));
+                }}
               />
 
           <AttendanceTab
