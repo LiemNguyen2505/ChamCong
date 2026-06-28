@@ -278,14 +278,14 @@ export function useAdminLogic(globalData: any, fetchInitialData: any, isLoading:
     
     // Load based on active Tab
     if (activeTab === 'dashboard') {
-       // OPTIMIZATION: Do not fetch entire month `chamCongs` and `lichLamViecs` on dashboard
-       // as that consumes thousands of reads on first load! We only fetch today's data for active shift tracking.
-       fetchInitialData(filterMonth, false, { 
-         targetedKeys: ['chamCongs', 'lichLamViecs'], 
-         onlyToday: true,
-         branchId: filterBranch !== 'All' ? filterBranch : undefined 
-       })
-         .catch(e => console.error("Error fetching today dashboard data:", e));
+       if (!loadedKeysRef.current.has(`${filterMonth}-${filterBranch}-dashboard`)) {
+           loadedKeysRef.current.add(`${filterMonth}-${filterBranch}-dashboard`);
+           fetchInitialData(filterMonth, false, { 
+             targetedKeys: ['chamCongs', 'lichLamViecs', 'payrollAdjustments', 'violations', 'holidays'], 
+             branchId: filterBranch !== 'All' ? filterBranch : undefined 
+           })
+             .catch(e => console.error("Error fetching dashboard data:", e));
+       }
     }
     else if (activeTab === 'bangluong' || activeTab === 'bangcongthang') {
        keysToLoad.add('chamCongs');
