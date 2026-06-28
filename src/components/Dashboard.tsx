@@ -1,7 +1,7 @@
 import React from 'react';
 import { format } from 'date-fns';
 import { vi } from 'date-fns/locale';
-import { Users, AlertCircle, DollarSign, TrendingUp, CheckCircle2, Clock, ChevronDown, Wallet } from 'lucide-react';
+import { Users, AlertCircle, DollarSign, TrendingUp, CheckCircle2, Clock, ChevronDown, Wallet, RefreshCw } from 'lucide-react';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip as RechartsTooltip } from 'recharts';
 import { Employee, Timesheet, AdminAccount, PayrollAdjustment, ApprovalRequest } from '../types/admin';
 import { findEmployee } from '../utils/adminHelpers';
@@ -22,6 +22,7 @@ interface DashboardProps {
   getPreviousMonthRates: (empId: string, monthYear: string, adjustments: PayrollAdjustment[]) => any;
   toast: any;
   BranchTabs: React.FC<any>;
+  onRefresh?: () => void;
 }
 
 // Memoized Personnel Overview
@@ -227,7 +228,8 @@ export const Dashboard: React.FC<DashboardProps> = ({
   formatCurrency,
   getPreviousMonthRates,
   toast,
-  BranchTabs
+  BranchTabs,
+  onRefresh
 }) => {
   const [monthlyTargetHours, setMonthlyTargetHours] = React.useState(() => {
     const saved = localStorage.getItem(`targetHours_${filterBranch}`);
@@ -340,7 +342,18 @@ export const Dashboard: React.FC<DashboardProps> = ({
         <BranchTabs />
       </div>
       <div className="flex flex-row justify-between items-end px-3 md:px-0 mb-6 pt-6 md:pt-2">
-        <h2 className="text-[18px] md:text-4xl font-black text-slate-900 tracking-tight leading-none uppercase">TỔNG QUAN</h2>
+        <div className="flex items-center gap-3">
+          <h2 className="text-[18px] md:text-4xl font-black text-slate-900 tracking-tight leading-none uppercase">TỔNG QUAN</h2>
+          {onRefresh && (
+            <button 
+              onClick={onRefresh}
+              className={`p-2 rounded-xl transition-all flex items-center justify-center bg-stone-100 text-stone-600 hover:bg-stone-200`}
+              title="Làm mới dữ liệu"
+            >
+              <RefreshCw className="w-5 h-5" strokeWidth={2.5} />
+            </button>
+          )}
+        </div>
         <div className="text-[13px] md:text-lg text-slate-500 font-black opacity-90 uppercase tracking-widest leading-none">
           {format(new Date(), "dd/MM/yyyy", { locale: vi })}
         </div>
