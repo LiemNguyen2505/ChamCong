@@ -266,11 +266,19 @@ export function useAdminLogic(globalData: any, fetchInitialData: any, isLoading:
 
   const loadedKeysRef = useRef<Set<string>>(new Set());
 
+  const getLoadedKeys = () => {
+    if (!(window as any).__adminLoadedKeys) {
+      (window as any).__adminLoadedKeys = new Set<string>();
+    }
+    return (window as any).__adminLoadedKeys as Set<string>;
+  };
+
   // STABILIZER: Cô lập fetch data vào 1 useEffect duy nhất, load theo Tab để giảm số lượng read database
   useEffect(() => {
     if (!isAuthenticated) return;
     
     const keysToLoad = new Set<string>();
+    const loadedKeys = getLoadedKeys();
     
     // Always load these globally required ones (small static tables)
     keysToLoad.add('nhanViens');
@@ -278,8 +286,8 @@ export function useAdminLogic(globalData: any, fetchInitialData: any, isLoading:
     
     // Load based on active Tab
     if (activeTab === 'dashboard') {
-       if (!loadedKeysRef.current.has(`${filterMonth}-${filterBranch}-dashboard`)) {
-           loadedKeysRef.current.add(`${filterMonth}-${filterBranch}-dashboard`);
+       if (!loadedKeys.has(`${filterMonth}-${filterBranch}-dashboard`)) {
+           loadedKeys.add(`${filterMonth}-${filterBranch}-dashboard`);
            fetchInitialData(filterMonth, false, { 
              targetedKeys: ['chamCongs', 'lichLamViecs', 'payrollAdjustments', 'violations', 'holidays'], 
              branchId: filterBranch !== 'All' ? filterBranch : undefined 
@@ -287,7 +295,19 @@ export function useAdminLogic(globalData: any, fetchInitialData: any, isLoading:
              .catch(e => console.error("Error fetching dashboard data:", e));
        }
     }
-    else if (activeTab === 'bangluong' || activeTab === 'bangcongthang') {
+    else if (activeTab === 'bangcongthang') {
+       const targetDate = historyDay || format(new Date(), 'yyyy-MM-dd');
+       const cacheKey = `${filterMonth}-${filterBranch}-daily-bangcong-${targetDate}`;
+       if (!loadedKeys.has(cacheKey)) {
+           loadedKeys.add(cacheKey);
+           fetchInitialData(filterMonth, false, { 
+             targetedKeys: ['chamCongs', 'lichLamViecs'], 
+             exactDate: targetDate,
+             branchId: filterBranch !== 'All' ? filterBranch : undefined 
+           }).catch(e => console.error("Error fetching bangcongthang data:", e));
+       }
+    }
+    else if (activeTab === 'bangluong') {
        keysToLoad.add('chamCongs');
        keysToLoad.add('lichLamViecs');
        keysToLoad.add('payrollAdjustments');
@@ -309,11 +329,11 @@ export function useAdminLogic(globalData: any, fetchInitialData: any, isLoading:
     }
 
     const newKeysToFetch = Array.from(keysToLoad).filter(key => 
-       !loadedKeysRef.current.has(`${filterMonth}-${key}`)
+       !loadedKeys.has(`${filterMonth}-${key}`)
     );
 
     if (newKeysToFetch.length > 0) {
-      newKeysToFetch.forEach(k => loadedKeysRef.current.add(`${filterMonth}-${k}`));
+      newKeysToFetch.forEach(k => loadedKeys.add(`${filterMonth}-${k}`));
       
       const loadData = async () => {
         try {
@@ -328,7 +348,7 @@ export function useAdminLogic(globalData: any, fetchInitialData: any, isLoading:
 
       loadData();
     }
-  }, [filterMonth, filterBranch, isAuthenticated, activeTab, fetchInitialData]);
+  }, [filterMonth, filterBranch, isAuthenticated, activeTab, fetchInitialData, historyDay]);
 
   const isLoadingRef = useRef('');
 
