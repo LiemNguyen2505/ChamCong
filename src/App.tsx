@@ -61,6 +61,11 @@ export default function App() {
        return;
     }
 
+    if (document.hidden || !navigator.onLine) {
+       console.warn("⛔ FETCH BLOCKED: Background tab or offline detected.");
+       return;
+    }
+
     const targetMonth = monthYear || format(new Date(), 'yyyy-MM');
     const todayLiteral = format(new Date(), 'yyyy-MM-dd');
     const routeSuffix = options.isWeek ? `_week_${options.weekStart}` : (options.onlyToday ? `_today_${todayLiteral}` : (options.exactDate ? `_${options.exactDate}` : ''));
