@@ -107,7 +107,8 @@ const FinancialMetrics = React.memo(({
   formatCurrency, 
   filterMonth, 
   setActiveTab, 
-  toast 
+  toast,
+  onRefresh
 }: {
   totalSalary: number,
   totalHoursMonth: number,
@@ -119,7 +120,8 @@ const FinancialMetrics = React.memo(({
   formatCurrency: (val: number) => string,
   filterMonth: string,
   setActiveTab: (tab: string) => void,
-  toast: any
+  toast: any,
+  onRefresh?: () => void
 }) => {
   return (
     <div className="bg-white rounded-xl md:rounded-3xl border border-stone-100 shadow-sm p-4 md:p-8 group md:flex-1">
@@ -133,18 +135,16 @@ const FinancialMetrics = React.memo(({
               <h3 className={`font-black text-white ${adminTheme.accent} px-3 py-1.5 rounded-lg text-[13px] md:text-lg uppercase tracking-tight leading-none inline-block shadow-sm`}>
                 LƯƠNG HÔM NAY
               </h3>
-              <div className="flex items-center gap-1 text-emerald-600 font-black text-[8px] uppercase tracking-widest bg-emerald-50 px-1.5 py-0.5 rounded-lg border border-emerald-100">
-                <TrendingUp className="w-2.5 h-2.5" /> REAL-TIME
-              </div>
             </div>
             <p className="text-[9px] font-bold text-stone-400 uppercase tracking-widest mt-2 opacity-60">DỰ TOÁN {filterMonth}</p>
           </div>
         </div>
         <button 
-          onClick={() => setActiveTab('bangluong')}
-          className="p-2 bg-stone-50 rounded-xl text-stone-400"
+          onClick={onRefresh}
+          className="p-2 bg-stone-50 rounded-xl text-stone-400 hover:bg-stone-200 transition-colors"
+          title="Tải lại dữ liệu"
         >
-          <ChevronDown className="w-4 h-4 -rotate-90" />
+          <RefreshCw className="w-4 h-4" />
         </button>
       </div>
 
@@ -378,6 +378,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
             filterMonth={filterMonth}
             setActiveTab={setActiveTab}
             toast={toast}
+            onRefresh={onRefresh}
         />
       </div>
     </div>
